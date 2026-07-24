@@ -1,0 +1,60 @@
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <PropertyGroup>
+        <ProjectGuid>{12FC295A-769F-4A1C-B9AB-81F4F08F9923}</ProjectGuid>
+    </PropertyGroup>
+    <ItemGroup>
+        <Projects Include="Desktop\ProjDesktopREST.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="ServidorConsole\ServidorConsole.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="ServidorWinService\ServidorWinService.dproj">
+            <Dependencies/>
+        </Projects>
+    </ItemGroup>
+    <ProjectExtensions>
+        <Borland.Personality>Default.Personality.12</Borland.Personality>
+        <Borland.ProjectType/>
+        <BorlandProject>
+            <Default.Personality/>
+        </BorlandProject>
+    </ProjectExtensions>
+    <Target Name="ProjDesktopREST">
+        <MSBuild Projects="Desktop\ProjDesktopREST.dproj"/>
+    </Target>
+    <Target Name="ProjDesktopREST:Clean">
+        <MSBuild Projects="Desktop\ProjDesktopREST.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="ProjDesktopREST:Make">
+        <MSBuild Projects="Desktop\ProjDesktopREST.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="ServidorConsole">
+        <MSBuild Projects="ServidorConsole\ServidorConsole.dproj"/>
+    </Target>
+    <Target Name="ServidorConsole:Clean">
+        <MSBuild Projects="ServidorConsole\ServidorConsole.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="ServidorConsole:Make">
+        <MSBuild Projects="ServidorConsole\ServidorConsole.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="ServidorWinService">
+        <MSBuild Projects="ServidorWinService\ServidorWinService.dproj"/>
+    </Target>
+    <Target Name="ServidorWinService:Clean">
+        <MSBuild Projects="ServidorWinService\ServidorWinService.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="ServidorWinService:Make">
+        <MSBuild Projects="ServidorWinService\ServidorWinService.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="Build">
+        <CallTarget Targets="ProjDesktopREST;ServidorConsole;ServidorWinService"/>
+    </Target>
+    <Target Name="Clean">
+        <CallTarget Targets="ProjDesktopREST:Clean;ServidorConsole:Clean;ServidorWinService:Clean"/>
+    </Target>
+    <Target Name="Make">
+        <CallTarget Targets="ProjDesktopREST:Make;ServidorConsole:Make;ServidorWinService:Make"/>
+    </Target>
+    <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
+</Project>

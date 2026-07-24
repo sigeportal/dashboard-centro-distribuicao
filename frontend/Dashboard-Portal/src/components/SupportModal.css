@@ -1,0 +1,165 @@
+/* Support Modal Overlay */
+.support-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(11, 28, 48, 0.45);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: overlayFadeIn 0.25s ease-out;
+}
+
+/* Support Modal */
+.support-modal {
+  background: var(--bg-secondary);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 1.5rem;
+  width: 100%;
+  max-width: 440px;
+  padding: 2rem;
+  box-shadow: var(--shadow-level-3);
+  animation: modalSlideIn 0.3s ease-out;
+  margin: 1rem;
+}
+
+.support-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+}
+
+.support-modal-header h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.support-modal-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.04);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.support-modal-close:hover {
+  background: rgba(186, 26, 26, 0.1);
+  color: var(--danger);
+}
+
+.support-modal-desc {
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  margin-bottom: 1.75rem;
+}
+
+.support-options {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.support-option-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.25rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: rgba(255, 255, 255, 0.4);
+  text-decoration: none;
+  color: inherit;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+}
+
+.support-option-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-level-1);
+}
+
+.icon-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
+.option-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.option-label {
+  font-size: 0.8rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+}
+
+.option-value {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* Email Card Specifics */
+.email-card {
+  border-left: 4px solid var(--info);
+}
+
+.email-card .icon-wrapper {
+  background: rgba(0, 101, 145, 0.08);
+  color: var(--info);
+}
+
+.email-card:hover {
+  background: rgba(0, 101, 145, 0.03);
+  border-color: var(--info);
+}
+
+/* WhatsApp Card Specifics */
+.whatsapp-card {
+  border-left: 4px solid #25D366;
+}
+
+.whatsapp-card .icon-wrapper {
+  background: rgba(37, 211, 102, 0.08);
+  color: #25D366;
+}
+
+.whatsapp-card:hover {
+  background: rgba(37, 211, 102, 0.03);
+  border-color: #25D366;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .support-modal {
+    margin: 0.75rem;
+    padding: 1.5rem;
+  }
+}

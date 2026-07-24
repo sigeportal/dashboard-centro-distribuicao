@@ -1,0 +1,86 @@
+{
+	"hash": "d41d8cd98f00b204e9800998ecf8427e",
+	"updated": "2022-10-03T11:12:05.6226491-04:00",
+	"installedModules": {
+		"github.com/paolo-rossi/delphi-jose-jwt": {
+			"name": "delphi-jose-jwt",
+			"version": "v3.0.2",
+			"hash": "1d7fa80f250fee6a43d92408bcff8826",
+			"artifacts": {},
+			"failed": false,
+			"changed": false
+		},
+		"github.com/viniciussanchez/dataset-serialize": {
+			"name": "dataset-serialize",
+			"version": "v2.4.9",
+			"hash": "9642b3cc260cb708f855c37b12151b1a",
+			"artifacts": {},
+			"failed": false,
+			"changed": false
+		},
+		"github.com/viniciussanchez/restrequest4delphi": {
+			"name": "restrequest4delphi",
+			"version": "v4.0.3",
+			"hash": "d5cb49c57be102f0eb1d81b94603aa7f",
+			"artifacts": {},
+			"failed": false,
+			"changed": true
+		},
+		"https://github.com/cachopaweb/clientrest": {
+			"name": "clientrest",
+			"version": "1.0.5",
+			"hash": "098d0e128d57e8d9692d398c1a28d0c5",
+			"artifacts": {},
+			"failed": false,
+			"changed": false
+		},
+		"https://github.com/cachopaweb/factory-connections": {
+			"name": "factory-connections",
+			"version": "v1.0.3",
+			"hash": "a6ad8c2ddb9952af6e2a0f311d14aaa0",
+			"artifacts": {},
+			"failed": false,
+			"changed": false
+		},
+		"https://github.com/cachopaweb/portalorm": {
+			"name": "portalorm",
+			"version": "v1.0.17",
+			"hash": "b1cb3de6aac84d40dbcc4b7e6f8a1e35",
+			"artifacts": {},
+			"failed": false,
+			"changed": false
+		},
+		"https://github.com/schneiderinfosystems/fb4d": {
+			"name": "fb4d",
+			"version": "1.5.0",
+			"hash": "ee80174077c2c6585ae02fd4ff39c29b",
+			"artifacts": {},
+			"failed": false,
+			"changed": false
+		},
+		"https://github.com/viniciussanchez/dataset-serialize": {
+			"name": "dataset-serialize",
+			"version": "v2.4.8",
+			"hash": "f0a2ca8e5cfcec74593bad062094e6b7",
+			"artifacts": {},
+			"failed": false,
+			"changed": false
+		},
+		"https://github.com/viniciussanchez/dataset-serialize-adapter-restrequest4delphi": {
+			"name": "dataset-serialize-adapter-restrequest4delphi",
+			"version": "1.0.1",
+			"hash": "4aff6a2f91271d4a37b711a547201752",
+			"artifacts": {},
+			"failed": false,
+			"changed": false
+		},
+		"https://github.com/viniciussanchez/restrequest4delphi": {
+			"name": "restrequest4delphi",
+			"version": "v4.0.3",
+			"hash": "d5cb49c57be102f0eb1d81b94603aa7f",
+			"artifacts": {},
+			"failed": false,
+			"changed": false
+		}
+	}
+}

@@ -1,0 +1,15 @@
+{
+	"name": "Desktop",
+	"description": "",
+	"version": "1.0.0",
+	"homepage": "",
+	"mainsrc": "./src",
+	"projects": [],
+	"dependencies": {
+		"https://github.com/cachopaweb/portalorm": "^v1.0.7",
+		"https://github.com/schneiderinfosystems/fb4d": "^1.5.0",
+		"https://github.com/viniciussanchez/dataset-serialize": "^v2.4.5",
+		"https://github.com/viniciussanchez/dataset-serialize-adapter-restrequest4delphi": "^1.0.1",
+		"https://github.com/viniciussanchez/restrequest4delphi": "^v4.0.3"
+	}
+}

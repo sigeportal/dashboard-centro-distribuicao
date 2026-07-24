@@ -1,0 +1,61 @@
+import { Link } from 'react-router-dom';
+import { LayoutDashboard, Users, Package, ArrowRightLeft, DollarSign, ShoppingCart, Wrench, Database } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+
+const navItems = [
+  { tab: 'geral', to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+  { tab: 'clientes', to: '/dashboard?tab=clientes', icon: Users, label: 'Clientes' },
+  { tab: 'produtos', to: '/dashboard?tab=produtos', icon: Package, label: 'Produtos' },
+  { tab: 'vendas', to: '/dashboard?tab=vendas', icon: ShoppingCart, label: 'Vendas' },
+  { tab: 'os', to: '/dashboard?tab=os', icon: Wrench, label: 'OS' },
+  { tab: 'movimentacoes', to: '/dashboard?tab=movimentacoes', icon: ArrowRightLeft, label: 'Movimentações', roles: ['admin', 'gerente'] },
+  { tab: 'recebimentos', to: '/dashboard?tab=recebimentos', icon: DollarSign, label: 'Recebimentos', roles: ['admin', 'gerente'] },
+  { tab: 'transferencias', to: '/dashboard?tab=transferencias', icon: ArrowRightLeft, label: 'Centro Distribuição', roles: ['admin', 'gerente'] },
+  { tab: 'cadastros', to: '/dashboard?tab=cadastros', icon: Database, label: 'Cadastros Online', roles: ['admin', 'gerente'] },
+];
+
+export default function Sidebar({
+  currentTab,
+  isMobileMenuOpen,
+  onCloseMobileMenu,
+  isCollapsed,
+  showServiceOrders = false
+}) {
+  const { userRole } = useAuth();
+
+  const filteredItems = navItems.filter(item => {
+    if (item.tab === 'os' && !showServiceOrders) {
+      return false;
+    }
+    if (item.roles && !item.roles.includes(userRole)) {
+      return false;
+    }
+    return true;
+  });
+
+  return (
+    <aside className={`sidebar glass ${isMobileMenuOpen ? 'sidebar--open' : ''} ${isCollapsed ? 'sidebar--collapsed' : ''}`}>
+      <div className="sidebar-logo">
+        <img
+          src={isCollapsed ? "/portal_gerencial_icon.svg" : "/portal_gerencial_logo.svg?v=2"}
+          alt="Portal Gerencial"
+          className="logo-img"
+        />
+      </div>
+      
+      <nav className="sidebar-nav">
+        {filteredItems.map(({ tab, to, icon: Icon, label }) => (
+          <Link
+            key={tab}
+            to={to}
+            className={`nav-item ${currentTab === tab ? 'active' : ''}`}
+            onClick={onCloseMobileMenu}
+          >
+            <Icon size={20} />
+            <span>{label}</span>
+          </Link>
+        ))}
+      </nav>
+    </aside>
+  );
+}

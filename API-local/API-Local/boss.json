@@ -1,0 +1,20 @@
+{
+	"name": "APIDashboard",
+	"description": "",
+	"version": "1.0.0",
+	"homepage": "",
+	"mainsrc": "./src",
+	"projects": [],
+	"dependencies": {
+		"github.com/hashload/horse": "^3.2.0",
+		"github.com/hashload/horse-cors": "^1.0.7",
+		"github.com/hashload/horse-jwt": "^2.0.18",
+		"github.com/hashload/horse-logger": "^2.0.9",
+		"github.com/hashload/horse-logger-provider-console": "^1.0.9",
+		"github.com/hashload/horse-logger-provider-logfile": "^1.0.13",
+		"github.com/hashload/jhonson": "^1.2.1",
+		"https://github.com/cachopaweb/portalorm": "^v1.0.30",
+		"https://github.com/gabrielbaltazar/gbswagger": "^3.1.0",
+		"https://github.com/paolo-rossi/delphi-jose-jwt": "^v3.3.1"
+	}
+}

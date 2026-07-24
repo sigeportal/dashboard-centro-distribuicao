@@ -1,0 +1,286 @@
+/* Customer Details Modal Overlay */
+.customer-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(11, 28, 48, 0.45);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: customerOverlayFadeIn 0.25s ease-out;
+}
+
+@keyframes customerOverlayFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Customer Modal Content */
+.customer-modal {
+  background: var(--bg-secondary);
+  border: 1px solid var(--glass-border, rgba(0, 0, 0, 0.08));
+  border-radius: 1.5rem;
+  width: 90%;
+  max-width: 750px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-level-3, 0px 12px 32px rgba(0, 0, 0, 0.12));
+  animation: customerModalSlideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+}
+
+@keyframes customerModalSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(30px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Modal Header */
+.customer-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.5rem 2rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.customer-modal-header h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 1.35rem;
+  font-weight: 750;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.customer-modal-header .header-icon {
+  color: var(--accent);
+}
+
+.customer-modal-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.04);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.customer-modal-close:hover {
+  background: rgba(186, 26, 26, 0.1);
+  color: var(--danger);
+  transform: rotate(90deg);
+}
+
+/* Modal Body */
+.customer-modal-body {
+  padding: 2rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  flex: 1;
+}
+
+/* Profile Summary */
+.customer-profile-summary {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.avatar-placeholder {
+  width: 60px;
+  height: 60px;
+  background: linear-gradient(135deg, var(--accent) 0%, #fdba74 100%);
+  color: #fff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.75rem;
+  font-weight: 700;
+  box-shadow: 0 4px 10px rgba(249, 115, 22, 0.2);
+}
+
+.profile-info h4 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 0.25rem 0;
+}
+
+.profile-code {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  background: rgba(0, 0, 0, 0.04);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+/* Details Grid */
+.customer-details-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.25rem;
+}
+
+.details-section-card {
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  padding: 1.25rem;
+  border-radius: 1rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.01);
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  transition: all 0.2s ease;
+}
+
+.details-section-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+.details-section-card.highlight-financial {
+  border-left: 4px solid var(--accent);
+  background: rgba(249, 115, 22, 0.02);
+}
+
+.details-section-card h5 {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.details-section-card.highlight-financial h5 {
+  color: var(--accent-hover);
+}
+
+.details-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.field-label {
+  font-size: 0.725rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.field-value {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.field-value.email-value {
+  word-break: break-all;
+}
+
+.devedor-amount {
+  font-weight: 700;
+  font-size: 1.15rem;
+}
+
+.devedor-amount.has-debt {
+  color: var(--danger);
+}
+
+.devedor-amount.no-debt {
+  color: var(--success);
+}
+
+/* Responsiveness */
+@media (max-width: 768px) {
+  .customer-modal {
+    width: 95%;
+    max-height: 95vh;
+  }
+
+  .customer-modal-header {
+    padding: 1.25rem 1.5rem;
+  }
+
+  .customer-modal-body {
+    padding: 1.5rem;
+    gap: 1.25rem;
+  }
+
+  .customer-details-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.customer-modal-toggle-sensitive {
+  background: rgba(249, 115, 22, 0.1);
+  border: none;
+  color: var(--accent);
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.customer-modal-toggle-sensitive:hover {
+  background: rgba(249, 115, 22, 0.18);
+  color: var(--accent-hover);
+}
+
+.customer-modal-toggle-sensitive:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.loading-skeleton {
+  display: inline-block;
+  height: 1.25rem;
+  width: 100px;
+  background-color: rgba(0, 0, 0, 0.08);
+  border-radius: 4px;
+  animation: pulse 1.5s infinite ease-in-out;
+}

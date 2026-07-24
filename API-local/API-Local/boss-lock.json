@@ -1,0 +1,126 @@
+{
+	"hash": "d41d8cd98f00b204e9800998ecf8427e",
+	"updated": "2026-04-01T09:24:31.0422235-04:00",
+	"installedModules": {
+		"github.com/andre-djsystem/hashlib4pascal": {
+			"name": "hashlib4pascal",
+			"version": "1.0.0",
+			"hash": "8528036224699ab509c7d8f31d691ffb",
+			"artifacts": {},
+			"failed": false,
+			"changed": false
+		},
+		"github.com/dliocode/horse-utils-clientip": {
+			"name": "horse-utils-clientip",
+			"version": "0.0.8",
+			"hash": "1c67ec48526a6691e039d95d21ff8b47",
+			"artifacts": {},
+			"failed": false,
+			"changed": false
+		},
+		"github.com/hashload/horse": {
+			"name": "horse",
+			"version": "3.2.0",
+			"hash": "fd8ce1e6b90904f8761b38e4a48df3ce",
+			"artifacts": {},
+			"failed": false,
+			"changed": false
+		},
+		"github.com/hashload/horse-cors": {
+			"name": "horse-cors",
+			"version": "1.0.8",
+			"hash": "5912d54ab484eecdd92e85a89a264184",
+			"artifacts": {},
+			"failed": false,
+			"changed": false
+		},
+		"github.com/hashload/horse-jwt": {
+			"name": "horse-jwt",
+			"version": "2.0.20",
+			"hash": "86641dd3b554bb0ad565ead91f536d18",
+			"artifacts": {},
+			"failed": false,
+			"changed": false
+		},
+		"github.com/hashload/horse-logger": {
+			"name": "horse-logger",
+			"version": "2.0.10",
+			"hash": "353de9aab1efa838501aae6c8286ebb7",
+			"artifacts": {},
+			"failed": false,
+			"changed": false
+		},
+		"github.com/hashload/horse-logger-provider-console": {
+			"name": "horse-logger-provider-console",
+			"version": "1.0.10",
+			"hash": "902f03044f8c213ad2495224be7a1ba2",
+			"artifacts": {},
+			"failed": false,
+			"changed": false
+		},
+		"github.com/hashload/horse-logger-provider-logfile": {
+			"name": "horse-logger-provider-logfile",
+			"version": "1.0.14",
+			"hash": "7db7c6339146157cec759447c4c4c9ae",
+			"artifacts": {},
+			"failed": false,
+			"changed": false
+		},
+		"github.com/hashload/jhonson": {
+			"name": "jhonson",
+			"version": "1.2.3",
+			"hash": "bcb020e7bbc151eee39d80e21f8eae4c",
+			"artifacts": {},
+			"failed": false,
+			"changed": false
+		},
+		"github.com/paolo-rossi/delphi-jose-jwt": {
+			"name": "delphi-jose-jwt",
+			"version": "v3.3.1",
+			"hash": "54de41bef1f45342bbe9f29480b218e3",
+			"artifacts": {},
+			"failed": false,
+			"changed": false
+		},
+		"https://github.com/cachopaweb/clientrest": {
+			"name": "clientrest",
+			"version": "1.0.6",
+			"hash": "87e3b304e4187b2f6b68eb0270ff9523",
+			"artifacts": {},
+			"failed": false,
+			"changed": false
+		},
+		"https://github.com/cachopaweb/factory-connections": {
+			"name": "factory-connections",
+			"version": "v1.0.6",
+			"hash": "07f7576200bb3baab560ff63b0348dd4",
+			"artifacts": {},
+			"failed": false,
+			"changed": false
+		},
+		"https://github.com/cachopaweb/portalorm": {
+			"name": "portalorm",
+			"version": "v1.1.3",
+			"hash": "9094655a7a5c71ebcf5230ffdc3bee4d",
+			"artifacts": {},
+			"failed": false,
+			"changed": false
+		},
+		"https://github.com/gabrielbaltazar/gbswagger": {
+			"name": "gbswagger",
+			"version": "3.1.0",
+			"hash": "a4406edef890effebded2ebe65b097cd",
+			"artifacts": {},
+			"failed": false,
+			"changed": false
+		},
+		"https://github.com/paolo-rossi/delphi-jose-jwt": {
+			"name": "delphi-jose-jwt",
+			"version": "v3.3.1",
+			"hash": "54de41bef1f45342bbe9f29480b218e3",
+			"artifacts": {},
+			"failed": false,
+			"changed": true
+		}
+	}
+}

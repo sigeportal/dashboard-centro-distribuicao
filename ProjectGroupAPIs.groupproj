@@ -1,0 +1,60 @@
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <PropertyGroup>
+        <ProjectGuid>{6FDC8EE8-7020-4A23-8BE5-8188B0F42694}</ProjectGuid>
+    </PropertyGroup>
+    <ItemGroup>
+        <Projects Include="API-local\API-Local\api_dashboard.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="API-auth\API-Central\AUTH.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="ServidorRESTConfeccoes\ServidorConsole\ServidorConsole.dproj">
+            <Dependencies/>
+        </Projects>
+    </ItemGroup>
+    <ProjectExtensions>
+        <Borland.Personality>Default.Personality.12</Borland.Personality>
+        <Borland.ProjectType/>
+        <BorlandProject>
+            <Default.Personality/>
+        </BorlandProject>
+    </ProjectExtensions>
+    <Target Name="api_dashboard">
+        <MSBuild Projects="API-local\API-Local\api_dashboard.dproj"/>
+    </Target>
+    <Target Name="api_dashboard:Clean">
+        <MSBuild Projects="API-local\API-Local\api_dashboard.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="api_dashboard:Make">
+        <MSBuild Projects="API-local\API-Local\api_dashboard.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="AUTH">
+        <MSBuild Projects="API-auth\API-Central\AUTH.dproj"/>
+    </Target>
+    <Target Name="AUTH:Clean">
+        <MSBuild Projects="API-auth\API-Central\AUTH.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="AUTH:Make">
+        <MSBuild Projects="API-auth\API-Central\AUTH.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="ServidorConsole">
+        <MSBuild Projects="ServidorRESTConfeccoes\ServidorConsole\ServidorConsole.dproj"/>
+    </Target>
+    <Target Name="ServidorConsole:Clean">
+        <MSBuild Projects="ServidorRESTConfeccoes\ServidorConsole\ServidorConsole.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="ServidorConsole:Make">
+        <MSBuild Projects="ServidorRESTConfeccoes\ServidorConsole\ServidorConsole.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="Build">
+        <CallTarget Targets="api_dashboard;AUTH;ServidorConsole"/>
+    </Target>
+    <Target Name="Clean">
+        <CallTarget Targets="api_dashboard:Clean;AUTH:Clean;ServidorConsole:Clean"/>
+    </Target>
+    <Target Name="Make">
+        <CallTarget Targets="api_dashboard:Make;AUTH:Make;ServidorConsole:Make"/>
+    </Target>
+    <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
+</Project>

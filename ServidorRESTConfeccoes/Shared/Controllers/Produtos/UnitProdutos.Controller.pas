@@ -1,0 +1,330 @@
+unit UnitProdutos.Controller;
+
+interface
+
+uses
+	Horse,
+	Horse.Commons,
+	Classes,
+	SysUtils,
+	System.IOUtils,
+	System.Json, FireDAC.Comp.Client;
+
+type
+	TProdutosController = class
+		class procedure Router;
+		class procedure Get(Req: THorseRequest; Res: THorseResponse; Next: TProc);
+		class procedure GetForID(Req: THorseRequest; Res: THorseResponse; Next: TProc);
+		class procedure Post(Req: THorseRequest; Res: THorseResponse; Next: TProc);
+		class procedure Put(Req: THorseRequest; Res: THorseResponse; Next: TProc);
+		class procedure Delete(Req: THorseRequest; Res: THorseResponse; Next: TProc);
+		class procedure UploadImage(Req: THorseRequest; Res: THorseResponse);
+		class procedure DeleteImage(Req: THorseRequest; Res: THorseResponse);
+		class procedure PostEmLote(Req: THorseRequest; Res: THorseResponse);
+	end;
+
+implementation
+
+{ TProdutosController }
+
+uses
+	UnitConnection.Model.Interfaces,
+	UnitDatabase,
+	UnitFunctions,
+	UnitProdutos.Model,
+	UnitTabela.Helpers;
+
+class procedure TProdutosController.Delete(Req: THorseRequest; Res: THorseResponse; Next: TProc);
+var
+	Produtos: TProdutos;
+	id      : Integer;
+begin
+	try
+		id       := Req.Params.Items['id'].ToInteger();
+		Produtos := TProdutos.Create(TDatabase.Connection);
+		Produtos.Apagar(id);
+		Res.Send('').Status(THTTPStatus.NoContent);
+	finally
+		Produtos.DisposeOf;
+	end;
+end;
+
+class procedure TProdutosController.DeleteImage(Req: THorseRequest; Res: THorseResponse);
+var
+	id               : string;
+	CaminhoPasta     : string;
+	NomeArquivo      : string;
+	CaracterSeparador: Char;
+begin
+	id                := Req.Params.Items['id'];
+	CaracterSeparador := TPath.DirectorySeparatorChar;
+	CaminhoPasta      := TPath.Combine(GetCurrentDir, GetCurrentDir + CaracterSeparador + 'imagens' + CaracterSeparador + 'produtos' + CaracterSeparador);
+	NomeArquivo       := ChangeFileExt(CaminhoPasta + id, '.png');
+	if FileExists(NomeArquivo) then
+		DeleteFile(NomeArquivo);
+	Res.Send<TJSONObject>(TJSONObject.Create.AddPair('msg', 'arquivo deletado com sucesso'))
+end;
+
+class procedure TProdutosController.Get(Req: THorseRequest; Res: THorseResponse; Next: TProc);
+var
+	Produtos  : TProdutos;
+	aJson     : TJSONArray;
+	Query     : iQuery;
+	FiltroNome: string;
+	Total     : Integer;
+	Codigo    : string;
+	Codbarras : string;
+  Cadastrar: string;
+begin
+	aJson    := TJSONArray.Create;
+	Query    := TDatabase.Query;
+	Produtos := TProdutos.Create(TDatabase.Connection);
+	try
+		if Req.Query.ContainsKey('total') then
+		begin
+			Total := Req.Query.Items['total'].ToInteger();
+			if Total > 0 then
+				Query.Add(Format('SELECT FIRST %d DISTINCT PRO_CODIGO FROM PRODUTOS ', [Total]))
+		end
+		else
+			Query.Add('SELECT PRO_CODIGO FROM PRODUTOS ');
+		if Req.Query.ContainsKey('codigo') then
+		begin
+			Codigo := Req.Query.Items['codigo'].Replace('''', '');
+			if not Codigo.IsEmpty then
+				Query.Add(Format('WHERE PRO_CODIGO LIKE %s', [QuotedStr('%' + Codigo + '%')]));
+		end;
+		if Req.Query.ContainsKey('nome') then
+		begin
+			FiltroNome := Req.Query.Items['nome'].Replace('''', '');
+			if not FiltroNome.IsEmpty then
+				Query.Add(Format('OR PRO_NOME LIKE %s', [QuotedStr('%' + FiltroNome + '%')]));
+		end;
+		if Req.Query.ContainsKey('codbarra') then
+		begin
+			Codbarras := Req.Query.Items['codbarra'].Replace('''', '');
+			if not Codbarras.IsEmpty then
+			begin
+				if Codigo.IsEmpty then
+					Query.Add(Format('WHERE PRO_CODBARRA LIKE %s', [QuotedStr('%' + Codbarras + '%')]))
+				else
+					Query.Add(Format('OR PRO_CODBARRA LIKE %s', [QuotedStr('%' + Codbarras + '%')]));
+			end;
+		end;
+    if Req.Query.ContainsKey('cadastrar') then
+    begin
+      Cadastrar := Req.Query.Items['cadastrar'];
+      if Cadastrar.Contains('S') then
+      	Query.Add('WHERE PRO_CADASTRAR = ''S''')
+    end;
+		Query.Add('ORDER BY PRO_CODIGO');
+		Query.Open();
+		Query.Dataset.First;
+		while not Query.Dataset.Eof do
+		begin
+			Produtos.BuscaDadosTabela(Query.Dataset.FieldByName('PRO_CODIGO').AsInteger);
+			aJson.Add(TJSONObject.ParseJSONValue(Produtos.ToJson) as TJSONObject);
+			Query.Dataset.Next;
+		end;
+		Res.Send<TJSONArray>(aJson);
+	finally
+		Produtos.DisposeOf;
+	end;
+end;
+
+class procedure TProdutosController.GetForID(Req: THorseRequest; Res: THorseResponse; Next: TProc);
+var
+	Produtos: TProdutos;
+	aJson   : TJSONArray;
+	id      : Integer;
+begin
+	aJson := TJSONArray.Create;
+	id    := Req.Params.Items['id'].ToInteger();
+	try
+		Produtos := TProdutos.Create(TDatabase.Connection);
+		Produtos.BuscaDadosTabela(id);
+		Res.Send<TJSONObject>(TJSONObject.ParseJSONValue(Produtos.ToJson) as TJSONObject);
+	finally
+		Produtos.DisposeOf;
+	end;
+end;
+
+class procedure TProdutosController.Post(Req: THorseRequest; Res: THorseResponse; Next: TProc);
+var
+	Produtos: TProdutos;
+begin
+	try
+		Produtos := TProdutos.Create(TDatabase.Connection).fromJson<TProdutos>(Req.Body);
+		Produtos.SalvaNoBanco(1);
+		Res.Send<TJSONObject>(TJSONObject.ParseJSONValue(Produtos.ToJson) as TJSONObject);
+	finally
+		Produtos.DisposeOf;
+	end;
+end;
+
+class procedure TProdutosController.PostEmLote(Req: THorseRequest; Res: THorseResponse);
+var
+	Itens     : TProdutos;
+	aJson     : TJSONArray;
+	oJsonValue: TJSONValue;
+	oJson     : TJSONObject;
+	LQuery    : iQuery;
+	FDQuery   : TFDQuery;
+	i         : Integer;
+begin
+	oJson   := Req.Body<TJSONObject>;
+	aJson   := oJson.GetValue<TJSONArray>('itens');
+	LQuery  := TDatabase.Query;
+	FDQuery := TFDQuery(LQuery.Query);
+	FDQuery.Close;
+	FDQuery.SQL.Clear;
+	FDQuery.SQL.Add('UPDATE OR INSERT INTO PRODUTOS (PRO_CODIGO, PRO_FOR, PRO_FABRICANTE, PRO_QUANTIDADEM, PRO_QUANTIDADE,');
+	FDQuery.SQL.Add('PRO_VALORV, PRO_VALORCM, PRO_VALORC, PRO_VALORL, PRO_VALORF, PRO_QUANTIDADEF, PRO_LOCAL,');
+	FDQuery.SQL.Add('PRO_EMBALAGEM, PRO_DATAUC, PRO_GRU, PRO_DESCRICAO, PRO_DATAUA, PRO_ABC, PRO_CODBARRA,');
+	FDQuery.SQL.Add('PRO_VALORS, PRO_TIPO, PRO_TOTALIZADOR, PRO_NOME, PRO_ESTADO, PRO_GTIN, PRO_IAT,');
+	FDQuery.SQL.Add('PRO_IPPT, PRO_ALIQICMS_OPINT, PRO_PERC_RED_OPINT, PRO_UM, PRO_GENERO, PRO_NCM, PRO_CFOP,');
+	FDQuery.SQL.Add('PRO_EXCECAO_NCM, PRO_TIPO_ITEM, PRO_ABC_ANALITICO, PRO_CEST,');
+	FDQuery.SQL.Add('PRO_SIT_TRIB, PRO_CST, PRO_TT, PRO_MAR, PRO_COD_AGRUP,');
+	FDQuery.SQL.Add('PRO_VALORP, PRO_URL_IMAGEM, PRO_CADASTRAR)');
+	FDQuery.SQL.Add('VALUES (:PRO_CODIGO, :PRO_FOR, :PRO_FABRICANTE, :PRO_QUANTIDADEM, :PRO_QUANTIDADE, :PRO_VALORV, :PRO_VALORCM,');
+	FDQuery.SQL.Add(':PRO_VALORC, :PRO_VALORL, :PRO_VALORF, :PRO_QUANTIDADEF, :PRO_LOCAL, :PRO_EMBALAGEM, :PRO_DATAUC, :PRO_GRU,');
+	FDQuery.SQL.Add(':PRO_DESCRICAO, :PRO_DATAUA, :PRO_ABC, :PRO_CODBARRA, :PRO_VALORS, :PRO_TIPO, :PRO_TOTALIZADOR, :PRO_NOME,');
+	FDQuery.SQL.Add(':PRO_ESTADO, :PRO_GTIN, :PRO_IAT, :PRO_IPPT, :PRO_ALIQICMS_OPINT, :PRO_PERC_RED_OPINT, :PRO_UM, :PRO_GENERO,');
+	FDQuery.SQL.Add(':PRO_NCM, :PRO_CFOP, :PRO_EXCECAO_NCM, :PRO_TIPO_ITEM, :PRO_ABC_ANALITICO, :PRO_CEST,');
+	FDQuery.SQL.Add(':PRO_SIT_TRIB, :PRO_CST, :PRO_TT, :PRO_MAR, :PRO_COD_AGRUP, :PRO_VALORP,');
+	FDQuery.SQL.Add(':PRO_URL_IMAGEM, :PRO_CADASTRAR)');
+	FDQuery.SQL.Add('MATCHING (PRO_CODIGO)');
+	// preparando para usar inser��es via ArrayDML
+	FDQuery.Params.ArraySize := aJson.Count;
+	for i                    := 0 to Pred(aJson.Count) do
+	begin
+		oJsonValue := aJson.Items[i];
+		Itens      := TProdutos.Create(TDatabase.Connection).fromJson<TProdutos>(oJsonValue.ToJson);
+		try
+			FDQuery.ParamByName('PRO_CODIGO').AsIntegers[i]              := Itens.Codigo;
+			FDQuery.ParamByName('PRO_FOR').AsIntegers[i]                 := Itens.ForCodigo;
+			FDQuery.ParamByName('PRO_FABRICANTE').AsStrings[i]           := Itens.Fabricante;
+			FDQuery.ParamByName('PRO_QUANTIDADEM').AsFloats[i]           := Itens.Quantidadem;
+			FDQuery.ParamByName('PRO_QUANTIDADE').AsFloats[i]            := Itens.Quantidade;
+			FDQuery.ParamByName('PRO_VALORV').AsCurrencys[i]             := Itens.Valorv;
+			FDQuery.ParamByName('PRO_VALORCM').AsCurrencys[i]            := Itens.Valorcm;
+			FDQuery.ParamByName('PRO_VALORC').AsCurrencys[i]             := Itens.Valorc;
+			FDQuery.ParamByName('PRO_VALORL').AsCurrencys[i]             := Itens.Valorl;
+			FDQuery.ParamByName('PRO_VALORF').AsCurrencys[i]             := Itens.Valorf;
+			FDQuery.ParamByName('PRO_QUANTIDADEF').AsFloats[i]           := Itens.Quantidadef;
+			FDQuery.ParamByName('PRO_LOCAL').AsStrings[i]                := Itens.Local;
+			FDQuery.ParamByName('PRO_EMBALAGEM').AsStrings[i]            := Itens.Embalagem;
+			FDQuery.ParamByName('PRO_DATAUC').AsDateTimes[i]             := Itens.Datauc;
+			FDQuery.ParamByName('PRO_GRU').AsIntegers[i]                 := Itens.Gru;
+			FDQuery.ParamByName('PRO_DESCRICAO').AsStrings[i]            := Itens.Descricao.Substring(0, 30);
+			FDQuery.ParamByName('PRO_DATAUA').AsDateTimes[i]             := Itens.Dataua;
+			FDQuery.ParamByName('PRO_ABC').AsStrings[i]                  := Itens.Abc;
+			FDQuery.ParamByName('PRO_CODBARRA').AsStrings[i]             := Itens.Codbarra;
+			FDQuery.ParamByName('PRO_VALORS').AsCurrencys[i]             := Itens.Valors;
+			FDQuery.ParamByName('PRO_TIPO').AsIntegers[i]                := Itens.Tipo;
+			FDQuery.ParamByName('PRO_TOTALIZADOR').AsIntegers[i]         := Itens.CodTotalizador;
+			FDQuery.ParamByName('PRO_NOME').AsStrings[i]                 := Itens.Nome;
+			FDQuery.ParamByName('PRO_ESTADO').AsStrings[i]               := Itens.Estado;
+			FDQuery.ParamByName('PRO_GTIN').AsStrings[i]                 := Itens.Gtin;
+			FDQuery.ParamByName('PRO_IAT').AsStrings[i]                  := Itens.Iat;
+			FDQuery.ParamByName('PRO_IPPT').AsStrings[i]                 := Itens.Ippt;
+			FDQuery.ParamByName('PRO_ALIQICMS_OPINT').AsFloats[i]        := Itens.Aliqicms_opint;
+			FDQuery.ParamByName('PRO_PERC_RED_OPINT').AsFloats[i]        := Itens.Perc_red_opint;
+			FDQuery.ParamByName('PRO_UM').AsIntegers[i]                  := Itens.Um;
+			FDQuery.ParamByName('PRO_GENERO').AsIntegers[i]              := Itens.Genero;
+			FDQuery.ParamByName('PRO_NCM').AsStrings[i]                  := Itens.Ncm;
+			FDQuery.ParamByName('PRO_CFOP').AsStrings[i]                 := Itens.Cfop;
+			FDQuery.ParamByName('PRO_EXCECAO_NCM').AsIntegers[i]         := Itens.Excecao_ncm;
+			FDQuery.ParamByName('PRO_TIPO_ITEM').AsStrings[i]            := Itens.Tipo_item;
+			FDQuery.ParamByName('PRO_ABC_ANALITICO').AsStrings[i]        := Itens.Abc_analitico;
+			FDQuery.ParamByName('PRO_CEST').AsStrings[i]                 := Itens.Cest;
+			FDQuery.ParamByName('PRO_SIT_TRIB').AsStrings[i]             := Itens.Sit_trib;
+			FDQuery.ParamByName('PRO_CST').AsStrings[i]                  := Itens.Cst;
+			FDQuery.ParamByName('PRO_TT').AsIntegers[i]                  := Itens.Tt;
+			FDQuery.ParamByName('PRO_MAR').AsIntegers[i]                 := Itens.Mar;
+			FDQuery.ParamByName('PRO_COD_AGRUP').AsStrings[i]            := Itens.Cod_agrup;
+			FDQuery.ParamByName('PRO_VALORP').AsCurrencys[i]             := Itens.Valorp;
+			FDQuery.ParamByName('PRO_URL_IMAGEM').AsStrings[i]           := Itens.URL_Imagem;
+			FDQuery.ParamByName('PRO_CADASTRAR').AsStrings[i]            := Itens.Cadastrar;
+		finally
+			Itens.DisposeOf;
+		end;
+	end;
+	// Executa as inser��es em lote
+	FDQuery.Execute(aJson.Count, 0);
+	Res.Send<TJSONObject>(oJson);
+end;
+
+class procedure TProdutosController.Put(Req: THorseRequest; Res: THorseResponse; Next: TProc);
+var
+	Produtos: TProdutos;
+begin
+	try
+		Produtos := TProdutos.Create(TDatabase.Connection).fromJson<TProdutos>(Req.Body);
+		Produtos.SalvaNoBanco(1);
+		Res.Send<TJSONObject>(TJSONObject.ParseJSONValue(Produtos.ToJson) as TJSONObject);
+	finally
+		Produtos.DisposeOf;
+	end;
+end;
+
+class procedure TProdutosController.Router;
+begin
+	THorse.Group.Prefix('/v1')
+  	.Route('/produtos')
+      .Get(Get)
+      .Post(Post)
+      .Put(Put)
+	  .&End;
+	THorse.Group.Prefix('/v1')
+  	.Route('/produtos/:id')
+      .Get(GetForID)
+      .Delete(Delete)
+	  .&End;
+  THorse.Group.Prefix('/v1')
+  	.Route('/produtos/emLote')
+    	.Post(PostEmLote)
+	  .&End;
+	THorse.Group.Prefix('/v1')
+  	.Route('produtos/foto/:id')
+    	.Post(UploadImage)
+    	.Delete(DeleteImage)
+	  .&End;
+end;
+
+class procedure TProdutosController.UploadImage(Req: THorseRequest; Res: THorseResponse);
+var
+	id               : string;
+	Arquivo          : TMemoryStream;
+	CaminhoPasta     : string;
+	NomeArquivo      : string;
+	Produto          : TProdutos;
+	CaracterSeparador: Char;
+begin
+	Arquivo           := Req.Body<TMemoryStream>;
+	id                := Req.Params.Items['id'];
+	CaracterSeparador := TPath.DirectorySeparatorChar;
+	CaminhoPasta      := TPath.Combine(GetCurrentDir, GetCurrentDir + CaracterSeparador + 'imagens' + CaracterSeparador + 'produtos' + CaracterSeparador);
+	if not DirectoryExists(CaminhoPasta) then
+		ForceDirectories(CaminhoPasta);
+	NomeArquivo := ChangeFileExt(CaminhoPasta + id, '.png');
+	if Assigned(Arquivo) then
+	begin
+		Arquivo.SaveToFile(NomeArquivo);
+		Produto := TProdutos.Create(TDatabase.Connection);
+		try
+			Produto.BuscaDadosTabela(id.ToInteger());
+			Produto.URL_Imagem := ExtractFileName(NomeArquivo);
+			Produto.SalvaNoBanco(1);
+			Res.Send<TJSONObject>(TJSONObject.Create.AddPair('foto', Produto.URL_Imagem)).Status(THTTPStatus.Created);
+		finally
+			Produto.DisposeOf;
+		end;
+	end
+	else
+	begin
+		Res.Send<TJSONObject>(TJSONObject.Create.AddPair('msg', 'N�o foi poss�vel criar a imagem!')).Status(THTTPStatus.BadRequest);
+	end;
+end;
+
+end.

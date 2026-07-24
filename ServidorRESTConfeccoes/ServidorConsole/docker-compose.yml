@@ -1,0 +1,11 @@
+version: '3.6'
+
+services:
+  servidor_joalheria:
+    image: cachopaweb/servidor_joalheria
+    container_name: servidor_joalheria
+    privileged: true  
+    environment:
+      - PORT=8080
+    ports:
+      - 8080:8080

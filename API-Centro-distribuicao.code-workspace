@@ -1,0 +1,20 @@
+{
+	"folders": [
+		{
+			"path": "API-local/API-Local"
+		},
+		{
+			"path": "API-auth/API-Central"
+		},
+		{
+			"path": "frontend/Dashboard-Portal"
+		},
+		{
+			"path": "docs"
+		},
+		{
+			"path": "../CentroDeDistribuicao"
+		}
+	],
+	"settings": {}
+}

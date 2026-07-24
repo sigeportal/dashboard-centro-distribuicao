@@ -1,0 +1,92 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+:root {
+  /* Kinetic Logic Palette */
+  --bg-primary: #f8f9ff;
+  --bg-secondary: #ffffff; /* surface-container-lowest */
+  --text-primary: #0b1c30; /* on-background / on-surface */
+  --text-secondary: #584237; /* on-surface-variant */
+  
+  --accent: #f97316; /* primary-container (Vibrant International Orange) */
+  --accent-hover: #9d4300; /* primary (Darker shade) */
+  
+  --danger: #ba1a1a; /* error */
+  --success: #006c49; /* secondary / success */
+  --info: #006591; /* tertiary / info blue */
+  
+  --glass-bg: rgba(255, 255, 255, 0.7);
+  --glass-border: rgba(0, 0, 0, 0.08);
+  
+  /* Elevation Shadows */
+  --shadow-level-1: 0px 4px 12px rgba(0, 0, 0, 0.05);
+  --shadow-level-2: 0px 8px 24px rgba(0, 0, 0, 0.08);
+  --shadow-level-3: 0px 12px 32px rgba(0, 0, 0, 0.12);
+  
+  --card-shadow: var(--shadow-level-1);
+
+  /* Spacing Units */
+  --space-xs: 4px;
+  --space-sm: 12px;
+  --space-md: 24px;
+  --space-lg: 40px;
+  --space-xl: 64px;
+
+  /* Rounding Radii */
+  --radius-sm: 0.25rem;
+  --radius-default: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.5rem;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
+}
+
+/* Glassmorphism Classes */
+.glass {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: var(--card-shadow);
+}
+
+/* Accessibility: Keyboard Focus Indicators */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[role="button"]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 4px rgba(249, 115, 22, 0.25);
+}
+
