@@ -72,6 +72,7 @@ type
     FTipoOperacao: string;
     FTipoPagamento: string;
     FValor: Double;
+    FDataRef: TDateTime;
   public
     [TCampo('ID', 'INTEGER NOT NULL PRIMARY KEY')]
     property Id: Integer read FId write FId;
@@ -90,6 +91,9 @@ type
 
     [TCampo('VALOR', 'DOUBLE PRECISION NOT NULL')]
     property Valor: Double read FValor write FValor;
+
+    [TCampo('DATA_REF', 'DATE')]
+    property DataRef: TDateTime read FDataRef write FDataRef;
   end;
 
   [TNomeTabela('DASHBOARD_VENDAS_GRUPO', 'ID')]
@@ -100,6 +104,7 @@ type
     FNomeGrupo: string;
     FValor: Double;
     FLucro: Double;
+    FDataRef: TDateTime;
   public
     [TCampo('ID', 'INTEGER NOT NULL PRIMARY KEY')]
     property Id: Integer read FId write FId;
@@ -115,6 +120,9 @@ type
 
     [TCampo('LUCRO', 'DOUBLE PRECISION')]
     property Lucro: Double read FLucro write FLucro;
+
+    [TCampo('DATA_REF', 'DATE')]
+    property DataRef: TDateTime read FDataRef write FDataRef;
   end;
 
   [TNomeTabela('DASHBOARD_CLIENTES_CIDADE', 'ID')]
@@ -124,6 +132,7 @@ type
     FEmpresaId: Integer;
     FCidade: string;
     FQuantidade: Integer;
+    FDataRef: TDateTime;
   public
     [TCampo('ID', 'INTEGER NOT NULL PRIMARY KEY')]
     property Id: Integer read FId write FId;
@@ -136,6 +145,9 @@ type
 
     [TCampo('QUANTIDADE', 'INTEGER NOT NULL')]
     property Quantidade: Integer read FQuantidade write FQuantidade;
+
+    [TCampo('DATA_REF', 'DATE')]
+    property DataRef: TDateTime read FDataRef write FDataRef;
   end;
 
   [TNomeTabela('DASHBOARD_VENDAS_HORA', 'ID')]
@@ -145,6 +157,7 @@ type
     FEmpresaId: Integer;
     FHora: string;
     FValor: Double;
+    FDataRef: TDateTime;
   public
     [TCampo('ID', 'INTEGER NOT NULL PRIMARY KEY')]
     property Id: Integer read FId write FId;
@@ -157,6 +170,9 @@ type
 
     [TCampo('VALOR', 'DOUBLE PRECISION NOT NULL')]
     property Valor: Double read FValor write FValor;
+
+    [TCampo('DATA_REF', 'DATE')]
+    property DataRef: TDateTime read FDataRef write FDataRef;
   end;
 
 implementation

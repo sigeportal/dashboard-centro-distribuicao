@@ -38,6 +38,7 @@ type
     class procedure OsDiarias(Req: THorseRequest; Res: THorseResponse);
     class procedure EstoquePosicao(Req: THorseRequest; Res: THorseResponse);
     class procedure EnsureEstoqueEmpresaTable;
+    class procedure EnsureDashboardTables;
   end;
 
 implementation
@@ -147,16 +148,19 @@ end;
 
 class procedure TSyncController.SyncDashboard(Req: THorseRequest; Res: THorseResponse);
 var
-  LBody: TJSONObject;
+  LBody, LObj: TJSONObject;
   LArrDiario, LArrPag, LArrGrupo, LArrCidade, LArrHora, LArrEstoque: TJSONArray;
-  LObj: TJSONObject;
-  I, LEmpresaId, cod: Integer;
   LQuery: iQuery;
+  LEmpresaId, I, cod: Integer;
+  LDataRefStr, LDataRefSql: string;
 begin
+  EnsureEstoqueEmpresaTable;
+  EnsureDashboardTables;
+
   LBody := Req.Body<TJSONObject>;
   if not Assigned(LBody) then
   begin
-    Res.Status(THTTPStatus.BadRequest).Send('{"error": "JSON body expected"}');
+    Res.Status(THTTPStatus.BadRequest).Send('{"error": "Corpo da requisição inválido"}');
     Exit;
   end;
 
@@ -172,131 +176,176 @@ begin
       begin
         LObj := TJSONObject(LArrDiario.Items[I]);
         try
+          LDataRefStr := FormatDateTime('yyyy-mm-dd', ISOToDate(LObj.GetValue<string>('data_ref', '')));
+          LDataRefSql := QuotedStr(LDataRefStr);
+
           LQuery.Clear;
-          LQuery.Add('UPDATE OR INSERT INTO DASHBOARD_DIARIO (EMPRESA_ID, DATA_REF, VENDAS_VALOR, VENDAS_LUCRO, VENDAS_MAIOR, VENDAS_QTD, OS_VALOR, OS_LUCRO, OS_MAIOR, OS_QTD, MOV_CREDITO, MOV_DEBITO)');
-          LQuery.Add('VALUES (:EMP, :DREF, :VVAL, :VLUC, :VMAI, :VQTD, :OVAL, :OLUC, :OMAI, :OQTD, :MCRE, :MDEB)');
-          LQuery.Add('MATCHING (EMPRESA_ID, DATA_REF)');
-          LQuery.AddParam('EMP', LEmpresaId);
-          LQuery.AddParam('DREF', ISOToDate(LObj.GetValue<string>('data_ref', '')));
-          LQuery.AddParam('VVAL', LObj.GetValue<Double>('vendas_valor', 0));
-          LQuery.AddParam('VLUC', LObj.GetValue<Double>('vendas_lucro', 0));
-          LQuery.AddParam('VMAI', LObj.GetValue<Double>('vendas_maior', 0));
-          LQuery.AddParam('VQTD', LObj.GetValue<Integer>('vendas_qtd', 0));
-          LQuery.AddParam('OVAL', LObj.GetValue<Double>('os_valor', 0));
-          LQuery.AddParam('OLUC', LObj.GetValue<Double>('os_lucro', 0));
-          LQuery.AddParam('OMAI', LObj.GetValue<Double>('os_maior', 0));
-          LQuery.AddParam('OQTD', LObj.GetValue<Integer>('os_qtd', 0));
-          LQuery.AddParam('MCRE', LObj.GetValue<Double>('mov_credito', 0));
-          LQuery.AddParam('MDEB', LObj.GetValue<Double>('mov_debito', 0));
+          LQuery.Add(Format(
+            'UPDATE OR INSERT INTO DASHBOARD_DIARIO (EMPRESA_ID, DATA_REF, VENDAS_VALOR, VENDAS_LUCRO, VENDAS_MAIOR, VENDAS_QTD, OS_VALOR, OS_LUCRO, OS_MAIOR, OS_QTD, MOV_CREDITO, MOV_DEBITO) ' +
+            'VALUES (%d, %s, %s, %s, %s, %d, %s, %s, %s, %d, %s, %s) MATCHING (EMPRESA_ID, DATA_REF)',
+            [LEmpresaId, LDataRefSql,
+             FloatToStr(LObj.GetValue<Double>('vendas_valor', 0)).Replace(',', '.'),
+             FloatToStr(LObj.GetValue<Double>('vendas_lucro', 0)).Replace(',', '.'),
+             FloatToStr(LObj.GetValue<Double>('vendas_maior', 0)).Replace(',', '.'),
+             LObj.GetValue<Integer>('vendas_qtd', 0),
+             FloatToStr(LObj.GetValue<Double>('os_valor', 0)).Replace(',', '.'),
+             FloatToStr(LObj.GetValue<Double>('os_lucro', 0)).Replace(',', '.'),
+             FloatToStr(LObj.GetValue<Double>('os_maior', 0)).Replace(',', '.'),
+             LObj.GetValue<Integer>('os_qtd', 0),
+             FloatToStr(LObj.GetValue<Double>('mov_credito', 0)).Replace(',', '.'),
+             FloatToStr(LObj.GetValue<Double>('mov_debito', 0)).Replace(',', '.')]
+          ));
           LQuery.ExecSQL;
-        except end;
+        except
+          on E: Exception do Writeln('-> Erro ao salvar DASHBOARD_DIARIO: ' + E.Message);
+        end;
       end;
     end;
 
-    // 2. Pagamentos (Limpa registros anteriores da empresa para evitar duplicidades)
+    // 2. Pagamentos
     LArrPag := LBody.GetValue<TJSONArray>('pagamentos', nil);
-    if Assigned(LArrPag) then
+    if Assigned(LArrPag) and (LArrPag.Count > 0) then
     begin
-      try
-        LQuery.Clear;
-        LQuery.Add('DELETE FROM DASHBOARD_PAGAMENTOS WHERE EMPRESA_ID = :EMP');
-        LQuery.AddParam('EMP', LEmpresaId);
-        LQuery.ExecSQL;
-      except end;
-
       for I := 0 to LArrPag.Count - 1 do
       begin
         LObj := TJSONObject(LArrPag.Items[I]);
         try
+          if LObj.ContainsKey('data_ref') and not LObj.GetValue<string>('data_ref', '').IsEmpty then
+            LDataRefStr := FormatDateTime('yyyy-mm-dd', ISOToDate(LObj.GetValue<string>('data_ref', '')))
+          else
+            LDataRefStr := FormatDateTime('yyyy-mm-dd', Date);
+          LDataRefSql := QuotedStr(LDataRefStr);
+
+          if I = 0 then
+          begin
+            LQuery.Clear;
+            LQuery.Add(Format('DELETE FROM DASHBOARD_PAGAMENTOS WHERE EMPRESA_ID = %d AND (DATA_REF IS NULL OR DATA_REF = %s)', [LEmpresaId, LDataRefSql]));
+            LQuery.ExecSQL;
+          end;
+
           LQuery.Clear;
-          LQuery.Add('INSERT INTO DASHBOARD_PAGAMENTOS (ID, EMPRESA_ID, TIPO_REGISTRO, TIPO_OPERACAO, TIPO_PAGAMENTO, VALOR) VALUES (:ID, :EMP, :TREG, :TOPE, :TPAG, :VAL)');
-          LQuery.AddParam('ID', GeraCodigo('DASHBOARD_PAGAMENTOS', 'ID'));
-          LQuery.AddParam('EMP', LEmpresaId);
-          LQuery.AddParam('TREG', LObj.GetValue<string>('tipo_registro', ''));
-          LQuery.AddParam('TOPE', LObj.GetValue<string>('tipo_operacao', ''));
-          LQuery.AddParam('TPAG', LObj.GetValue<string>('tipo_pagamento', ''));
-          LQuery.AddParam('VAL', LObj.GetValue<Double>('valor', 0));
+          LQuery.Add(Format(
+            'INSERT INTO DASHBOARD_PAGAMENTOS (ID, EMPRESA_ID, TIPO_REGISTRO, TIPO_OPERACAO, TIPO_PAGAMENTO, VALOR, DATA_REF) VALUES (%d, %d, %s, %s, %s, %s, %s)',
+            [GeraCodigo('DASHBOARD_PAGAMENTOS', 'ID'), LEmpresaId,
+             QuotedStr(LObj.GetValue<string>('tipo_registro', '')),
+             QuotedStr(LObj.GetValue<string>('tipo_operacao', '')),
+             QuotedStr(LObj.GetValue<string>('tipo_pagamento', '')),
+             FloatToStr(LObj.GetValue<Double>('valor', 0)).Replace(',', '.'),
+             LDataRefSql]
+          ));
           LQuery.ExecSQL;
-        except end;
+        except
+          on E: Exception do Writeln('-> Erro ao salvar DASHBOARD_PAGAMENTOS: ' + E.Message);
+        end;
       end;
     end;
 
-    // 3. Grupos (Limpa registros anteriores da empresa para evitar duplicidades)
+    // 3. Grupos
     LArrGrupo := LBody.GetValue<TJSONArray>('vendas_grupo', nil);
-    if Assigned(LArrGrupo) then
+    if Assigned(LArrGrupo) and (LArrGrupo.Count > 0) then
     begin
-      try
-        LQuery.Clear;
-        LQuery.Add('DELETE FROM DASHBOARD_VENDAS_GRUPO WHERE EMPRESA_ID = :EMP');
-        LQuery.AddParam('EMP', LEmpresaId);
-        LQuery.ExecSQL;
-      except end;
-
       for I := 0 to LArrGrupo.Count - 1 do
       begin
         LObj := TJSONObject(LArrGrupo.Items[I]);
         try
+          if LObj.ContainsKey('data_ref') and not LObj.GetValue<string>('data_ref', '').IsEmpty then
+            LDataRefStr := FormatDateTime('yyyy-mm-dd', ISOToDate(LObj.GetValue<string>('data_ref', '')))
+          else
+            LDataRefStr := FormatDateTime('yyyy-mm-dd', Date);
+          LDataRefSql := QuotedStr(LDataRefStr);
+
+          if I = 0 then
+          begin
+            LQuery.Clear;
+            LQuery.Add(Format('DELETE FROM DASHBOARD_VENDAS_GRUPO WHERE EMPRESA_ID = %d AND (DATA_REF IS NULL OR DATA_REF = %s)', [LEmpresaId, LDataRefSql]));
+            LQuery.ExecSQL;
+          end;
+
           LQuery.Clear;
-          LQuery.Add('INSERT INTO DASHBOARD_VENDAS_GRUPO (ID, EMPRESA_ID, NOME_GRUPO, VALOR, LUCRO) VALUES (:ID, :EMP, :NOME, :VAL, :LUC)');
-          LQuery.AddParam('ID', GeraCodigo('DASHBOARD_VENDAS_GRUPO', 'ID'));
-          LQuery.AddParam('EMP', LEmpresaId);
-          LQuery.AddParam('NOME', LObj.GetValue<string>('nome_grupo', ''));
-          LQuery.AddParam('VAL', LObj.GetValue<Double>('valor', 0));
-          LQuery.AddParam('LUC', LObj.GetValue<Double>('lucro', 0));
+          LQuery.Add(Format(
+            'INSERT INTO DASHBOARD_VENDAS_GRUPO (ID, EMPRESA_ID, NOME_GRUPO, VALOR, LUCRO, DATA_REF) VALUES (%d, %d, %s, %s, %s, %s)',
+            [GeraCodigo('DASHBOARD_VENDAS_GRUPO', 'ID'), LEmpresaId,
+             QuotedStr(LObj.GetValue<string>('nome_grupo', '')),
+             FloatToStr(LObj.GetValue<Double>('valor', 0)).Replace(',', '.'),
+             FloatToStr(LObj.GetValue<Double>('lucro', 0)).Replace(',', '.'),
+             LDataRefSql]
+          ));
           LQuery.ExecSQL;
-        except end;
+        except
+          on E: Exception do Writeln('-> Erro ao salvar DASHBOARD_VENDAS_GRUPO: ' + E.Message);
+        end;
       end;
     end;
 
-    // 4. Clientes Cidade (Limpa registros anteriores da empresa para evitar duplicidades)
+    // 4. Clientes Cidade
     LArrCidade := LBody.GetValue<TJSONArray>('clientes_cidade', nil);
-    if Assigned(LArrCidade) then
+    if Assigned(LArrCidade) and (LArrCidade.Count > 0) then
     begin
-      try
-        LQuery.Clear;
-        LQuery.Add('DELETE FROM DASHBOARD_CLIENTES_CIDADE WHERE EMPRESA_ID = :EMP');
-        LQuery.AddParam('EMP', LEmpresaId);
-        LQuery.ExecSQL;
-      except end;
-
       for I := 0 to LArrCidade.Count - 1 do
       begin
         LObj := TJSONObject(LArrCidade.Items[I]);
         try
+          if LObj.ContainsKey('data_ref') and not LObj.GetValue<string>('data_ref', '').IsEmpty then
+            LDataRefStr := FormatDateTime('yyyy-mm-dd', ISOToDate(LObj.GetValue<string>('data_ref', '')))
+          else
+            LDataRefStr := FormatDateTime('yyyy-mm-dd', Date);
+          LDataRefSql := QuotedStr(LDataRefStr);
+
+          if I = 0 then
+          begin
+            LQuery.Clear;
+            LQuery.Add(Format('DELETE FROM DASHBOARD_CLIENTES_CIDADE WHERE EMPRESA_ID = %d AND (DATA_REF IS NULL OR DATA_REF = %s)', [LEmpresaId, LDataRefSql]));
+            LQuery.ExecSQL;
+          end;
+
           LQuery.Clear;
-          LQuery.Add('INSERT INTO DASHBOARD_CLIENTES_CIDADE (ID, EMPRESA_ID, CIDADE, QUANTIDADE) VALUES (:ID, :EMP, :CID, :QTD)');
-          LQuery.AddParam('ID', GeraCodigo('DASHBOARD_CLIENTES_CIDADE', 'ID'));
-          LQuery.AddParam('EMP', LEmpresaId);
-          LQuery.AddParam('CID', LObj.GetValue<string>('cidade', ''));
-          LQuery.AddParam('QTD', LObj.GetValue<Integer>('quantidade', 0));
+          LQuery.Add(Format(
+            'INSERT INTO DASHBOARD_CLIENTES_CIDADE (ID, EMPRESA_ID, CIDADE, QUANTIDADE, DATA_REF) VALUES (%d, %d, %s, %d, %s)',
+            [GeraCodigo('DASHBOARD_CLIENTES_CIDADE', 'ID'), LEmpresaId,
+             QuotedStr(LObj.GetValue<string>('cidade', '')),
+             LObj.GetValue<Integer>('quantidade', 0),
+             LDataRefSql]
+          ));
           LQuery.ExecSQL;
-        except end;
+        except
+          on E: Exception do Writeln('-> Erro ao salvar DASHBOARD_CLIENTES_CIDADE: ' + E.Message);
+        end;
       end;
     end;
 
-    // 5. Vendas Hora (Limpa registros anteriores da empresa para evitar duplicidades)
+    // 5. Vendas Hora
     LArrHora := LBody.GetValue<TJSONArray>('vendas_hora', nil);
-    if Assigned(LArrHora) then
+    if Assigned(LArrHora) and (LArrHora.Count > 0) then
     begin
-      try
-        LQuery.Clear;
-        LQuery.Add('DELETE FROM DASHBOARD_VENDAS_HORA WHERE EMPRESA_ID = :EMP');
-        LQuery.AddParam('EMP', LEmpresaId);
-        LQuery.ExecSQL;
-      except end;
-
       for I := 0 to LArrHora.Count - 1 do
       begin
         LObj := TJSONObject(LArrHora.Items[I]);
         try
+          if LObj.ContainsKey('data_ref') and not LObj.GetValue<string>('data_ref', '').IsEmpty then
+            LDataRefStr := FormatDateTime('yyyy-mm-dd', ISOToDate(LObj.GetValue<string>('data_ref', '')))
+          else
+            LDataRefStr := FormatDateTime('yyyy-mm-dd', Date);
+          LDataRefSql := QuotedStr(LDataRefStr);
+
+          if I = 0 then
+          begin
+            LQuery.Clear;
+            LQuery.Add(Format('DELETE FROM DASHBOARD_VENDAS_HORA WHERE EMPRESA_ID = %d AND (DATA_REF IS NULL OR DATA_REF = %s)', [LEmpresaId, LDataRefSql]));
+            LQuery.ExecSQL;
+          end;
+
           LQuery.Clear;
-          LQuery.Add('INSERT INTO DASHBOARD_VENDAS_HORA (ID, EMPRESA_ID, HORA, VALOR) VALUES (:ID, :EMP, :HORA, :VAL)');
-          LQuery.AddParam('ID', GeraCodigo('DASHBOARD_VENDAS_HORA', 'ID'));
-          LQuery.AddParam('EMP', LEmpresaId);
-          LQuery.AddParam('HORA', LObj.GetValue<string>('hora', ''));
-          LQuery.AddParam('VAL', LObj.GetValue<Double>('valor', 0));
+          LQuery.Add(Format(
+            'INSERT INTO DASHBOARD_VENDAS_HORA (ID, EMPRESA_ID, HORA, VALOR, DATA_REF) VALUES (%d, %d, %s, %s, %s)',
+            [GeraCodigo('DASHBOARD_VENDAS_HORA', 'ID'), LEmpresaId,
+             QuotedStr(LObj.GetValue<string>('hora', '')),
+             FloatToStr(LObj.GetValue<Double>('valor', 0)).Replace(',', '.'),
+             LDataRefSql]
+          ));
           LQuery.ExecSQL;
-        except end;
+        except
+          on E: Exception do Writeln('-> Erro ao salvar DASHBOARD_VENDAS_HORA: ' + E.Message);
+        end;
       end;
     end;
 
@@ -586,7 +635,13 @@ class function TSyncController.ObterEmpresaId(Req: THorseRequest): Integer;
 var
   LEmpresaIdStr: string;
 begin
-  if Req.Headers.TryGetValue('X-Empresa-Id', LEmpresaIdStr) or Req.Headers.TryGetValue('x-empresa-id', LEmpresaIdStr) then
+  if Req.Query.ContainsKey('emp_id') then
+    Result := StrToIntDef(Req.Query.Items['emp_id'], 1)
+  else if Req.Query.ContainsKey('empresa_id') then
+    Result := StrToIntDef(Req.Query.Items['empresa_id'], 1)
+  else if Req.Query.ContainsKey('emp') then
+    Result := StrToIntDef(Req.Query.Items['emp'], 1)
+  else if Req.Headers.TryGetValue('X-Empresa-Id', LEmpresaIdStr) or Req.Headers.TryGetValue('x-empresa-id', LEmpresaIdStr) then
     Result := StrToIntDef(LEmpresaIdStr, 1)
   else
     Result := 1;
@@ -614,18 +669,24 @@ var
   LQuery: iQuery;
   LArr: TJSONArray;
   LItem: TJSONObject;
+  LEmpresaId: Integer;
+  LSQL, LWhere: string;
 begin
   LArr := TJSONArray.Create;
   LQuery := TDatabase.Query;
+  LEmpresaId := ObterEmpresaId(Req);
   try
-    LQuery.Add(
-      'SELECT CIDADE, SUM(QUANTIDADE) AS QUANTIDADE ' +
-      'FROM DASHBOARD_CLIENTES_CIDADE ' +
-      'WHERE (:EMPRESA_ID = 0 OR EMPRESA_ID = :EMPRESA_ID) ' +
-      'GROUP BY CIDADE ' +
-      'ORDER BY SUM(QUANTIDADE) DESC'
-    ).Open;
-    LQuery.AddParam('EMPRESA_ID', ObterEmpresaId(Req));
+    LWhere := Format('WHERE (%d = 0 OR EMPRESA_ID = %d)', [LEmpresaId, LEmpresaId]);
+    if Req.Query.ContainsKey('startDate') and not Req.Query.Items['startDate'].IsEmpty then
+      LWhere := LWhere + Format(' AND (DATA_REF IS NULL OR DATA_REF >= %s)', [QuotedStr(Req.Query.Items['startDate'])]);
+    if Req.Query.ContainsKey('endDate') and not Req.Query.Items['endDate'].IsEmpty then
+      LWhere := LWhere + Format(' AND (DATA_REF IS NULL OR DATA_REF <= %s)', [QuotedStr(Req.Query.Items['endDate'])]);
+
+    LSQL := 'SELECT CIDADE, SUM(QUANTIDADE) AS QUANTIDADE FROM DASHBOARD_CLIENTES_CIDADE ' + LWhere + ' GROUP BY CIDADE ORDER BY SUM(QUANTIDADE) DESC';
+    LQuery.Clear;
+    LQuery.Add(LSQL);
+    LQuery.Open;
+
     while not LQuery.DataSet.Eof do
     begin
       LItem := TJSONObject.Create;
@@ -649,12 +710,24 @@ var
   LQuery: iQuery;
   LArr: TJSONArray;
   LItem: TJSONObject;
+  LEmpresaId: Integer;
+  LSQL, LWhere: string;
 begin
   LArr := TJSONArray.Create;
   LQuery := TDatabase.Query;
+  LEmpresaId := ObterEmpresaId(Req);
   try
-    LQuery.Add('SELECT TIPO_OPERACAO, TIPO_PAGAMENTO, VALOR FROM DASHBOARD_PAGAMENTOS WHERE EMPRESA_ID = :EMPRESA_ID AND TIPO_REGISTRO = ''DESPESA''').Open;
-    LQuery.AddParam('EMPRESA_ID', ObterEmpresaId(Req));
+    LWhere := Format('WHERE (%d = 0 OR EMPRESA_ID = %d) AND TIPO_REGISTRO = ''DESPESA''', [LEmpresaId, LEmpresaId]);
+    if Req.Query.ContainsKey('startDate') and not Req.Query.Items['startDate'].IsEmpty then
+      LWhere := LWhere + Format(' AND (DATA_REF IS NULL OR DATA_REF >= %s)', [QuotedStr(Req.Query.Items['startDate'])]);
+    if Req.Query.ContainsKey('endDate') and not Req.Query.Items['endDate'].IsEmpty then
+      LWhere := LWhere + Format(' AND (DATA_REF IS NULL OR DATA_REF <= %s)', [QuotedStr(Req.Query.Items['endDate'])]);
+
+    LSQL := 'SELECT TIPO_OPERACAO, TIPO_PAGAMENTO, SUM(VALOR) AS VALOR FROM DASHBOARD_PAGAMENTOS ' + LWhere + ' GROUP BY TIPO_OPERACAO, TIPO_PAGAMENTO';
+    LQuery.Clear;
+    LQuery.Add(LSQL);
+    LQuery.Open;
+
     while not LQuery.DataSet.Eof do
     begin
       LItem := TJSONObject.Create;
@@ -679,12 +752,24 @@ var
   LQuery: iQuery;
   LArr: TJSONArray;
   LItem: TJSONObject;
+  LEmpresaId: Integer;
+  LSQL, LWhere: string;
 begin
   LArr := TJSONArray.Create;
   LQuery := TDatabase.Query;
+  LEmpresaId := ObterEmpresaId(Req);
   try
-    LQuery.Add('SELECT DATA_REF, VENDAS_VALOR, VENDAS_LUCRO FROM DASHBOARD_DIARIO WHERE EMPRESA_ID = :EMPRESA_ID ORDER BY DATA_REF').Open;
-    LQuery.AddParam('EMPRESA_ID', ObterEmpresaId(Req));
+    LWhere := Format('WHERE (%d = 0 OR EMPRESA_ID = %d)', [LEmpresaId, LEmpresaId]);
+    if Req.Query.ContainsKey('startDate') and not Req.Query.Items['startDate'].IsEmpty then
+      LWhere := LWhere + Format(' AND DATA_REF >= %s', [QuotedStr(Req.Query.Items['startDate'])]);
+    if Req.Query.ContainsKey('endDate') and not Req.Query.Items['endDate'].IsEmpty then
+      LWhere := LWhere + Format(' AND DATA_REF <= %s', [QuotedStr(Req.Query.Items['endDate'])]);
+
+    LSQL := 'SELECT DATA_REF, SUM(VENDAS_VALOR) AS VENDAS_VALOR, SUM(VENDAS_LUCRO) AS VENDAS_LUCRO FROM DASHBOARD_DIARIO ' + LWhere + ' GROUP BY DATA_REF ORDER BY DATA_REF';
+    LQuery.Clear;
+    LQuery.Add(LSQL);
+    LQuery.Open;
+
     while not LQuery.DataSet.Eof do
     begin
       LItem := TJSONObject.Create;
@@ -709,12 +794,24 @@ var
   LQuery: iQuery;
   LArr: TJSONArray;
   LItem: TJSONObject;
+  LEmpresaId: Integer;
+  LSQL, LWhere: string;
 begin
   LArr := TJSONArray.Create;
   LQuery := TDatabase.Query;
+  LEmpresaId := ObterEmpresaId(Req);
   try
-    LQuery.Add('SELECT DATA_REF, OS_VALOR, OS_LUCRO FROM DASHBOARD_DIARIO WHERE EMPRESA_ID = :EMPRESA_ID ORDER BY DATA_REF').Open;
-    LQuery.AddParam('EMPRESA_ID', ObterEmpresaId(Req));
+    LWhere := Format('WHERE (%d = 0 OR EMPRESA_ID = %d)', [LEmpresaId, LEmpresaId]);
+    if Req.Query.ContainsKey('startDate') and not Req.Query.Items['startDate'].IsEmpty then
+      LWhere := LWhere + Format(' AND DATA_REF >= %s', [QuotedStr(Req.Query.Items['startDate'])]);
+    if Req.Query.ContainsKey('endDate') and not Req.Query.Items['endDate'].IsEmpty then
+      LWhere := LWhere + Format(' AND DATA_REF <= %s', [QuotedStr(Req.Query.Items['endDate'])]);
+
+    LSQL := 'SELECT DATA_REF, SUM(OS_VALOR) AS OS_VALOR, SUM(OS_LUCRO) AS OS_LUCRO FROM DASHBOARD_DIARIO ' + LWhere + ' GROUP BY DATA_REF ORDER BY DATA_REF';
+    LQuery.Clear;
+    LQuery.Add(LSQL);
+    LQuery.Open;
+
     while not LQuery.DataSet.Eof do
     begin
       LItem := TJSONObject.Create;
@@ -739,18 +836,24 @@ var
   LQuery: iQuery;
   LArr: TJSONArray;
   LItem: TJSONObject;
+  LEmpresaId: Integer;
+  LSQL, LWhere: string;
 begin
   LArr := TJSONArray.Create;
   LQuery := TDatabase.Query;
+  LEmpresaId := ObterEmpresaId(Req);
   try
-    LQuery.Add(
-      'SELECT NOME_GRUPO, SUM(VALOR) AS VALOR, SUM(LUCRO) AS LUCRO ' +
-      'FROM DASHBOARD_VENDAS_GRUPO ' +
-      'WHERE (:EMPRESA_ID = 0 OR EMPRESA_ID = :EMPRESA_ID) ' +
-      'GROUP BY NOME_GRUPO ' +
-      'ORDER BY SUM(VALOR) DESC'
-    ).Open;
-    LQuery.AddParam('EMPRESA_ID', ObterEmpresaId(Req));
+    LWhere := Format('WHERE (%d = 0 OR EMPRESA_ID = %d)', [LEmpresaId, LEmpresaId]);
+    if Req.Query.ContainsKey('startDate') and not Req.Query.Items['startDate'].IsEmpty then
+      LWhere := LWhere + Format(' AND (DATA_REF IS NULL OR DATA_REF >= %s)', [QuotedStr(Req.Query.Items['startDate'])]);
+    if Req.Query.ContainsKey('endDate') and not Req.Query.Items['endDate'].IsEmpty then
+      LWhere := LWhere + Format(' AND (DATA_REF IS NULL OR DATA_REF <= %s)', [QuotedStr(Req.Query.Items['endDate'])]);
+
+    LSQL := 'SELECT NOME_GRUPO, SUM(VALOR) AS VALOR, SUM(LUCRO) AS LUCRO FROM DASHBOARD_VENDAS_GRUPO ' + LWhere + ' GROUP BY NOME_GRUPO ORDER BY SUM(VALOR) DESC';
+    LQuery.Clear;
+    LQuery.Add(LSQL);
+    LQuery.Open;
+
     while not LQuery.DataSet.Eof do
     begin
       LItem := TJSONObject.Create;
@@ -775,18 +878,24 @@ var
   LQuery: iQuery;
   LArr: TJSONArray;
   LItem: TJSONObject;
+  LEmpresaId: Integer;
+  LSQL, LWhere: string;
 begin
   LArr := TJSONArray.Create;
   LQuery := TDatabase.Query;
+  LEmpresaId := ObterEmpresaId(Req);
   try
-    LQuery.Add(
-      'SELECT TIPO_PAGAMENTO, SUM(VALOR) AS VALOR ' +
-      'FROM DASHBOARD_PAGAMENTOS ' +
-      'WHERE (:EMPRESA_ID = 0 OR EMPRESA_ID = :EMPRESA_ID) AND TIPO_REGISTRO = ''VENDA'' ' +
-      'GROUP BY TIPO_PAGAMENTO ' +
-      'ORDER BY SUM(VALOR) DESC'
-    ).Open;
-    LQuery.AddParam('EMPRESA_ID', ObterEmpresaId(Req));
+    LWhere := Format('WHERE (%d = 0 OR EMPRESA_ID = %d) AND TIPO_REGISTRO = ''VENDA''', [LEmpresaId, LEmpresaId]);
+    if Req.Query.ContainsKey('startDate') and not Req.Query.Items['startDate'].IsEmpty then
+      LWhere := LWhere + Format(' AND (DATA_REF IS NULL OR DATA_REF >= %s)', [QuotedStr(Req.Query.Items['startDate'])]);
+    if Req.Query.ContainsKey('endDate') and not Req.Query.Items['endDate'].IsEmpty then
+      LWhere := LWhere + Format(' AND (DATA_REF IS NULL OR DATA_REF <= %s)', [QuotedStr(Req.Query.Items['endDate'])]);
+
+    LSQL := 'SELECT TIPO_PAGAMENTO, SUM(VALOR) AS VALOR FROM DASHBOARD_PAGAMENTOS ' + LWhere + ' GROUP BY TIPO_PAGAMENTO ORDER BY SUM(VALOR) DESC';
+    LQuery.Clear;
+    LQuery.Add(LSQL);
+    LQuery.Open;
+
     while not LQuery.DataSet.Eof do
     begin
       LItem := TJSONObject.Create;
@@ -810,18 +919,24 @@ var
   LQuery: iQuery;
   LArr: TJSONArray;
   LItem: TJSONObject;
+  LEmpresaId: Integer;
+  LSQL, LWhere: string;
 begin
   LArr := TJSONArray.Create;
   LQuery := TDatabase.Query;
+  LEmpresaId := ObterEmpresaId(Req);
   try
-    LQuery.Add(
-      'SELECT TIPO_PAGAMENTO, SUM(VALOR) AS VALOR ' +
-      'FROM DASHBOARD_PAGAMENTOS ' +
-      'WHERE (:EMPRESA_ID = 0 OR EMPRESA_ID = :EMPRESA_ID) AND TIPO_REGISTRO = ''COMPRA'' ' +
-      'GROUP BY TIPO_PAGAMENTO ' +
-      'ORDER BY SUM(VALOR) DESC'
-    ).Open;
-    LQuery.AddParam('EMPRESA_ID', ObterEmpresaId(Req));
+    LWhere := Format('WHERE (%d = 0 OR EMPRESA_ID = %d) AND TIPO_REGISTRO = ''COMPRA''', [LEmpresaId, LEmpresaId]);
+    if Req.Query.ContainsKey('startDate') and not Req.Query.Items['startDate'].IsEmpty then
+      LWhere := LWhere + Format(' AND (DATA_REF IS NULL OR DATA_REF >= %s)', [QuotedStr(Req.Query.Items['startDate'])]);
+    if Req.Query.ContainsKey('endDate') and not Req.Query.Items['endDate'].IsEmpty then
+      LWhere := LWhere + Format(' AND (DATA_REF IS NULL OR DATA_REF <= %s)', [QuotedStr(Req.Query.Items['endDate'])]);
+
+    LSQL := 'SELECT TIPO_PAGAMENTO, SUM(VALOR) AS VALOR FROM DASHBOARD_PAGAMENTOS ' + LWhere + ' GROUP BY TIPO_PAGAMENTO ORDER BY SUM(VALOR) DESC';
+    LQuery.Clear;
+    LQuery.Add(LSQL);
+    LQuery.Open;
+
     while not LQuery.DataSet.Eof do
     begin
       LItem := TJSONObject.Create;
@@ -845,18 +960,24 @@ var
   LQuery: iQuery;
   LArr: TJSONArray;
   LItem: TJSONObject;
+  LEmpresaId: Integer;
+  LSQL, LWhere: string;
 begin
   LArr := TJSONArray.Create;
   LQuery := TDatabase.Query;
+  LEmpresaId := ObterEmpresaId(Req);
   try
-    LQuery.Add(
-      'SELECT TIPO_PAGAMENTO, SUM(VALOR) AS VALOR ' +
-      'FROM DASHBOARD_PAGAMENTOS ' +
-      'WHERE (:EMPRESA_ID = 0 OR EMPRESA_ID = :EMPRESA_ID) AND TIPO_REGISTRO = ''RECEBIMENTO'' ' +
-      'GROUP BY TIPO_PAGAMENTO ' +
-      'ORDER BY SUM(VALOR) DESC'
-    ).Open;
-    LQuery.AddParam('EMPRESA_ID', ObterEmpresaId(Req));
+    LWhere := Format('WHERE (%d = 0 OR EMPRESA_ID = %d) AND TIPO_REGISTRO = ''RECEBIMENTO''', [LEmpresaId, LEmpresaId]);
+    if Req.Query.ContainsKey('startDate') and not Req.Query.Items['startDate'].IsEmpty then
+      LWhere := LWhere + Format(' AND (DATA_REF IS NULL OR DATA_REF >= %s)', [QuotedStr(Req.Query.Items['startDate'])]);
+    if Req.Query.ContainsKey('endDate') and not Req.Query.Items['endDate'].IsEmpty then
+      LWhere := LWhere + Format(' AND (DATA_REF IS NULL OR DATA_REF <= %s)', [QuotedStr(Req.Query.Items['endDate'])]);
+
+    LSQL := 'SELECT TIPO_PAGAMENTO, SUM(VALOR) AS VALOR FROM DASHBOARD_PAGAMENTOS ' + LWhere + ' GROUP BY TIPO_PAGAMENTO ORDER BY SUM(VALOR) DESC';
+    LQuery.Clear;
+    LQuery.Add(LSQL);
+    LQuery.Open;
+
     while not LQuery.DataSet.Eof do
     begin
       LItem := TJSONObject.Create;
@@ -880,18 +1001,24 @@ var
   LQuery: iQuery;
   LArr: TJSONArray;
   LItem: TJSONObject;
+  LEmpresaId: Integer;
+  LSQL, LWhere: string;
 begin
   LArr := TJSONArray.Create;
   LQuery := TDatabase.Query;
+  LEmpresaId := ObterEmpresaId(Req);
   try
-    LQuery.Add(
-      'SELECT TIPO_PAGAMENTO, SUM(VALOR) AS VALOR ' +
-      'FROM DASHBOARD_PAGAMENTOS ' +
-      'WHERE (:EMPRESA_ID = 0 OR EMPRESA_ID = :EMPRESA_ID) AND TIPO_REGISTRO = ''PAGAMENTO'' ' +
-      'GROUP BY TIPO_PAGAMENTO ' +
-      'ORDER BY SUM(VALOR) DESC'
-    ).Open;
-    LQuery.AddParam('EMPRESA_ID', ObterEmpresaId(Req));
+    LWhere := Format('WHERE (%d = 0 OR EMPRESA_ID = %d) AND TIPO_REGISTRO = ''PAGAMENTO''', [LEmpresaId, LEmpresaId]);
+    if Req.Query.ContainsKey('startDate') and not Req.Query.Items['startDate'].IsEmpty then
+      LWhere := LWhere + Format(' AND (DATA_REF IS NULL OR DATA_REF >= %s)', [QuotedStr(Req.Query.Items['startDate'])]);
+    if Req.Query.ContainsKey('endDate') and not Req.Query.Items['endDate'].IsEmpty then
+      LWhere := LWhere + Format(' AND (DATA_REF IS NULL OR DATA_REF <= %s)', [QuotedStr(Req.Query.Items['endDate'])]);
+
+    LSQL := 'SELECT TIPO_PAGAMENTO, SUM(VALOR) AS VALOR FROM DASHBOARD_PAGAMENTOS ' + LWhere + ' GROUP BY TIPO_PAGAMENTO ORDER BY SUM(VALOR) DESC';
+    LQuery.Clear;
+    LQuery.Add(LSQL);
+    LQuery.Open;
+
     while not LQuery.DataSet.Eof do
     begin
       LItem := TJSONObject.Create;
@@ -915,12 +1042,24 @@ var
   LQuery: iQuery;
   LArr: TJSONArray;
   LItem: TJSONObject;
+  LEmpresaId: Integer;
+  LSQL, LWhere: string;
 begin
   LArr := TJSONArray.Create;
   LQuery := TDatabase.Query;
+  LEmpresaId := ObterEmpresaId(Req);
   try
-    LQuery.Add('SELECT DATA_REF, MOV_CREDITO, MOV_DEBITO FROM DASHBOARD_DIARIO WHERE EMPRESA_ID = :EMPRESA_ID ORDER BY DATA_REF').Open;
-    LQuery.AddParam('EMPRESA_ID', ObterEmpresaId(Req));
+    LWhere := Format('WHERE (%d = 0 OR EMPRESA_ID = %d)', [LEmpresaId, LEmpresaId]);
+    if Req.Query.ContainsKey('startDate') and not Req.Query.Items['startDate'].IsEmpty then
+      LWhere := LWhere + Format(' AND DATA_REF >= %s', [QuotedStr(Req.Query.Items['startDate'])]);
+    if Req.Query.ContainsKey('endDate') and not Req.Query.Items['endDate'].IsEmpty then
+      LWhere := LWhere + Format(' AND DATA_REF <= %s', [QuotedStr(Req.Query.Items['endDate'])]);
+
+    LSQL := 'SELECT DATA_REF, SUM(MOV_CREDITO) AS MOV_CREDITO, SUM(MOV_DEBITO) AS MOV_DEBITO FROM DASHBOARD_DIARIO ' + LWhere + ' GROUP BY DATA_REF ORDER BY DATA_REF';
+    LQuery.Clear;
+    LQuery.Add(LSQL);
+    LQuery.Open;
+
     while not LQuery.DataSet.Eof do
     begin
       LItem := TJSONObject.Create;
@@ -945,12 +1084,24 @@ var
   LQuery: iQuery;
   LArr: TJSONArray;
   LItem: TJSONObject;
+  LEmpresaId: Integer;
+  LSQL, LWhere: string;
 begin
   LArr := TJSONArray.Create;
   LQuery := TDatabase.Query;
+  LEmpresaId := ObterEmpresaId(Req);
   try
-    LQuery.Add('SELECT DATA_REF, VENDAS_VALOR, VENDAS_MAIOR, VENDAS_QTD FROM DASHBOARD_DIARIO WHERE EMPRESA_ID = :EMPRESA_ID ORDER BY DATA_REF').Open;
-    LQuery.AddParam('EMPRESA_ID', ObterEmpresaId(Req));
+    LWhere := Format('WHERE (%d = 0 OR EMPRESA_ID = %d)', [LEmpresaId, LEmpresaId]);
+    if Req.Query.ContainsKey('startDate') and not Req.Query.Items['startDate'].IsEmpty then
+      LWhere := LWhere + Format(' AND DATA_REF >= %s', [QuotedStr(Req.Query.Items['startDate'])]);
+    if Req.Query.ContainsKey('endDate') and not Req.Query.Items['endDate'].IsEmpty then
+      LWhere := LWhere + Format(' AND DATA_REF <= %s', [QuotedStr(Req.Query.Items['endDate'])]);
+
+    LSQL := 'SELECT DATA_REF, SUM(VENDAS_VALOR) AS VENDAS_VALOR, MAX(VENDAS_MAIOR) AS VENDAS_MAIOR, SUM(VENDAS_QTD) AS VENDAS_QTD FROM DASHBOARD_DIARIO ' + LWhere + ' GROUP BY DATA_REF ORDER BY DATA_REF';
+    LQuery.Clear;
+    LQuery.Add(LSQL);
+    LQuery.Open;
+
     while not LQuery.DataSet.Eof do
     begin
       LItem := TJSONObject.Create;
@@ -976,12 +1127,24 @@ var
   LQuery: iQuery;
   LArr: TJSONArray;
   LItem: TJSONObject;
+  LEmpresaId: Integer;
+  LSQL, LWhere: string;
 begin
   LArr := TJSONArray.Create;
   LQuery := TDatabase.Query;
+  LEmpresaId := ObterEmpresaId(Req);
   try
-    LQuery.Add('SELECT HORA, VALOR FROM DASHBOARD_VENDAS_HORA WHERE EMPRESA_ID = :EMPRESA_ID ORDER BY HORA').Open;
-    LQuery.AddParam('EMPRESA_ID', ObterEmpresaId(Req));
+    LWhere := Format('WHERE (%d = 0 OR EMPRESA_ID = %d)', [LEmpresaId, LEmpresaId]);
+    if Req.Query.ContainsKey('startDate') and not Req.Query.Items['startDate'].IsEmpty then
+      LWhere := LWhere + Format(' AND (DATA_REF IS NULL OR DATA_REF >= %s)', [QuotedStr(Req.Query.Items['startDate'])]);
+    if Req.Query.ContainsKey('endDate') and not Req.Query.Items['endDate'].IsEmpty then
+      LWhere := LWhere + Format(' AND (DATA_REF IS NULL OR DATA_REF <= %s)', [QuotedStr(Req.Query.Items['endDate'])]);
+
+    LSQL := 'SELECT HORA, SUM(VALOR) AS VALOR FROM DASHBOARD_VENDAS_HORA ' + LWhere + ' GROUP BY HORA ORDER BY HORA';
+    LQuery.Clear;
+    LQuery.Add(LSQL);
+    LQuery.Open;
+
     while not LQuery.DataSet.Eof do
     begin
       LItem := TJSONObject.Create;
@@ -1005,12 +1168,24 @@ var
   LQuery: iQuery;
   LArr: TJSONArray;
   LItem: TJSONObject;
+  LEmpresaId: Integer;
+  LSQL, LWhere: string;
 begin
   LArr := TJSONArray.Create;
   LQuery := TDatabase.Query;
+  LEmpresaId := ObterEmpresaId(Req);
   try
-    LQuery.Add('SELECT DATA_REF, OS_VALOR, OS_MAIOR, OS_QTD FROM DASHBOARD_DIARIO WHERE EMPRESA_ID = :EMPRESA_ID ORDER BY DATA_REF').Open;
-    LQuery.AddParam('EMPRESA_ID', ObterEmpresaId(Req));
+    LWhere := Format('WHERE (%d = 0 OR EMPRESA_ID = %d)', [LEmpresaId, LEmpresaId]);
+    if Req.Query.ContainsKey('startDate') and not Req.Query.Items['startDate'].IsEmpty then
+      LWhere := LWhere + Format(' AND DATA_REF >= %s', [QuotedStr(Req.Query.Items['startDate'])]);
+    if Req.Query.ContainsKey('endDate') and not Req.Query.Items['endDate'].IsEmpty then
+      LWhere := LWhere + Format(' AND DATA_REF <= %s', [QuotedStr(Req.Query.Items['endDate'])]);
+
+    LSQL := 'SELECT DATA_REF, SUM(OS_VALOR) AS OS_VALOR, MAX(OS_MAIOR) AS OS_MAIOR, SUM(OS_QTD) AS OS_QTD FROM DASHBOARD_DIARIO ' + LWhere + ' GROUP BY DATA_REF ORDER BY DATA_REF';
+    LQuery.Clear;
+    LQuery.Add(LSQL);
+    LQuery.Open;
+
     while not LQuery.DataSet.Eof do
     begin
       LItem := TJSONObject.Create;
@@ -1028,6 +1203,35 @@ begin
       LArr.Free;
       Res.Status(THTTPStatus.InternalServerError).Send('{"error": "' + E.Message + '"}');
     end;
+  end;
+end;
+
+class procedure TSyncController.EnsureDashboardTables;
+var
+  LDiario: TDashboardDiario;
+  LPag: TDashboardPagamento;
+  LGrupo: TDashboardVendasGrupo;
+  LCidade: TDashboardClientesCidade;
+  LHora: TDashboardVendasHora;
+begin
+  try
+    LDiario := TDashboardDiario.Create(TDatabase.Connection);
+    try LDiario.CriaTabela; finally LDiario.DisposeOf; end;
+
+    LPag := TDashboardPagamento.Create(TDatabase.Connection);
+    try LPag.CriaTabela; finally LPag.DisposeOf; end;
+
+    LGrupo := TDashboardVendasGrupo.Create(TDatabase.Connection);
+    try LGrupo.CriaTabela; finally LGrupo.DisposeOf; end;
+
+    LCidade := TDashboardClientesCidade.Create(TDatabase.Connection);
+    try LCidade.CriaTabela; finally LCidade.DisposeOf; end;
+
+    LHora := TDashboardVendasHora.Create(TDatabase.Connection);
+    try LHora.CriaTabela; finally LHora.DisposeOf; end;
+  except
+    on E: Exception do
+      Writeln('-> Erro ao verificar/criar tabelas de dashboard: ' + E.Message);
   end;
 end;
 
