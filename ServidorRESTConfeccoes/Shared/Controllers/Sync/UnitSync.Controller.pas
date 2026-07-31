@@ -210,7 +210,7 @@ begin
       begin
         LObj := TJSONObject(LArrPag.Items[I]);
         try
-          if LObj.ContainsKey('data_ref') and not LObj.GetValue<string>('data_ref', '').IsEmpty then
+          if (LObj.GetValue<string>('data_ref', '') <> '') then
             LDataRefStr := FormatDateTime('yyyy-mm-dd', ISOToDate(LObj.GetValue<string>('data_ref', '')))
           else
             LDataRefStr := FormatDateTime('yyyy-mm-dd', Date);
@@ -248,7 +248,7 @@ begin
       begin
         LObj := TJSONObject(LArrGrupo.Items[I]);
         try
-          if LObj.ContainsKey('data_ref') and not LObj.GetValue<string>('data_ref', '').IsEmpty then
+          if (LObj.GetValue<string>('data_ref', '') <> '') then
             LDataRefStr := FormatDateTime('yyyy-mm-dd', ISOToDate(LObj.GetValue<string>('data_ref', '')))
           else
             LDataRefStr := FormatDateTime('yyyy-mm-dd', Date);
@@ -285,7 +285,7 @@ begin
       begin
         LObj := TJSONObject(LArrCidade.Items[I]);
         try
-          if LObj.ContainsKey('data_ref') and not LObj.GetValue<string>('data_ref', '').IsEmpty then
+          if (LObj.GetValue<string>('data_ref', '') <> '') then
             LDataRefStr := FormatDateTime('yyyy-mm-dd', ISOToDate(LObj.GetValue<string>('data_ref', '')))
           else
             LDataRefStr := FormatDateTime('yyyy-mm-dd', Date);
@@ -321,7 +321,7 @@ begin
       begin
         LObj := TJSONObject(LArrHora.Items[I]);
         try
-          if LObj.ContainsKey('data_ref') and not LObj.GetValue<string>('data_ref', '').IsEmpty then
+          if (LObj.GetValue<string>('data_ref', '') <> '') then
             LDataRefStr := FormatDateTime('yyyy-mm-dd', ISOToDate(LObj.GetValue<string>('data_ref', '')))
           else
             LDataRefStr := FormatDateTime('yyyy-mm-dd', Date);
