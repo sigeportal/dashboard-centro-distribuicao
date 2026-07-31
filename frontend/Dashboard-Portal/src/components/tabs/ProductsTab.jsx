@@ -72,9 +72,9 @@ export default function ProductsTab({ data, pages, searchTerms, setSearchTerms, 
         if (key && !uniqueMap.has(key)) {
           uniqueMap.set(key, st);
         } else if (key && uniqueMap.has(key)) {
-          // Se já tem essa unidade, dá preferência ao item com data_atualizacao preenchida ou mais recente
           const existing = uniqueMap.get(key);
-          if ((!existing.data_atualizacao && st.data_atualizacao) || 
+          if ((Number(st.quantidade) > Number(existing.quantidade)) ||
+              (!existing.data_atualizacao && st.data_atualizacao) || 
               (st.data_atualizacao && st.data_atualizacao > existing.data_atualizacao)) {
             uniqueMap.set(key, st);
           }
@@ -254,7 +254,11 @@ export default function ProductsTab({ data, pages, searchTerms, setSearchTerms, 
                         {unitStocks.map((stock, i) => {
                           const empName = stock.empresa_nome || `Unidade #${stock.empresa_id}`;
                           const isCd = empName.toUpperCase().includes('CD') || stock.empresa_id === 1 || stock.empresa_id === 5;
-                          const qty = Number(stock.quantidade) || 0;
+                          const mainCdQty = Number(selectedProduct.quantidade || selectedProduct.pro_quantidade || selectedProduct.PRO_QUANTIDADE || 0);
+                          let qty = Number(stock.quantidade) || 0;
+                          if (isCd && qty === 0 && mainCdQty > 0) {
+                            qty = mainCdQty;
+                          }
 
                           return (
                             <tr key={stock.empresa_id || i}>

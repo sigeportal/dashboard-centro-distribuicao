@@ -312,24 +312,26 @@ begin
           if LObj.TryGetValue('pro_codigo', cod) then
           begin
             LQuery.Clear;
-            LQuery.Add('UPDATE ESTOQUE_EMPRESA SET EE_QUANTIDADE = :QTD, EE_DATA_ATUALIZACAO = CURRENT_TIMESTAMP WHERE EE_EMPRESA_ID = :EMP AND EE_PRO_CODIGO = :PRO');
-            LQuery.AddParam('QTD', LObj.GetValue<Double>('quantidade', 0));
-            LQuery.AddParam('EMP', LEmpresaId);
-            LQuery.AddParam('PRO', LObj.GetValue<Integer>('pro_codigo'));
+            LQuery.Add(Format(
+              'UPDATE ESTOQUE_EMPRESA SET EE_QUANTIDADE = %s, EE_DATA_ATUALIZACAO = CURRENT_TIMESTAMP WHERE EE_EMPRESA_ID = %d AND EE_PRO_CODIGO = %d',
+              [FloatToStr(LObj.GetValue<Double>('quantidade', 0)).Replace(',', '.'), LEmpresaId, LObj.GetValue<Integer>('pro_codigo')]
+            ));
             LQuery.ExecSQL;
 
             if TFDQuery(LQuery.Query).RowsAffected = 0 then
             begin
               LQuery.Clear;
-              LQuery.Add('INSERT INTO ESTOQUE_EMPRESA (EE_ID, EE_EMPRESA_ID, EE_PRO_CODIGO, EE_QUANTIDADE, EE_DATA_ATUALIZACAO) VALUES (:ID, :EMP, :PRO, :QTD, CURRENT_TIMESTAMP)');
-              LQuery.AddParam('ID', GeraCodigo('ESTOQUE_EMPRESA', 'EE_ID'));
-              LQuery.AddParam('EMP', LEmpresaId);
-              LQuery.AddParam('PRO', LObj.GetValue<Integer>('pro_codigo'));
-              LQuery.AddParam('QTD', LObj.GetValue<Double>('quantidade', 0));
+              LQuery.Add(Format(
+                'INSERT INTO ESTOQUE_EMPRESA (EE_ID, EE_EMPRESA_ID, EE_PRO_CODIGO, EE_QUANTIDADE, EE_DATA_ATUALIZACAO) VALUES (%d, %d, %d, %s, CURRENT_TIMESTAMP)',
+                [GeraCodigo('ESTOQUE_EMPRESA', 'EE_ID'), LEmpresaId, LObj.GetValue<Integer>('pro_codigo'), FloatToStr(LObj.GetValue<Double>('quantidade', 0)).Replace(',', '.')]
+              ));
               LQuery.ExecSQL;
             end;
           end;
-        except end;
+        except
+          on E: Exception do
+            Writeln('-> Erro ao salvar ESTOQUE_EMPRESA no sync: ' + E.Message);
+        end;
       end;
     end;
 
@@ -1079,11 +1081,13 @@ begin
           '  %d AS EE_PRO_CODIGO, ' +
           '  MAX(P.PRO_NOME) AS PRO_NOME, ' +
           '  COALESCE( ' +
-          '    MAX(E.EE_QUANTIDADE), ' +
-          '    (SELECT SUM(TRI.TRI_QUANTIDADE) ' +
+          '    NULLIF(MAX(E.EE_QUANTIDADE), 0), ' +
+          '    CASE WHEN U.EMP_ID IN (1, 5) THEN MAX(P.PRO_QUANTIDADE) ELSE NULL END, ' +
+          '    (SELECT COALESCE(SUM(TRI.TRI_QUANTIDADE), 0) ' +
           '     FROM TRANSFERENCIA_ITEM TRI ' +
           '     JOIN TRANSFERENCIA TR ON TR.TR_ID = TRI.TRI_TRANSFERENCIA_ID ' +
-          '     WHERE TRI.TRI_PRODUTO_ID = %d AND TR.TR_DESTINO = U.EMP_ID), ' +
+          '     WHERE TRI.TRI_PRODUTO_ID = %d AND TR.TR_DESTINO = U.EMP_ID AND (TR.TR_STATUS = ''Conferido/Aprovado'' OR TR.TR_STATUS = ''Em Trânsito'')), ' +
+          '    MAX(E.EE_QUANTIDADE), ' +
           '    0) AS EE_QUANTIDADE, ' +
           '  MAX(E.EE_DATA_ATUALIZACAO) AS EE_DATA_ATUALIZACAO ' +
           'FROM (' +
