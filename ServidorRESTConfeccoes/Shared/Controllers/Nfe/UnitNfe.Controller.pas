@@ -225,7 +225,7 @@ begin
   QueryExec.Clear;
   QueryExec.Add(Format(
     'INSERT INTO NFE_CENTRAL (NFE_ID, NFE_TRANSFERENCIA_ID, NFE_CHAVE, NFE_NUMERO, NFE_SERIE, NFE_PROTOCOLO, NFE_EMITENTE_CNPJ, NFE_DESTINATARIO_CNPJ, NFE_VALOR_TOTAL, NFE_STATUS, NFE_MOTIVO_SEFAZ, NFE_DATA_EMISSAO) ' +
-    'VALUES (%d, %d, %s, %d, 1, %s, %s, %s, %s, ''AUTORIZADA'', ''Autorizado o uso da NF-e (Modelo 55 - Transferencia)'', CURRENT_TIMESTAMP)',
+    'VALUES (%d, %d, %s, %d, 1, %s, %s, %s, %s, ''AUTORIZADA'', ''Autorizado o uso da NF-e (Modelo 55 - Transferencia - NT 2025.002)'', CURRENT_TIMESTAMP)',
     [LNewNfeId, LTrId, QuotedStr(LChaveFicticia), LTrId, QuotedStr(LProtocolo), QuotedStr('30882804000122'), QuotedStr('05557971000150'), FloatToStr(LValorTotal).Replace(',', '.')]
   ));
   QueryExec.ExecSQL;
@@ -242,7 +242,7 @@ begin
   LResObj.AddPair('numero', TJSONNumber.Create(LTrId));
   LResObj.AddPair('serie', TJSONNumber.Create(1));
   LResObj.AddPair('cstat', TJSONNumber.Create(100));
-  LResObj.AddPair('motivo', 'Autorizado o uso da NF-e (Modelo 55 - Transferencia de Estoque)');
+  LResObj.AddPair('motivo', 'Autorizado o uso da NF-e (Modelo 55 - Transferencia de Estoque - Reforma Tributaria NT 2025.002)');
 
   Res.Status(THTTPStatus.OK).Send(LResObj);
 end;

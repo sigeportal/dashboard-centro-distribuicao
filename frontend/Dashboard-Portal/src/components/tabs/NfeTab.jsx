@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
-import { FileText, Download, ShieldCheck, RefreshCw, XCircle, Search, Eye, AlertTriangle, CheckCircle } from 'lucide-react';
+import { FileText, Download, ShieldCheck, RefreshCw, XCircle, Search, Eye, AlertTriangle, CheckCircle, Clock } from 'lucide-react';
 import { createApi } from '../../services/api';
 import { formatCurrency, formatDatehora } from '../../utils/formatters';
+import SearchBar from '../SearchBar';
 import './CadastrosTab.css';
+import '../../pages/Dashboard.css';
 
 export default function NfeTab() {
   const api = createApi(true); // CD_API_BASE (port 9000)
@@ -44,7 +46,7 @@ export default function NfeTab() {
         link.download = `DANFE_${chave}.pdf`;
         link.click();
       } else {
-        alert('Conteúdo do DANFE em PDF gerado com sucesso!');
+        alert('Conteúdo do DANFE em PDF obtido com sucesso!');
       }
     } catch (err) {
       console.error('Erro ao baixar DANFE:', err);
@@ -110,60 +112,80 @@ export default function NfeTab() {
 
   return (
     <div className="cadastros-container">
-      <div className="cd-title-row">
+      {/* Cabeçalho Superior */}
+      <div className="crud-title-row" style={{ marginBottom: '1.5rem' }}>
         <div className="cd-title-with-badge">
-          <h2><FileText size={24} /> Painel de Notas Fiscais (NF-e Modelo 55)</h2>
-          <span className="cd-badge cd-badge-matriz">SEFAZ ONLINE</span>
+          <h2><FileText size={24} style={{ color: 'var(--accent-primary)' }} /> Painel de Notas Fiscais (NF-e Modelo 55)</h2>
+          <span className="badge badge-success">SEFAZ ONLINE (NT 2025.002)</span>
         </div>
         <button className="refresh-btn" onClick={fetchNotes} disabled={loading}>
           <RefreshCw size={18} className={loading ? 'spin' : ''} /> Atualizar Lista
         </button>
       </div>
 
-      {/* Cards de Resumo */}
-      <div className="cd-details-meta grid-4" style={{ marginBottom: '1.5rem', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
-        <div className="list-card glass" style={{ textAlign: 'center', padding: '1rem' }}>
-          <span style={{ fontSize: '0.85rem', color: '#6b7280', fontWeight: 600 }}>Total Emitidas</span>
-          <h3 style={{ fontSize: '1.6rem', color: 'var(--text-primary)', margin: '0.4rem 0 0 0' }}>{totalEmitidas}</h3>
+      {/* Grid de Cards de Estatística no padrão global dashboard-grid */}
+      <div className="dashboard-grid">
+        <div className="metric-card glass">
+          <div className="metric-header">
+            <span>Total Emitidas</span>
+            <FileText className="metric-icon" size={24} />
+          </div>
+          <div className="metric-value">{totalEmitidas}</div>
         </div>
-        <div className="list-card glass" style={{ textAlign: 'center', padding: '1rem', borderLeft: '4px solid #10b981' }}>
-          <span style={{ fontSize: '0.85rem', color: '#10b981', fontWeight: 600 }}>Autorizadas 🟢</span>
-          <h3 style={{ fontSize: '1.6rem', color: '#10b981', margin: '0.4rem 0 0 0' }}>{totalAutorizadas}</h3>
+
+        <div className="metric-card glass">
+          <div className="metric-header">
+            <span>Autorizadas 🟢</span>
+            <CheckCircle className="metric-icon" size={24} style={{ color: '#10b981', background: 'rgba(16, 185, 129, 0.1)' }} />
+          </div>
+          <div className="metric-value" style={{ color: '#10b981' }}>{totalAutorizadas}</div>
         </div>
-        <div className="list-card glass" style={{ textAlign: 'center', padding: '1rem', borderLeft: '4px solid #f59e0b' }}>
-          <span style={{ fontSize: '0.85rem', color: '#f59e0b', fontWeight: 600 }}>Canceladas 🟡</span>
-          <h3 style={{ fontSize: '1.6rem', color: '#f59e0b', margin: '0.4rem 0 0 0' }}>{totalCanceladas}</h3>
+
+        <div className="metric-card glass">
+          <div className="metric-header">
+            <span>Canceladas 🟡</span>
+            <Clock className="metric-icon" size={24} style={{ color: '#f59e0b', background: 'rgba(245, 158, 11, 0.1)' }} />
+          </div>
+          <div className="metric-value" style={{ color: '#f59e0b' }}>{totalCanceladas}</div>
         </div>
-        <div className="list-card glass" style={{ textAlign: 'center', padding: '1rem', borderLeft: '4px solid #ef4444' }}>
-          <span style={{ fontSize: '0.85rem', color: '#ef4444', fontWeight: 600 }}>Rejeitadas 🔴</span>
-          <h3 style={{ fontSize: '1.6rem', color: '#ef4444', margin: '0.4rem 0 0 0' }}>{totalRejeitadas}</h3>
+
+        <div className="metric-card glass">
+          <div className="metric-header">
+            <span>Rejeitadas 🔴</span>
+            <XCircle className="metric-icon" size={24} style={{ color: '#ef4444', background: 'rgba(239, 68, 68, 0.1)' }} />
+          </div>
+          <div className="metric-value" style={{ color: '#ef4444' }}>{totalRejeitadas}</div>
         </div>
       </div>
 
-      {/* Filtros e Busca */}
-      <div className="list-card glass" style={{ marginBottom: '1.5rem', padding: '1.2rem' }}>
-        <div className="grid-2" style={{ alignItems: 'center' }}>
-          <div style={{ position: 'relative' }}>
-            <input 
-              type="text" 
-              placeholder="🔍 Buscar por número da nota, chave NFe (44 dígitos) ou protocolo..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="cd-text-input"
-              style={{ paddingRight: '2.5rem' }}
-            />
-          </div>
-          <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+      {/* Barra de Filtro e Busca Harmonizada */}
+      <div className="list-card glass" style={{ marginBottom: '1.5rem', padding: '1.25rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '1rem', alignItems: 'center' }}>
+          <SearchBar
+            value={searchTerm}
+            onChange={setSearchTerm}
+            onSearch={() => {}}
+            onClear={() => setSearchTerm('')}
+            placeholder="Buscar por número da NF, chave de acesso de 44 dígitos ou protocolo..."
+          />
+          <div style={{ minWidth: '200px' }}>
             <select 
               value={statusFilter} 
               onChange={(e) => setStatusFilter(e.target.value)}
               className="cd-text-input"
-              style={{ width: 'auto', minWidth: '180px' }}
+              style={{
+                width: '100%',
+                padding: '0.65rem 0.9rem',
+                borderRadius: '8px',
+                border: '1px solid rgba(0, 0, 0, 0.15)',
+                fontWeight: 600,
+                backgroundColor: '#ffffff'
+              }}
             >
               <option value="todos">Todos os Status</option>
-              <option value="AUTORIZADA">Autorizadas 🟢</option>
-              <option value="CANCELADA">Canceladas 🟡</option>
-              <option value="REJEITADA">Rejeitadas 🔴</option>
+              <option value="AUTORIZADA">🟢 Autorizadas</option>
+              <option value="CANCELADA">🟡 Canceladas</option>
+              <option value="REJEITADA">🔴 Rejeitadas</option>
             </select>
           </div>
         </div>
@@ -181,7 +203,7 @@ export default function NfeTab() {
                 <th>Data Emissão</th>
                 <th>Valor Total</th>
                 <th>Status SEFAZ</th>
-                <th style={{ textAlign: 'right' }}>Ações</th>
+                <th style={{ textAlign: 'right' }}>Ações Fiscais</th>
               </tr>
             </thead>
             <tbody>
@@ -190,7 +212,7 @@ export default function NfeTab() {
                   <td><strong>NF-e #{n.numero || n.id} (Série {n.serie || 1})</strong></td>
                   <td><span className="badge badge-info">Lote #{n.transferencia_id || n.id}</span></td>
                   <td>
-                    <span style={{ fontFamily: 'monospace', fontSize: '0.82rem', color: 'var(--accent-primary)' }} title={n.chave}>
+                    <span style={{ fontFamily: 'monospace', fontSize: '0.85rem', color: 'var(--accent-primary)', fontWeight: 600 }} title={n.chave}>
                       {n.chave ? `${n.chave.substring(0, 10)}...${n.chave.substring(34)}` : '-'}
                     </span>
                   </td>
@@ -206,7 +228,7 @@ export default function NfeTab() {
                       className="cd-action-btn view" 
                       onClick={() => handleDownloadDanfe(n.chave)}
                       title="Baixar DANFE em PDF"
-                      style={{ marginRight: '4px' }}
+                      style={{ marginRight: '6px' }}
                     >
                       📄 DANFE (PDF)
                     </button>
@@ -214,7 +236,7 @@ export default function NfeTab() {
                       className="cd-action-btn view" 
                       onClick={() => handleDownloadXml(n.chave)}
                       title="Baixar XML Autorizado"
-                      style={{ marginRight: '4px', backgroundColor: '#8b5cf6', color: '#fff' }}
+                      style={{ marginRight: '6px', backgroundColor: '#8b5cf6', color: '#fff' }}
                     >
                       📥 XML
                     </button>
@@ -233,7 +255,7 @@ export default function NfeTab() {
               ))}
               {filteredNotes.length === 0 && (
                 <tr>
-                  <td colSpan="7" style={{ textAlign: 'center', padding: '2.5rem' }}>
+                  <td colSpan="7" style={{ textAlign: 'center', padding: '2.5rem', color: '#6b7280' }}>
                     Nenhuma Nota Fiscal (NF-e) encontrada.
                   </td>
                 </tr>

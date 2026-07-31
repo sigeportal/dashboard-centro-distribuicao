@@ -23,13 +23,16 @@
 - **Tabela `ESTOQUE_EMPRESA`**:
   - Exige a chave primária `EE_ID`. Novas gravações geram a chave via `GeraCodigo('ESTOQUE_EMPRESA', 'EE_ID')`.
 
-## 4. Integração com a NotaFiscal Online API (Emissão de NF-e / Modelo 55)
+## 4. Integração com a NotaFiscal Online API (Emissão de NF-e / Modelo 55 - NT 2025.002)
 - **Servidor REST Cloud**: `https://servidor-nota-fiscal-434040955537.southamerica-east1.run.app/v1`
 - **Autenticação JWT**: `POST /v1/auth/login` com `username` e `password`. Toda requisição subsequente deve incluir o cabeçalho `Authorization: Bearer <token>`.
 - **Emissão de Transferências (Modelo 55)**:
   - CFOP padrão para transferência interna de mercadorias entre matriz e filiais: **`5152`** (ou `6152` para interestadual).
   - Forma de pagamento: **`90` (Sem Pagamento)**.
   - CST ICMS: **`102` (Simples Nacional sem permissão de crédito)** ou conforme CRT do emitente.
+- **Reforma Tributária (NT 2025.002 - IBS/CBS e Imposto Seletivo)**:
+  - **Campos de Cabeçalho**: `finalidade_emissao` (`1` Normal, `5` Nota de Crédito, `6` Nota de Débito), `cmun_fg_ibs` (`5003801`), `cind_op` (`010104`), `tp_nf_credito` (`"01"`), `tp_nf_debito` (`"04"`).
+  - **Campos por Item**: `cst_ibscbs` (`"01"`), `cclass_trib` (`"000000"` ou `"810001"`), `aliq_ibs_uf` (`0.1`), `aliq_ibs_mun` (`0.0`), `aliq_cbs` (`0.9`), `cst_is` (`"01"`), `cclass_trib_is` (`"000000"`), `aliq_is` (`0.0`).
 - **Acompanhamento e Downloads**:
   - DANFE em PDF: `GET /v1/nfe/{chave}/danfe` (`Accept: application/pdf`).
   - XML Autorizado: `GET /v1/nfe/{chave}/xml` (`Accept: application/xml`).
