@@ -21,6 +21,46 @@ export default function CadastrosTab() {
   const [historyData, setHistoryData] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
 
+  // Saldo de Estoque Específico da Unidade Logada
+  const [activeUnitStocks, setActiveUnitStocks] = useState({});
+  const activeUnitId = Number(localStorage.getItem('selected_company_id')) || 1;
+  const activeUnitName = localStorage.getItem('selected_company_name') || (activeUnitId === 1 ? 'CD DOURADINA' : `Unidade #${activeUnitId}`);
+  const isMatriz = activeUnitId === 1 || activeUnitName.toUpperCase().includes('CD') || activeUnitName.toUpperCase().includes('DOURADINA');
+
+  useEffect(() => {
+    fetchActiveUnitStocks();
+  }, [activeUnitId]);
+
+  const fetchActiveUnitStocks = async () => {
+    try {
+      const res = await api.get('/v1/estoque/posicao');
+      let dataArr = [];
+      if (Array.isArray(res.data)) dataArr = res.data;
+      else if (res.data?.data && Array.isArray(res.data.data)) dataArr = res.data.data;
+
+      const map = {};
+      dataArr.forEach(st => {
+        if (Number(st.empresa_id) === activeUnitId) {
+          map[st.pro_codigo] = Number(st.quantidade) || 0;
+        }
+      });
+      setActiveUnitStocks(map);
+    } catch (err) {
+      console.warn('Erro ao buscar saldos de estoque no cadastro:', err);
+    }
+  };
+
+  const getProductStockForActiveUnit = (item) => {
+    const prodId = item.codigo || item.id || item.pro_codigo;
+    if (activeUnitStocks[prodId] !== undefined) {
+      return activeUnitStocks[prodId];
+    }
+    if (isMatriz) {
+      return Number(item.quantidade) || 0;
+    }
+    return 0;
+  };
+
   // Listas de Dados
   const [produtos, setProdutos] = useState([]);
   const [grupos, setGrupos] = useState([]);
@@ -578,7 +618,7 @@ export default function CadastrosTab() {
                       <th>NCM</th>
                       <th>UM</th>
                       <th>Totalizador</th>
-                      <th>Estoque</th>
+                      <th>Estoque ({activeUnitName})</th>
                       <th>Preço</th>
                       <th>Cód. Barras</th>
                       <th>Ações</th>
@@ -593,7 +633,7 @@ export default function CadastrosTab() {
                         <td><span className="badge badge-info">{item.ncm || item.pro_ncm || '6109.10.00'}</span></td>
                         <td><strong>{item.um || item.embalagem || item.pro_um || 'UN'}</strong></td>
                         <td><span className="badge badge-success">#{item.codTotalizador || item.pro_totalizador || 1}</span></td>
-                        <td>{item.quantidade}</td>
+                        <td><strong style={{ color: getProductStockForActiveUnit(item) > 0 ? '#10b981' : '#ef4444' }}>{getProductStockForActiveUnit(item)}</strong></td>
                         <td>R$ {Number(item.valorv).toFixed(2)}</td>
                         <td>{item.codbarra || '-'}</td>
                         <td className="actions-cell">

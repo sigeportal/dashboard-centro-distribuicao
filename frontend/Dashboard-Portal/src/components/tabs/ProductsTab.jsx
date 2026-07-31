@@ -16,7 +16,47 @@ export default function ProductsTab({ data, pages, searchTerms, setSearchTerms, 
   const [historyData, setHistoryData] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
 
+  // Saldo de Estoque Específico da Unidade Logada
+  const [activeUnitStocks, setActiveUnitStocks] = useState({});
+  const activeUnitId = Number(localStorage.getItem('selected_company_id')) || 1;
+  const activeUnitName = localStorage.getItem('selected_company_name') || (activeUnitId === 1 ? 'CD DOURADINA' : `Unidade #${activeUnitId}`);
+  const isMatriz = activeUnitId === 1 || activeUnitName.toUpperCase().includes('CD') || activeUnitName.toUpperCase().includes('DOURADINA');
+
   const api = createApi(true);
+
+  useEffect(() => {
+    fetchActiveUnitStocks();
+  }, [activeUnitId]);
+
+  const fetchActiveUnitStocks = async () => {
+    try {
+      const res = await api.get('/v1/estoque/posicao');
+      let dataArr = [];
+      if (Array.isArray(res.data)) dataArr = res.data;
+      else if (res.data?.data && Array.isArray(res.data.data)) dataArr = res.data.data;
+
+      const map = {};
+      dataArr.forEach(st => {
+        if (Number(st.empresa_id) === activeUnitId) {
+          map[st.pro_codigo] = Number(st.quantidade) || 0;
+        }
+      });
+      setActiveUnitStocks(map);
+    } catch (err) {
+      console.warn('Erro ao buscar saldos de estoque da unidade ativa:', err);
+    }
+  };
+
+  const getProductStockForActiveUnit = (item) => {
+    const prodId = item.codigo || item.id || item.pro_codigo;
+    if (activeUnitStocks[prodId] !== undefined) {
+      return activeUnitStocks[prodId];
+    }
+    if (isMatriz) {
+      return Number(item.quantidade) || 0;
+    }
+    return 0;
+  };
 
   // Formata datas para pt-BR e fuso horário UTC-4 (Mato Grosso do Sul / Campo Grande)
   const formatDatePtBr = (dateStr) => {
@@ -135,7 +175,7 @@ export default function ProductsTab({ data, pages, searchTerms, setSearchTerms, 
               <th scope="col">Nome</th>
               <th scope="col">Fabricante</th>
               <th scope="col">Cód. Barras</th>
-              <th scope="col">Estoque Geral</th>
+              <th scope="col">Estoque ({activeUnitName})</th>
               <th scope="col">Valor (Venda)</th>
               <th scope="col">Ações & Histórico</th>
             </tr>
@@ -147,7 +187,11 @@ export default function ProductsTab({ data, pages, searchTerms, setSearchTerms, 
                 <td data-label="Nome">{item.nome}</td>
                 <td data-label="Fabricante">{item.fabricante}</td>
                 <td data-label="Cód. Barras">{item.codbarra}</td>
-                <td data-label="Estoque Geral">{item.quantidade}</td>
+                <td data-label={`Estoque (${activeUnitName})`}>
+                  <strong style={{ color: getProductStockForActiveUnit(item) > 0 ? '#10b981' : '#ef4444' }}>
+                    {getProductStockForActiveUnit(item)}
+                  </strong>
+                </td>
                 <td data-label="Valor (Venda)">{formatCurrency(item.valorv)}</td>
                 <td data-label="Ações & Histórico">
                   <div style={{ display: 'inline-flex', gap: '6px', flexWrap: 'wrap' }}>
