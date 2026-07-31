@@ -133,36 +133,71 @@ export default function TransferTab() {
     fetchUnits();
   }, []);
 
+  // Gerenciamento de notificações dispensadas pelo usuário
+  const [dismissedNotifications, setDismissedNotifications] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('dismissed_transfer_notifications') || '[]');
+    } catch {
+      return [];
+    }
+  });
+
   // Notifica o gestor sobre transferências direcionadas pendentes de conferência
   useEffect(() => {
     if (transfers.length > 0) {
       const activeUnitId = Number(localStorage.getItem('selected_company_id')) || 1;
+      const newNotifications = [];
+
+      // Notifica se a unidade atual possui transferências recebidas pendentes de conferência
       const pendingReception = transfers.filter(
         t => t.destino === activeUnitId && t.status === 'Em Trânsito'
       );
       
-      const newNotifications = pendingReception.map(t => ({
-        id: t.id,
-        message: `Atenção: Nova transferência #${t.id} pendente de recepção e conferência na sua unidade!`,
-        type: 'warning'
-      }));
+      pendingReception.forEach(t => {
+        const notifId = `pending-${t.id}`;
+        if (!dismissedNotifications.includes(notifId)) {
+          const origName = getUnitName(t.origem);
+          newNotifications.push({
+            id: notifId,
+            message: `Atenção: Nova transferência #${t.id} enviada pela unidade [${origName}] está pendente de recepção e conferência!`,
+            type: 'warning'
+          });
+        }
+      });
 
-      // Notifica se a matriz aprovou uma das nossas transferências enviadas
+      // Notifica se a unidade de destino confirmou/aprovou uma transferência enviada por esta unidade
       const approvedSent = transfers.filter(
         t => t.origem === activeUnitId && t.status === 'Conferido/Aprovado'
       );
 
       approvedSent.forEach(t => {
-        newNotifications.push({
-          id: `app-${t.id}`,
-          message: `Sucesso: Unidade de destino confirmou o recebimento da transferência #${t.id}!`,
-          type: 'success'
-        });
+        const notifId = `app-${t.id}`;
+        if (!dismissedNotifications.includes(notifId)) {
+          const destName = getUnitName(t.destino);
+          newNotifications.push({
+            id: notifId,
+            message: `Sucesso: Unidade [${destName}] confirmou e aprovou o recebimento da transferência #${t.id}!`,
+            type: 'success'
+          });
+        }
       });
 
       setNotifications(newNotifications);
     }
-  }, [transfers]);
+  }, [transfers, units, dismissedNotifications]);
+
+  const handleDismissNotification = (id) => {
+    const updated = [...dismissedNotifications, id];
+    setDismissedNotifications(updated);
+    localStorage.setItem('dismissed_transfer_notifications', JSON.stringify(updated));
+  };
+
+  const handleClearAllNotifications = () => {
+    const allIds = notifications.map(n => n.id);
+    const updated = [...dismissedNotifications, ...allIds];
+    setDismissedNotifications(updated);
+    localStorage.setItem('dismissed_transfer_notifications', JSON.stringify(updated));
+  };
 
   const fetchTransfers = async () => {
     setLoading(true);
@@ -456,11 +491,48 @@ export default function TransferTab() {
       
       {/* Alertas de Notificações */}
       {notifications.length > 0 && (
-        <div className="cd-notifications-bar">
-          {notifications.map((n, idx) => (
-            <div key={idx} className={`cd-notification ${n.type}`}>
-              {n.type === 'warning' ? <AlertCircle size={20} /> : <CheckCircle size={20} />}
-              <span>{n.message}</span>
+        <div className="cd-notifications-bar" style={{ marginBottom: '1.25rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem', padding: '0 0.25rem' }}>
+            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+              🔔 Notificações da Central ({notifications.length})
+            </span>
+            <button 
+              onClick={handleClearAllNotifications}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: '#6b7280',
+                fontSize: '0.82rem',
+                cursor: 'pointer',
+                fontWeight: 600,
+                textDecoration: 'underline'
+              }}
+            >
+              Limpar Notificações
+            </button>
+          </div>
+          {notifications.map((n) => (
+            <div key={n.id} className={`cd-notification ${n.type}`} style={{ justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                {n.type === 'warning' ? <AlertCircle size={20} /> : <CheckCircle size={20} />}
+                <span>{n.message}</span>
+              </div>
+              <button 
+                onClick={() => handleDismissNotification(n.id)}
+                title="Dispensar Notificação"
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  color: 'inherit',
+                  opacity: 0.75,
+                  display: 'flex',
+                  alignItems: 'center'
+                }}
+              >
+                <X size={16} />
+              </button>
             </div>
           ))}
         </div>
