@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Outlet, useNavigate, useSearchParams } from 'react-router-dom';
 import { Building2, KeyRound, LifeBuoy, LogOut, Menu, Wrench } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { createApi } from '../services/api';
 import Sidebar from './Sidebar';
 import PasswordModal from './PasswordModal';
 import SupportModal from './SupportModal';
@@ -37,6 +38,56 @@ export default function Layout() {
     return localStorage.getItem('dashboard:show-service-orders') === 'true';
   });
   const userMenuRef = useRef(null);
+
+  // Unidade Logada / Selecionada
+  const [activeCompany, setActiveCompany] = useState(() => {
+    const id = Number(localStorage.getItem('selected_company_id')) || 1;
+    const storedName = localStorage.getItem('selected_company_name');
+    return { id, storedName };
+  });
+
+  useEffect(() => {
+    const fetchCompanyData = async () => {
+      try {
+        const api = createApi(true);
+        const res = await api.get('/v1/empresa');
+        if (Array.isArray(res.data)) {
+          const currentEmp = res.data.find(e => (e.codigo || e.Codigo || e.id) === activeCompany.id);
+          if (currentEmp) {
+            const realName = currentEmp.fantasia || currentEmp.Fantasia || currentEmp.razao_social || currentEmp.Razao_social;
+            if (realName) {
+              localStorage.setItem('selected_company_name', realName);
+              setActiveCompany(prev => ({ ...prev, storedName: realName }));
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Não foi possível obter dados da empresa no header:', err);
+      }
+    };
+    fetchCompanyData();
+  }, [activeCompany.id]);
+
+  const getCompanyDisplay = () => {
+    const id = activeCompany.id;
+    let name = activeCompany.storedName;
+
+    if (!name) {
+      const fallbackNames = {
+        1: 'CD DOURADINA',
+        2: 'ITAPORA',
+        3: 'MARACAJU',
+        4: 'NOVA ALVORADA',
+        5: 'RIO BRILHANTE',
+      };
+      name = fallbackNames[id] || `Unidade #${id}`;
+    }
+
+    const isMatriz = id === 1 || name.toUpperCase().includes('CD') || name.toUpperCase().includes('DOURADINA');
+    return { id, name, isMatriz };
+  };
+
+  const companyDisplay = getCompanyDisplay();
 
   const isNavExpanded = isMobileMenuOpen || !isSidebarCollapsed;
 
@@ -130,7 +181,7 @@ export default function Layout() {
 
       <main className="main-content">
         <header className="header glass">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
             <button
                className="hamburger-btn"
                onClick={handleToggleSidebar}
@@ -140,6 +191,21 @@ export default function Layout() {
               <Menu size={24} aria-hidden="true" />
             </button>
             <div className="header-title">{currentTitle}</div>
+
+            {/* Badge de Destaque da Unidade Logada */}
+            <div 
+              className="header-company-badge"
+              onClick={handleSwitchCompany}
+              title="Clique para alternar a unidade/empresa selecionada"
+            >
+              <Building2 size={16} className="company-badge-icon" />
+              <span className="company-badge-text">
+                Unidade: <strong>{companyDisplay.name}</strong>
+              </span>
+              <span className={`company-type-tag ${companyDisplay.isMatriz ? 'matriz' : 'filial'}`}>
+                {companyDisplay.isMatriz ? 'CD MATRIZ' : 'FILIAL'}
+              </span>
+            </div>
           </div>
           <div className="header-user" ref={userMenuRef}>
             <button

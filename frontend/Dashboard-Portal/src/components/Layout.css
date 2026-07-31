@@ -109,6 +109,64 @@
   color: var(--text-primary);
 }
 
+/* Badge de Unidade / Empresa Logada no Topo */
+.header-company-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.4rem 0.85rem;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(248, 250, 252, 0.95));
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-radius: 999px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  margin-left: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.header-company-badge:hover {
+  border-color: var(--accent-primary, #f97316);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.15);
+}
+
+.company-badge-icon {
+  color: var(--accent-primary, #f97316);
+}
+
+.company-badge-text {
+  color: var(--text-secondary);
+}
+
+.company-badge-text strong {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.company-type-tag {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 0.15rem 0.45rem;
+  border-radius: 6px;
+  text-transform: uppercase;
+}
+
+.company-type-tag.matriz {
+  background: rgba(234, 88, 12, 0.12);
+  color: #ea580c;
+  border: 1px solid rgba(234, 88, 12, 0.25);
+}
+
+.company-type-tag.filial {
+  background: rgba(16, 185, 129, 0.12);
+  color: #059669;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
 .header-user {
   position: relative;
   display: flex;
