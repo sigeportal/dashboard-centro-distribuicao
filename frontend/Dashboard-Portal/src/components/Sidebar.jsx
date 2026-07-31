@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { LayoutDashboard, Users, Package, ArrowRightLeft, DollarSign, ShoppingCart, ShoppingBag, Wrench, Database } from 'lucide-react';
+import { LayoutDashboard, Users, Package, ArrowRightLeft, DollarSign, ShoppingCart, ShoppingBag, Wrench, Database, FileText } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 const navItems = [
@@ -12,6 +12,7 @@ const navItems = [
   { tab: 'movimentacoes', to: '/dashboard?tab=movimentacoes', icon: ArrowRightLeft, label: 'Movimentações', roles: ['admin', 'gerente'] },
   { tab: 'recebimentos', to: '/dashboard?tab=recebimentos', icon: DollarSign, label: 'Recebimentos', roles: ['admin', 'gerente'] },
   { tab: 'transferencias', to: '/dashboard?tab=transferencias', icon: ArrowRightLeft, label: 'Centro Distribuição', roles: ['admin', 'gerente'] },
+  { tab: 'nfe', to: '/dashboard?tab=nfe', icon: FileText, label: 'Notas Fiscais (NF-e)', roles: ['admin', 'gerente'] },
   { tab: 'cadastros', to: '/dashboard?tab=cadastros', icon: Database, label: 'Cadastros Online', roles: ['admin', 'gerente'] },
 ];
 

@@ -60,7 +60,9 @@ uses
   UnitCompras.Model in '..\Shared\Models\Compras\UnitCompras.Model.pas',
   UnitCompras.Controller in '..\Shared\Controllers\Compras\UnitCompras.Controller.pas',
   UnitHisPro.Model in '..\Shared\Models\HistoricoEstoque\UnitHisPro.Model.pas',
-  UnitHisPro.Controller in '..\Shared\Controllers\HistoricoEstoque\UnitHisPro.Controller.pas';
+  UnitHisPro.Controller in '..\Shared\Controllers\HistoricoEstoque\UnitHisPro.Controller.pas',
+  UnitNfeCentral.Model in '..\Shared\Models\Nfe\UnitNfeCentral.Model.pas',
+  UnitNfe.Controller in '..\Shared\Controllers\Nfe\UnitNfe.Controller.pas';
 
 var
 	LLogFileConfig: THorseLoggerConsoleConfig;
@@ -99,6 +101,7 @@ begin
     TComprasController.Router;
     TSyncController.Router;
     THisProController.Router;
+    TNfeController.Router;
     
     //inicializa classes
     TInicializarClasses.Iniciar;  

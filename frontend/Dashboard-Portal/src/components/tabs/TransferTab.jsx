@@ -74,6 +74,46 @@ export default function TransferTab() {
     }
   };
 
+  const handleEmitTransferNfe = async () => {
+    if (transferItems.length === 0) {
+      alert('Adicione ao menos um produto no lote da transferência antes de emitir a NF-e.');
+      return;
+    }
+    setLoadingNf(true);
+    try {
+      const payload = {
+        origem: Number(originUnit),
+        destino: Number(destinationUnit),
+        obs: obs || 'Transferência de estoque entre unidades',
+        tipoFiscal: 'FISCAL',
+        numeroNf: numeroNf || '0',
+        chaveNfe: chaveNfe || '',
+        itens: transferItems.map(it => ({
+          produto_id: it.produto_id,
+          quantidade: it.quantidade,
+          valor: it.valor
+        }))
+      };
+      const resTr = await api.post('/v1/transferencias', payload);
+      const trId = resTr.data?.id || resTr.data?.transferencia_id || 1;
+
+      const resNfe = await api.post('/v1/nfe/emitir-transferencia', { transferencia_id: trId });
+      if (resNfe.data && resNfe.data.sucesso) {
+        setNumeroNf(String(resNfe.data.numero || trId));
+        setChaveNfe(resNfe.data.chave);
+        alert(`NF-e Modelo 55 autorizada na SEFAZ com sucesso!\n\nLote Transferência: #${trId}\nChave NFe: ${resNfe.data.chave}\nProtocolo SEFAZ: ${resNfe.data.protocolo}`);
+        fetchTransfers();
+      } else {
+        alert('Falha na autorização da NF-e na SEFAZ.');
+      }
+    } catch (err) {
+      console.error('Erro ao emitir NF-e da transferência:', err);
+      alert('Erro na transmissão da NF-e para a SEFAZ.');
+    } finally {
+      setLoadingNf(false);
+    }
+  };
+
   // Modal de Pesquisa de Produtos (Igual à tela de Produtos)
   const [showProductSearchModal, setShowProductSearchModal] = useState(false);
   const [modalSearchTerm, setModalSearchTerm] = useState('');
@@ -648,7 +688,7 @@ export default function TransferTab() {
                       />
                     </label>
                   </div>
-                  <div style={{ marginTop: '0.65rem', display: 'flex', justifyContent: 'flex-end' }}>
+                  <div style={{ marginTop: '0.65rem', display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                     <button 
                       type="button" 
                       onClick={handleFetchNfItems}
@@ -668,7 +708,29 @@ export default function TransferTab() {
                         boxShadow: '0 2px 6px rgba(37, 99, 235, 0.3)'
                       }}
                     >
-                      {loadingNf ? '⌛ Buscando Itens da Nota Fiscal...' : '📥 Puxar Todos os Itens Desta Nota Fiscal'}
+                      {loadingNf ? '⌛ Processando...' : '📥 Puxar Itens da Nota de Compra'}
+                    </button>
+
+                    <button 
+                      type="button" 
+                      onClick={handleEmitTransferNfe}
+                      disabled={loadingNf}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        background: 'linear-gradient(135deg, #10b981, #059669)',
+                        color: '#ffffff',
+                        border: 'none',
+                        padding: '0.6rem 1.2rem',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        fontWeight: 600,
+                        fontSize: '0.88rem',
+                        boxShadow: '0 2px 6px rgba(16, 185, 129, 0.3)'
+                      }}
+                    >
+                      {loadingNf ? '⌛ Transmitindo SEFAZ...' : '⚡ Emitir Nova NF-e via SEFAZ'}
                     </button>
                   </div>
                 </div>
