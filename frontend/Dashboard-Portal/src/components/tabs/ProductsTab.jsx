@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Package, Eye, X, Building2, History } from 'lucide-react';
 import SearchBar from '../SearchBar';
