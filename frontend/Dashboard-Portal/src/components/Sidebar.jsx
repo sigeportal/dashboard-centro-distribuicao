@@ -1,11 +1,12 @@
 import { Link } from 'react-router-dom';
-import { LayoutDashboard, Users, Package, ArrowRightLeft, DollarSign, ShoppingCart, Wrench, Database } from 'lucide-react';
+import { LayoutDashboard, Users, Package, ArrowRightLeft, DollarSign, ShoppingCart, ShoppingBag, Wrench, Database } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 const navItems = [
   { tab: 'geral', to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { tab: 'clientes', to: '/dashboard?tab=clientes', icon: Users, label: 'Clientes' },
   { tab: 'produtos', to: '/dashboard?tab=produtos', icon: Package, label: 'Produtos' },
+  { tab: 'compras', to: '/dashboard?tab=compras', icon: ShoppingBag, label: 'Compras', roles: ['admin', 'gerente'] },
   { tab: 'vendas', to: '/dashboard?tab=vendas', icon: ShoppingCart, label: 'Vendas' },
   { tab: 'os', to: '/dashboard?tab=os', icon: Wrench, label: 'OS' },
   { tab: 'movimentacoes', to: '/dashboard?tab=movimentacoes', icon: ArrowRightLeft, label: 'Movimentações', roles: ['admin', 'gerente'] },

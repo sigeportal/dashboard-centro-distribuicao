@@ -95,6 +95,7 @@ var Grupos: TGrupos;
 begin
   try
     Grupos := TGrupos.Create(TDatabase.Connection).fromJson<TGrupos>(Req.Body);
+    Grupos.Cadastrar := 'S';
     Grupos.SalvaNoBanco(1);
     Res.Send<TJSONObject>(TJSONObject.ParseJSONValue(Grupos.ToJson) as TJSONObject);
   finally
@@ -107,6 +108,7 @@ var Grupos: TGrupos;
 begin
   try
     Grupos := TGrupos.Create(TDatabase.Connection).fromJson<TGrupos>(Req.Body);
+    Grupos.Cadastrar := 'S';
     Grupos.SalvaNoBanco(1);
     Res.Send<TJSONObject>(TJSONObject.ParseJSONValue(Grupos.ToJson) as TJSONObject);
   finally
@@ -130,10 +132,10 @@ begin
 	FDQuery := TFDQuery(LQuery.Query);
 	FDQuery.Close;
 	FDQuery.SQL.Clear;
-	FDQuery.SQL.Add('UPDATE OR INSERT INTO GRUPO_1 (G1_CODIGO, G1_NOME)');
-	FDQuery.SQL.Add('VALUES (:G1_CODIGO, :G1_NOME)');
+	FDQuery.SQL.Add('UPDATE OR INSERT INTO GRUPO_1 (G1_CODIGO, G1_NOME, G1_CADASTRAR)');
+	FDQuery.SQL.Add('VALUES (:G1_CODIGO, :G1_NOME, :G1_CADASTRAR)');
 	FDQuery.SQL.Add('MATCHING (G1_CODIGO)');
-	// preparando para usar inser��es via ArrayDML
+	// preparando para usar inserções via ArrayDML
 	FDQuery.Params.ArraySize := aJson.Count;
 	for i                    := 0 to Pred(aJson.Count) do
 	begin
@@ -142,11 +144,12 @@ begin
 		try
 			FDQuery.ParamByName('G1_CODIGO').AsIntegers[i] := Itens.Codigo;
 			FDQuery.ParamByName('G1_NOME').AsStrings[i]    := Itens.Nome;
+			FDQuery.ParamByName('G1_CADASTRAR').AsStrings[i] := 'S';
 		finally
 			Itens.DisposeOf;
 		end;
 	end;
-	// Executa as inser��es em lote
+	// Executa as inseres em lote
 	FDQuery.Execute(aJson.Count, 0);
 	Res.Send<TJSONObject>(oJson);
 end;

@@ -17,6 +17,7 @@ export default function Layout() {
     geral: 'Visão Geral',
     clientes: 'Clientes',
     produtos: 'Produtos',
+    compras: 'Compras',
     vendas: 'Vendas',
     os: 'OS',
     movimentacoes: 'Movimentações',

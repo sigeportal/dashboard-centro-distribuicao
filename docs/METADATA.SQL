@@ -15447,10 +15447,14 @@ END^
 
 
 
-SET TERM ; ^
 
 
-/******************************************************************************/
-/***                              Descriptions                              ***/
-/******************************************************************************/
+CREATE TABLE ESTOQUE_EMPRESA (
+    EE_ID               INTEGER NOT NULL PRIMARY KEY,
+    EE_EMPRESA_ID       INTEGER NOT NULL,
+    EE_PRO_CODIGO       INTEGER NOT NULL,
+    EE_QUANTIDADE       NUMERIC(12,4) DEFAULT 0 NOT NULL,
+    EE_DATA_ATUALIZACAO TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 

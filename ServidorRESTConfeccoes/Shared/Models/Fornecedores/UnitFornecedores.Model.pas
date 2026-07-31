@@ -99,7 +99,7 @@ type
 		property InscMunicipal: string read FInscMunicipal write FInscMunicipal;
     [TRelacionamento('CIDADES', 'CID_CODIGO', 'FOR_CID', TCidade, UmPraUm)]
 		property Cidade: TCidade read FCidade write FCidade;
-    [TCampo('FOR_CADASTRAR', 'CHAR(1)')]
+    [TCampo('FOR_CADASTRAR', 'CHAR(1) DEFAULT ''N''')]
     property Cadastrar: string read FCadastrar write FCadastrar;
   end;
 

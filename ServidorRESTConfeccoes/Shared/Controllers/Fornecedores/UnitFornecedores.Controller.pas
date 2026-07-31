@@ -121,6 +121,7 @@ var Fornecedores: TFornecedores;
 begin
   try
     Fornecedores := TFornecedores.Create(TDatabase.Connection).fromJson<TFornecedores>(Req.Body);
+    Fornecedores.Cadastrar := 'S';
     Fornecedores.SalvaNoBanco(1);
     Res.Send<TJSONObject>(TJSONObject.ParseJSONValue(Fornecedores.ToJson) as TJSONObject);
   finally
@@ -149,11 +150,11 @@ begin
   FDQuery.SQL.Add('FOR_CONTATO, FOR_EMAIL, FOR_DATAC, FOR_DATAU, FOR_CELULAR, FOR_ENDCORRESP, FOR_OBS,');
   FDQuery.SQL.Add('FOR_CNPJ_CPF, FOR_INSC_ESTADUAL, FOR_COMPLEMENTO, FOR_COD_PAIS, FOR_SUFRAMA,');
   FDQuery.SQL.Add('FOR_INDIC_IE, FOR_CID, FOR_RAZAO_SOCIAL, FOR_FANTASIA, FOR_END_NUMERO, FOR_TIPO,');
-  FDQuery.SQL.Add('FOR_INSC_MUNICIPAL)');
+  FDQuery.SQL.Add('FOR_INSC_MUNICIPAL, FOR_CADASTRAR)');
   FDQuery.SQL.Add('VALUES (:FOR_CODIGO, :FOR_NOME, :FOR_ENDERECO, :FOR_BAIRRO, :FOR_CEP, :FOR_UF, :FOR_FONE, :FOR_CONTATO, :FOR_EMAIL,');
   FDQuery.SQL.Add(':FOR_DATAC, :FOR_DATAU, :FOR_CELULAR, :FOR_ENDCORRESP, :FOR_OBS, :FOR_CNPJ_CPF, :FOR_INSC_ESTADUAL,');
   FDQuery.SQL.Add(':FOR_COMPLEMENTO, :FOR_COD_PAIS, :FOR_SUFRAMA, :FOR_INDIC_IE, :FOR_CID, :FOR_RAZAO_SOCIAL, :FOR_FANTASIA,');
-  FDQuery.SQL.Add(':FOR_END_NUMERO, :FOR_TIPO, :FOR_INSC_MUNICIPAL)');
+  FDQuery.SQL.Add(':FOR_END_NUMERO, :FOR_TIPO, :FOR_INSC_MUNICIPAL, :FOR_CADASTRAR)');
   FDQuery.SQL.Add('MATCHING (FOR_CODIGO)');  
 	// preparando para usar inser��es via ArrayDML
 	FDQuery.Params.ArraySize := aJson.Count;
@@ -188,6 +189,7 @@ begin
       FDQuery.ParamByName('FOR_END_NUMERO').AsStrings[i] := Itens.End_numero;
       FDQuery.ParamByName('FOR_TIPO').AsStrings[i] := Itens.Tipo;
       FDQuery.ParamByName('FOR_INSC_MUNICIPAL').AsStrings[i] := Itens.InscMunicipal;
+      FDQuery.ParamByName('FOR_CADASTRAR').AsStrings[i] := 'S';
 		finally
 			Itens.DisposeOf;
 		end;
@@ -202,6 +204,7 @@ var Fornecedores: TFornecedores;
 begin
   try
     Fornecedores := TFornecedores.Create(TDatabase.Connection).fromJson<TFornecedores>(Req.Body);
+    Fornecedores.Cadastrar := 'S';
     Fornecedores.SalvaNoBanco(1);
     Res.Send<TJSONObject>(TJSONObject.ParseJSONValue(Fornecedores.ToJson) as TJSONObject);
   finally

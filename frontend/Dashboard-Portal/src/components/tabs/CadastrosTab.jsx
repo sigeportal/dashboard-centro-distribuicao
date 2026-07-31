@@ -1,13 +1,25 @@
 import { useState, useEffect } from 'react';
-import { Package, Folder, Layers, Ruler, Plus, Edit, Trash2, Save, X, RefreshCw, Grid } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { Package, Folder, Layers, Ruler, Plus, Edit, Trash2, Save, X, RefreshCw, Grid, AlertCircle, History } from 'lucide-react';
 import { createApi } from '../../services/api';
+import { formatCurrency, formatDatehora } from '../../utils/formatters';
+import Pagination from '../Pagination';
+import SearchBar from '../SearchBar';
 import './CadastrosTab.css';
 
 export default function CadastrosTab() {
   const api = createApi(true); // Conecta na CD_API_BASE (port 9000)
-  const [activeSubTab, setActiveSubTab] = useState('produtos'); // 'produtos', 'grupos', 'subgrupos', 'grades', 'tamanhos'
+  const [activeSubTab, setActiveSubTab] = useState('grupos'); // 'grupos', 'subgrupos', 'grades', 'tamanhos', 'produtos'
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [page, setPage] = useState(1);
+  const [meta, setMeta] = useState({ page: 1, limit: 10, total: 0, pages: 1 });
+  const [searchTerm, setSearchTerm] = useState('');
+
+  // Histórico de Movimentações (HIS_PRO)
+  const [selectedHistoryProduct, setSelectedHistoryProduct] = useState(null);
+  const [historyData, setHistoryData] = useState([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
 
   // Listas de Dados
   const [produtos, setProdutos] = useState([]);
@@ -15,46 +27,119 @@ export default function CadastrosTab() {
   const [subgrupos, setSubgrupos] = useState([]);
   const [grades, setGrades] = useState([]);
   const [tamanhos, setTamanhos] = useState([]);
+  const [totalizadores, setTotalizadores] = useState([]);
 
   // Estados de Formulário
   const [editingItem, setEditingItem] = useState(null); // Item em edição
   const [showForm, setShowForm] = useState(false);
 
   // Campos de Formulário
-  const [prodForm, setProdForm] = useState({ codigo: '', nome: '', fabricante: '', codbarra: '', quantidade: 0, valorv: 0, cadastrar: 'S', url_Imagem: '', distribute: true });
+  const [prodForm, setProdForm] = useState({ 
+    codigo: '', 
+    nome: '', 
+    fabricante: '', 
+    codbarra: '', 
+    quantidade: 0, 
+    valorv: 0, 
+    codTotalizador: 1, 
+    ncm: '6109.10.00', 
+    um: 'UN', 
+    cadastrar: 'S', 
+    url_Imagem: '', 
+    distribute: true 
+  });
   const [grupoForm, setGrupoForm] = useState({ codigo: '', nome: '' });
   const [subgrupoForm, setSubgrupoForm] = useState({ codigo: '', nome: '', g1: '', tr: '0' });
   const [gradeForm, setGradeForm] = useState({ codigo: '', pro: '', valor: '', tam: '', quantidade: '', codbarra: '', cor: '' });
   const [tamanhoForm, setTamanhoForm] = useState({ codigo: '', pro: '', tamanho: '', sigla: '', valor: '' });
 
   useEffect(() => {
-    fetchData();
+    const loadTotalizadores = async () => {
+      try {
+        const res = await api.get('/v1/totalizadores');
+        if (Array.isArray(res.data) && res.data.length > 0) {
+          setTotalizadores(res.data);
+        } else {
+          setTotalizadores([
+            { codigo: 1, totalizador: '01T1700', descricao: 'T - Tributado ICMS 17%' },
+            { codigo: 2, totalizador: '02T1200', descricao: 'T - Tributado ICMS 12%' },
+            { codigo: 3, totalizador: '03T2500', descricao: 'T - Tributado ICMS 25%' },
+            { codigo: 4, totalizador: 'F1', descricao: 'F - Substituição Tributária' },
+            { codigo: 5, totalizador: 'I1', descricao: 'I - Isento / Não Tributado' },
+            { codigo: 6, totalizador: 'N1', descricao: 'N - Não Incidência' }
+          ]);
+        }
+      } catch (err) {
+        setTotalizadores([
+          { codigo: 1, totalizador: '01T1700', descricao: 'T - Tributado ICMS 17%' },
+          { codigo: 2, totalizador: '02T1200', descricao: 'T - Tributado ICMS 12%' },
+          { codigo: 3, totalizador: '03T2500', descricao: 'T - Tributado ICMS 25%' },
+          { codigo: 4, totalizador: 'F1', descricao: 'F - Substituição Tributária' },
+          { codigo: 5, totalizador: 'I1', descricao: 'I - Isento / Não Tributado' },
+          { codigo: 6, totalizador: 'N1', descricao: 'N - Não Incidência' }
+        ]);
+      }
+    };
+    loadTotalizadores();
+  }, []);
+
+  useEffect(() => {
+    setSearchTerm('');
+    fetchData('last', '');
   }, [activeSubTab]);
 
-  const fetchData = async () => {
+  const fetchData = async (targetPage = 'last', search = searchTerm) => {
     setLoading(true);
     setError('');
     try {
-      if (activeSubTab === 'produtos') {
-        const res = await api.get('/v1/produtos');
-        if (Array.isArray(res.data)) setProdutos(res.data);
-      } else if (activeSubTab === 'grupos') {
-        const res = await api.get('/v1/grupos');
-        if (Array.isArray(res.data)) setGrupos(res.data);
-      } else if (activeSubTab === 'subgrupos') {
-        const res = await api.get('/v1/subgrupos');
-        if (Array.isArray(res.data)) setSubgrupos(res.data);
-      } else if (activeSubTab === 'grades') {
-        const res = await api.get('/v1/grades');
-        if (Array.isArray(res.data)) setGrades(res.data);
-        // Busca produtos e tamanhos auxiliares para os dropdowns da grade
-        const [pRes, tRes] = await Promise.all([api.get('/v1/produtos'), api.get('/v1/tamanhos')]);
-        if (Array.isArray(pRes.data)) setProdutos(pRes.data);
-        if (Array.isArray(tRes.data)) setTamanhos(tRes.data);
-      } else if (activeSubTab === 'tamanhos') {
-        const res = await api.get('/v1/tamanhos');
-        if (Array.isArray(res.data)) setTamanhos(res.data);
+      let pageToFetch = targetPage === 'last' ? 1 : targetPage;
+      const searchParam = search ? `&search=${encodeURIComponent(search)}` : '';
+      let url = `/v1/${activeSubTab}?page=${pageToFetch}&limit=10${searchParam}`;
+      let res = await api.get(url);
+
+      let items = [];
+      let metaData = { page: pageToFetch, limit: 10, total: 0, pages: 1 };
+
+      if (Array.isArray(res.data)) {
+        items = res.data;
+        metaData = { page: 1, limit: items.length || 10, total: items.length, pages: 1 };
+      } else if (res.data && Array.isArray(res.data.data)) {
+        items = res.data.data;
+        metaData = res.data.meta || metaData;
       }
+
+      if (targetPage === 'last' && metaData.pages > 1) {
+        pageToFetch = metaData.pages;
+        url = `/v1/${activeSubTab}?page=${pageToFetch}&limit=10${searchParam}`;
+        res = await api.get(url);
+        if (Array.isArray(res.data)) {
+          items = res.data;
+          metaData = { page: 1, limit: items.length || 10, total: items.length, pages: 1 };
+        } else if (res.data && Array.isArray(res.data.data)) {
+          items = res.data.data;
+          metaData = res.data.meta || metaData;
+        }
+      }
+
+      if (activeSubTab === 'produtos') {
+        setProdutos(items);
+      } else if (activeSubTab === 'grupos') {
+        setGrupos(items);
+      } else if (activeSubTab === 'subgrupos') {
+        setSubgrupos(items);
+      } else if (activeSubTab === 'grades') {
+        setGrades(items);
+        const [pRes, tRes] = await Promise.all([api.get('/v1/produtos?limit=100'), api.get('/v1/tamanhos?limit=100')]);
+        if (Array.isArray(pRes.data)) setProdutos(pRes.data);
+        else if (pRes.data?.data) setProdutos(pRes.data.data);
+        if (Array.isArray(tRes.data)) setTamanhos(tRes.data);
+        else if (tRes.data?.data) setTamanhos(tRes.data.data);
+      } else if (activeSubTab === 'tamanhos') {
+        setTamanhos(items);
+      }
+
+      setMeta(metaData);
+      setPage(metaData.page || pageToFetch);
     } catch (err) {
       console.error(err);
       setError('Erro ao carregar dados do servidor central.');
@@ -65,8 +150,21 @@ export default function CadastrosTab() {
 
   const handleOpenCreate = () => {
     setEditingItem(null);
-    // Reset formulários
-    setProdForm({ codigo: '', nome: '', fabricante: '', codbarra: '', quantidade: '', valorv: '', cadastrar: 'S', url_Imagem: '' });
+    // Reset formulários (Novo produto vem marcado para distribuição por padrão)
+    setProdForm({ 
+      codigo: '', 
+      nome: '', 
+      fabricante: '', 
+      codbarra: '', 
+      quantidade: '', 
+      valorv: '', 
+      codTotalizador: 1, 
+      ncm: '6109.10.00', 
+      um: 'UN', 
+      cadastrar: 'S', 
+      url_Imagem: '', 
+      distribute: true 
+    });
     setGrupoForm({ codigo: '', nome: '' });
     setSubgrupoForm({ codigo: '', nome: '', g1: '', tr: '0' });
     setGradeForm({ codigo: '', pro: '', valor: '', tam: '', quantidade: '', codbarra: '', cor: '' });
@@ -77,7 +175,12 @@ export default function CadastrosTab() {
   const handleOpenEdit = (item) => {
     setEditingItem(item);
     if (activeSubTab === 'produtos') {
-      setProdForm({ ...item });
+      setProdForm({ 
+        ...item,
+        codTotalizador: item.codTotalizador || item.pro_totalizador || 1,
+        ncm: item.ncm || item.pro_ncm || '6109.10.00',
+        um: item.um || item.embalagem || item.pro_um || 'UN'
+      });
     } else if (activeSubTab === 'grupos') {
       setGrupoForm({ ...item });
     } else if (activeSubTab === 'subgrupos') {
@@ -127,8 +230,12 @@ export default function CadastrosTab() {
           codbarra: prodForm.codbarra,
           quantidade: Number(prodForm.quantidade) || 0,
           valorv: Number(prodForm.valorv) || 0,
-          cadastrar: prodForm.cadastrar,
-          url_Imagem: prodForm.url_Imagem
+          codTotalizador: Number(prodForm.codTotalizador) || 1,
+          ncm: prodForm.ncm || '6109.10.00',
+          um: prodForm.um || 'UN',
+          embalagem: prodForm.um || 'UN',
+          cadastrar: prodForm.cadastrar || 'S',
+          url_Imagem: prodForm.url_Imagem || ''
         };
         if (editingItem) {
           await api.put('/v1/produtos', payload);
@@ -224,12 +331,32 @@ export default function CadastrosTab() {
 
       alert('Salvo com sucesso!');
       setShowForm(false);
-      fetchData();
+      fetchData(activeSubTab, page, searchTerm);
     } catch (err) {
       console.error(err);
-      alert('Erro ao salvar os dados.');
+      alert('Erro ao excluir registro.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleOpenHistoryModal = async (product) => {
+    setSelectedHistoryProduct(product);
+    setLoadingHistory(true);
+    try {
+      const res = await api.get(`/v1/historico-estoque?pro_codigo=${product.codigo}`);
+      if (res.data && Array.isArray(res.data.data)) {
+        setHistoryData(res.data.data);
+      } else if (Array.isArray(res.data)) {
+        setHistoryData(res.data);
+      } else {
+        setHistoryData([]);
+      }
+    } catch (err) {
+      console.error('Erro ao buscar histórico de estoque:', err);
+      setHistoryData([]);
+    } finally {
+      setLoadingHistory(false);
     }
   };
 
@@ -238,9 +365,6 @@ export default function CadastrosTab() {
       
       {/* Sub Menu de Cadastros */}
       <div className="crud-header-tabs glass">
-        <button className={`crud-tab-btn ${activeSubTab === 'produtos' ? 'active' : ''}`} onClick={() => { setActiveSubTab('produtos'); setShowForm(false); }}>
-          <Package size={18} /> Produtos
-        </button>
         <button className={`crud-tab-btn ${activeSubTab === 'grupos' ? 'active' : ''}`} onClick={() => { setActiveSubTab('grupos'); setShowForm(false); }}>
           <Folder size={18} /> Grupos
         </button>
@@ -252,6 +376,9 @@ export default function CadastrosTab() {
         </button>
         <button className={`crud-tab-btn ${activeSubTab === 'tamanhos' ? 'active' : ''}`} onClick={() => { setActiveSubTab('tamanhos'); setShowForm(false); }}>
           <Ruler size={18} /> Tamanhos
+        </button>
+        <button className={`crud-tab-btn ${activeSubTab === 'produtos' ? 'active' : ''}`} onClick={() => { setActiveSubTab('produtos'); setShowForm(false); }}>
+          <Package size={18} /> Produtos
         </button>
       </div>
 
@@ -271,7 +398,7 @@ export default function CadastrosTab() {
             {activeSubTab === 'produtos' && (
               <div className="grid-form">
                 <label className="crud-input">
-                  Nome do Produto
+                  Nome do Produto *
                   <input type="text" value={prodForm.nome} onChange={(e) => setProdForm({ ...prodForm, nome: e.target.value })} required />
                 </label>
                 <label className="crud-input">
@@ -279,8 +406,34 @@ export default function CadastrosTab() {
                   <input type="text" value={prodForm.fabricante} onChange={(e) => setProdForm({ ...prodForm, fabricante: e.target.value })} />
                 </label>
                 <label className="crud-input">
-                  Código de Barras
+                  Código de Barras (EAN)
                   <input type="text" value={prodForm.codbarra} onChange={(e) => setProdForm({ ...prodForm, codbarra: e.target.value })} />
+                </label>
+                <label className="crud-input">
+                  NCM (Classificação Fiscal) *
+                  <input type="text" required value={prodForm.ncm || '6109.10.00'} onChange={(e) => setProdForm({ ...prodForm, ncm: e.target.value })} placeholder="Ex: 6109.10.00" />
+                </label>
+                <label className="crud-input">
+                  Unidade de Medida (UM) *
+                  <select value={prodForm.um || 'UN'} onChange={(e) => setProdForm({ ...prodForm, um: e.target.value })}>
+                    <option value="UN">UN - Unidade</option>
+                    <option value="PC">PC - Peça</option>
+                    <option value="KG">KG - Quilograma</option>
+                    <option value="PAR">PAR - Par</option>
+                    <option value="CX">CX - Caixa</option>
+                    <option value="MT">MT - Metro</option>
+                    <option value="L">L - Litro</option>
+                  </select>
+                </label>
+                <label className="crud-input">
+                  Totalizador Fiscal (ICMS/ISS) *
+                  <select value={prodForm.codTotalizador || 1} onChange={(e) => setProdForm({ ...prodForm, codTotalizador: Number(e.target.value) })}>
+                    {totalizadores.map(tot => (
+                      <option key={tot.codigo} value={tot.codigo}>
+                        #{tot.codigo} - {tot.totalizador} ({tot.descricao || 'Tributado'})
+                      </option>
+                    ))}
+                  </select>
                 </label>
                 <label className="crud-input">
                   Estoque Inicial
@@ -296,7 +449,7 @@ export default function CadastrosTab() {
                 </label>
                 {!editingItem && (
                   <label className="crud-checkbox-container" style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', marginTop: '1rem' }}>
-                    <input type="checkbox" checked={prodForm.distribute} onChange={(e) => setProdForm({ ...prodForm, distribute: e.target.checked })} />
+                    <input type="checkbox" checked={prodForm.distribute !== false} onChange={(e) => setProdForm({ ...prodForm, distribute: e.target.checked })} />
                     <span style={{ fontSize: '0.9rem', color: 'var(--text-color)' }}>
                       Distribuir para Filiais (Gera transferência de estoque agendada para outras unidades)
                     </span>
@@ -422,6 +575,9 @@ export default function CadastrosTab() {
                       <th>Código</th>
                       <th>Nome</th>
                       <th>Marca</th>
+                      <th>NCM</th>
+                      <th>UM</th>
+                      <th>Totalizador</th>
                       <th>Estoque</th>
                       <th>Preço</th>
                       <th>Cód. Barras</th>
@@ -434,10 +590,14 @@ export default function CadastrosTab() {
                         <td><span className="item-code">#{item.codigo}</span></td>
                         <td>{item.nome}</td>
                         <td>{item.fabricante || '-'}</td>
+                        <td><span className="badge badge-info">{item.ncm || item.pro_ncm || '6109.10.00'}</span></td>
+                        <td><strong>{item.um || item.embalagem || item.pro_um || 'UN'}</strong></td>
+                        <td><span className="badge badge-success">#{item.codTotalizador || item.pro_totalizador || 1}</span></td>
                         <td>{item.quantidade}</td>
                         <td>R$ {Number(item.valorv).toFixed(2)}</td>
                         <td>{item.codbarra || '-'}</td>
                         <td className="actions-cell">
+                          <button className="crud-row-btn" onClick={() => handleOpenHistoryModal(item)} title="Ver Histórico (HIS_PRO)" style={{ background: 'rgba(99, 102, 241, 0.15)', color: '#6366f1' }}><History size={14} /></button>
                           <button className="crud-row-btn edit" onClick={() => handleOpenEdit(item)}><Edit size={14} /></button>
                           <button className="crud-row-btn delete" onClick={() => handleDelete(item.codigo)}><Trash2 size={14} /></button>
                         </td>
@@ -573,7 +733,73 @@ export default function CadastrosTab() {
 
             </table>
           </div>
+          
+          <Pagination
+            currentPage={meta.page || page}
+            totalPages={meta.pages || 1}
+            onPageChange={(p) => fetchData(p, searchTerm)}
+          />
         </div>
+      )}
+
+      {/* MODAL POPUP DE HISTÓRICO DE MOVIMENTAÇÃO (HIS_PRO) */}
+      {selectedHistoryProduct && createPortal(
+        <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setSelectedHistoryProduct(null); }}>
+          <div className="modal-content glass" style={{ maxWidth: '900px', width: '92vw' }}>
+            <div className="modal-header">
+              <h4><History size={20} style={{ color: 'var(--accent-primary)' }} /> Histórico de Movimentações (HIS_PRO): #{selectedHistoryProduct.codigo} - {selectedHistoryProduct.nome}</h4>
+              <button className="btn-close" onClick={() => setSelectedHistoryProduct(null)}><X size={18} /></button>
+            </div>
+            <div className="modal-body" style={{ padding: '1rem 0' }}>
+              {loadingHistory ? (
+                <div style={{ textAlign: 'center', padding: '2rem' }}>Carregando histórico de movimentação...</div>
+              ) : historyData.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>Nenhuma movimentação de estoque registrada para este produto.</div>
+              ) : (
+                <div className="table-responsive" style={{ maxHeight: '420px', overflowY: 'auto' }}>
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Data</th>
+                        <th>Origem / Operação</th>
+                        <th>Doc. / Ref</th>
+                        <th>Tipo</th>
+                        <th>Qtd Movimentada</th>
+                        <th>Qtd Anterior</th>
+                        <th>Custo Entrada</th>
+                        <th>Custo Médio</th>
+                        <th>Valor Venda</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {historyData.map((h, idx) => (
+                        <tr key={h.hp_codigo || idx}>
+                          <td>{formatDatehora(h.hp_data)}</td>
+                          <td><strong>{h.hp_origem || '-'}</strong></td>
+                          <td>{h.hp_doc || '-'}</td>
+                          <td>
+                            <span className={`badge ${h.hp_tipo === 'E' ? 'badge-success' : h.hp_tipo === 'S' ? 'badge-danger' : 'badge-info'}`}>
+                              {h.hp_tipo === 'E' ? 'Entrada' : h.hp_tipo === 'S' ? 'Saída' : h.hp_tipo || 'Movimento'}
+                            </span>
+                          </td>
+                          <td><strong>{h.hp_quantidade}</strong></td>
+                          <td>{h.hp_quantidadea || 0}</td>
+                          <td>{formatCurrency(h.hp_valorc || 0)}</td>
+                          <td>{formatCurrency(h.hp_valorcm || 0)}</td>
+                          <td>{formatCurrency(h.hp_valorv || 0)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+            <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
+              <button className="btn-secondary" onClick={() => setSelectedHistoryProduct(null)}>Fechar</button>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
 
     </div>

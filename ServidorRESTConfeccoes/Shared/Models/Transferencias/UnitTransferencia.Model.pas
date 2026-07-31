@@ -18,6 +18,10 @@ type
     FObs: string;
     FUsuarioRecebimento: string;
     FDataRecebimento: TDateTime;
+    FTipoFiscal: string;
+    FNumeroNf: string;
+    FChaveNfe: string;
+    FCadastrar: string;
   public
     [TCampo('TR_ID', 'INTEGER NOT NULL PRIMARY KEY')]
     property Id: Integer read FId write FId;
@@ -42,6 +46,18 @@ type
 
     [TCampo('TR_DATA_RECEBIMENTO', 'DATE')]
     property DataRecebimento: TDateTime read FDataRecebimento write FDataRecebimento;
+
+    [TCampo('TR_TIPO_FISCAL', 'VARCHAR(15)')]
+    property TipoFiscal: string read FTipoFiscal write FTipoFiscal;
+
+    [TCampo('TR_NUMERO_NF', 'VARCHAR(20)')]
+    property NumeroNf: string read FNumeroNf write FNumeroNf;
+
+    [TCampo('TR_CHAVE_NFE', 'VARCHAR(44)')]
+    property ChaveNfe: string read FChaveNfe write FChaveNfe;
+
+    [TCampo('TR_CADASTRAR', 'CHAR(1) DEFAULT ''N''')]
+    property Cadastrar: string read FCadastrar write FCadastrar;
   end;
 
 implementation

@@ -10,10 +10,16 @@ uses
   System.Net.HttpClient,
   System.Net.HttpClientComponent,
   System.DateUtils,
+  System.Variants,
   UnitDatabase,
   UnitConnection.Model.Interfaces,
   UnitConstants,
   UnitEmpresa.Model,
+  UnitOrdens.Model,
+  UnitOrdEst.Model,
+  UnitGrades.Model,
+  UnitTamanho.Model,
+  UnitCddTransferencia.Model,
   UnitFunctions,
   JOSE.Core.JWT,
   JOSE.Core.Builder;
@@ -26,7 +32,11 @@ type
     FCNPJ: string;
     FToken: string;
     FEmpresaId: Integer;
+    function ObterCpfAuth: string;
+    function ObterSenhaAuth: string;
+    function AutenticaUsuarioAUTH: Boolean;
     procedure LoadConfig;
+    procedure IdentificaEmpresaPorCNPJ;
     function GenerateJWT: string;
     procedure EnsureLocalTables;
     procedure SyncDashboard;
@@ -36,6 +46,11 @@ type
     function QueryVendasGrupoJson(StartDate, EndDate: string): TJSONArray;
     function QueryClientesCidadeJson: TJSONArray;
     function QueryVendasHoraJson(StartDate, EndDate: string): TJSONArray;
+    function QueryEstoqueJson: TJSONArray;
+    function SafeGetInt(const AObj: TJSONObject; const AKey: string; ADefault: Integer = 0): Integer;
+    function SafeGetFloat(const AObj: TJSONObject; const AKey: string; ADefault: Double = 0): Double;
+    function SafeGetString(const AObj: TJSONObject; const AKey: string; const ADefault: string = ''): string;
+    function SafeGetDateParam(const AObj: TJSONObject; const AKey: string): Variant;
   protected
     procedure Execute; override;
   public
@@ -55,8 +70,6 @@ implementation
 
 { TSyncThread }
 
-uses UnitOrdens.Model, UnitOrdEst.Model;
-
 constructor TSyncThread.Create;
 begin
   inherited Create(True);
@@ -75,6 +88,82 @@ begin
   inherited;
 end;
 
+function TSyncThread.ObterCpfAuth: string;
+begin
+  Result := GetEnvironmentVariable('AUTH_CPF').Trim;
+  if Result.IsEmpty then
+    Result := GetEnvironmentVariable('CPF_AUTH').Trim;
+  if Result.IsEmpty then
+    Result := FIniFile.ReadString('Sincronia', 'AUTH_CPF', FIniFile.ReadString('Auth', 'CPF', '123.456.789-09'));
+end;
+
+function TSyncThread.ObterSenhaAuth: string;
+begin
+  Result := GetEnvironmentVariable('AUTH_PASSWORD').Trim;
+  if Result.IsEmpty then
+    Result := GetEnvironmentVariable('AUTH_PASW').Trim;
+  if Result.IsEmpty then
+    Result := GetEnvironmentVariable('PASW_AUTH').Trim;
+  if Result.IsEmpty then
+    Result := FIniFile.ReadString('Sincronia', 'AUTH_PASSWORD', FIniFile.ReadString('Auth', 'PASSWORD', 'senha123'));
+end;
+
+function TSyncThread.AutenticaUsuarioAUTH: Boolean;
+var
+  LURL, LCpf, LSenha, LResponseStr: string;
+  LBodyJSON, LResponseJSON: TJSONObject;
+  LStream: TStringStream;
+  LResponse: IHTTPResponse;
+begin
+  Result := False;
+  LCpf := ObterCpfAuth;
+  LSenha := ObterSenhaAuth;
+
+  if LCpf.IsEmpty or LSenha.IsEmpty then
+    Exit;
+
+  LURL := TConstants.URL_AUTH + '/v1/login';
+  LBodyJSON := TJSONObject.Create;
+  try
+    LBodyJSON.AddPair('cpf', LCpf);
+    LBodyJSON.AddPair('password', LSenha);
+    LStream := TStringStream.Create(LBodyJSON.ToString, TEncoding.UTF8);
+    try
+      FClient.CustomHeaders['Authorization'] := '';
+      LResponse := FClient.Post(LURL, LStream);
+
+      if (LResponse.StatusCode <> 200) then
+      begin
+        LURL := TConstants.URL_CD + '/v1/login';
+        LResponse := FClient.Post(LURL, LStream);
+      end;
+
+      if LResponse.StatusCode = 200 then
+      begin
+        LResponseStr := LResponse.ContentAsString(TEncoding.UTF8);
+        LResponseJSON := TJSONObject.ParseJSONValue(LResponseStr) as TJSONObject;
+        if Assigned(LResponseJSON) then
+        begin
+          try
+            FToken := SafeGetString(LResponseJSON, 'access_token');
+            Result := not FToken.IsEmpty;
+          finally
+            LResponseJSON.Free;
+          end;
+        end;
+      end
+      else
+      begin
+        Writeln('-> Falha no login AUTH /v1/login (HTTP ' + LResponse.StatusCode.ToString + ') com CPF ' + LCpf);
+      end;
+    finally
+      LStream.Free;
+    end;
+  finally
+    LBodyJSON.Free;
+  end;
+end;
+
 procedure TSyncThread.LoadConfig;
 var
   LEmpresa: TEmpresa;
@@ -88,6 +177,85 @@ begin
     finally
       LEmpresa.Free;
     end;
+  end;
+
+  IdentificaEmpresaPorCNPJ;
+end;
+
+procedure TSyncThread.IdentificaEmpresaPorCNPJ;
+var
+  LURL, LResponseStr, LCnpjItem, LIdItem: string;
+  LResponse: IHTTPResponse;
+  LJSONVal, LObjItem: TJSONObject;
+  LArrCompanies: TJSONArray;
+  I: Integer;
+  LFound: Boolean;
+  LNomeItem: string;
+begin
+  FEmpresaId := 1;
+  if FCNPJ.IsEmpty then
+    Exit;
+
+  LFound := False;
+
+  // 1. Tenta autenticar via CPF e Password no AUTH server (/v1/login)
+  if not AutenticaUsuarioAUTH then
+  begin
+    if FToken.IsEmpty then
+      FToken := GenerateJWT;
+  end;
+
+  // 2. Consulta as empresas vinculadas ao usuario em /v1/companies/linked
+  LURL := TConstants.URL_AUTH + '/v1/companies/linked';
+
+  try
+    FClient.CustomHeaders['Authorization'] := 'Bearer ' + FToken;
+    LResponse := FClient.Get(LURL);
+
+    if (LResponse.StatusCode <> 200) then
+    begin
+      LURL := TConstants.URL_CD + '/v1/companies/linked';
+      LResponse := FClient.Get(LURL);
+    end;
+
+    if LResponse.StatusCode = 200 then
+    begin
+      LResponseStr := LResponse.ContentAsString(TEncoding.UTF8);
+      LJSONVal := TJSONObject.ParseJSONValue(LResponseStr) as TJSONObject;
+      if Assigned(LJSONVal) then
+      begin
+        try
+          LArrCompanies := LJSONVal.GetValue<TJSONArray>('companies', nil);
+          if Assigned(LArrCompanies) then
+          begin
+            for I := 0 to LArrCompanies.Count - 1 do
+            begin
+              LObjItem := TJSONObject(LArrCompanies.Items[I]);
+              LCnpjItem := NormalizaCNPJ(SafeGetString(LObjItem, 'cnpj'));
+              LIdItem := SafeGetString(LObjItem, 'id');
+              LNomeItem := SafeGetString(LObjItem, 'nome');
+              if (not LCnpjItem.IsEmpty) and (LCnpjItem = FCNPJ) then
+              begin
+                FEmpresaId := StrToIntDef(LIdItem, 1);
+                LFound := True;
+                Break;
+              end;
+            end;
+          end;
+        finally
+          LJSONVal.Free;
+        end;
+      end;
+    end;
+
+    if LFound then
+      Writeln('-> Empresa identificada pelo CNPJ (' + FCNPJ + ') - (' + LNomeItem +') em /v1/companies/linked: EMP_ID = ' + FEmpresaId.ToString)
+    else
+      Writeln('-> CNPJ local (' + FCNPJ + ') nao localizado em /v1/companies/linked. Usando EMP_ID padrao = ' + FEmpresaId.ToString);
+
+  except
+    on E: Exception do
+      Writeln('-> Erro ao consultar /v1/companies/linked: ' + E.Message);
   end;
 end;
 
@@ -109,55 +277,58 @@ end;
 
 procedure TSyncThread.EnsureLocalTables;
 var
-  LQuery: iQuery;
-  Ordens: TOrdens;
   OrdEst: TOrdEst;
+  Ordens: TOrdens;
+  CddTransf: TCddTransferencia;
+  CddTransfItem: TCddTransferenciaItem;
+  Tamanhos: TTamanho;
+  Grades: TGrades;
 begin
-	try
+  try
     OrdEst := TOrdEst.Create(TDatabase.Connection);
     try
       OrdEst.CriaTabela;
     finally
       OrdEst.DisposeOf;
     end;
+
     Ordens := TOrdens.Create(TDatabase.Connection);
     try
       Ordens.CriaTabela;
     finally
       Ordens.DisposeOf;
     end;
-  except
 
-  end;
-  try
-    LQuery := TDatabase.Query;
-    LQuery.Add('CREATE TABLE CDD_TRANSFERENCIAS (');
-    LQuery.Add('  ID INTEGER NOT NULL PRIMARY KEY,');
-    LQuery.Add('  CODIGO VARCHAR(40) NOT NULL,');
-    LQuery.Add('  STATUS VARCHAR(30) NOT NULL,');
-    LQuery.Add('  DATA_CRIACAO VARCHAR(30),');
-    LQuery.Add('  DATA_XML VARCHAR(30),');
-    LQuery.Add('  DATA_RECEBIMENTO VARCHAR(30),');
-    LQuery.Add('  DATA_CANCELAMENTO VARCHAR(30),');
-    LQuery.Add('  CONTEUDO_XML BLOB SUB_TYPE TEXT');
-    LQuery.Add(')');
-    LQuery.ExecSQL;
-  except
-    // ignore if already exists
-  end;
+    CddTransf := TCddTransferencia.Create(TDatabase.Connection);
+    try
+      CddTransf.CriaTabela;
+    finally
+      CddTransf.DisposeOf;
+    end;
 
-  try
-    LQuery := TDatabase.Query;
-    LQuery.Clear;
-    LQuery.Add('CREATE TABLE CDD_TRANSFERENCIAS_ITENS (');
-    LQuery.Add('  ID INTEGER NOT NULL PRIMARY KEY,');
-    LQuery.Add('  TRANSFERENCIA_ID INTEGER NOT NULL,');
-    LQuery.Add('  PRO_CODIGO INTEGER NOT NULL,');
-    LQuery.Add('  QUANTIDADE NUMERIC(15,4) NOT NULL');
-    LQuery.Add(')');
-    LQuery.ExecSQL;
+    CddTransfItem := TCddTransferenciaItem.Create(TDatabase.Connection);
+    try
+      CddTransfItem.CriaTabela;
+    finally
+      CddTransfItem.DisposeOf;
+    end;
+
+    Tamanhos := TTamanho.Create(TDatabase.Connection);
+    try
+      Tamanhos.CriaTabela;
+    finally
+      Tamanhos.DisposeOf;
+    end;
+
+    Grades := TGrades.Create(TDatabase.Connection);
+    try
+      Grades.CriaTabela;
+    finally
+      Grades.DisposeOf;
+    end;
   except
-    // ignore if already exists
+    on E: Exception do
+      Writeln('-> Erro ao verificar/criar tabelas locais: ' + E.Message);
   end;
 end;
 
@@ -331,6 +502,89 @@ begin
   end;
 end;
 
+function TSyncThread.QueryEstoqueJson: TJSONArray;
+var
+  LQuery: iQuery;
+  LItem: TJSONObject;
+begin
+  Result := TJSONArray.Create;
+  LQuery := TDatabase.Query;
+  LQuery.Add('SELECT PRO_CODIGO, COALESCE(PRO_QUANTIDADE, 0) AS QTD FROM PRODUTOS WHERE PRO_CODIGO IS NOT NULL');
+  LQuery.Open;
+
+  while not LQuery.DataSet.Eof do
+  begin
+    LItem := TJSONObject.Create;
+    LItem.AddPair('pro_codigo', TJSONNumber.Create(LQuery.DataSet.FieldByName('PRO_CODIGO').AsInteger));
+    LItem.AddPair('quantidade', TJSONNumber.Create(LQuery.DataSet.FieldByName('QTD').AsFloat));
+    Result.AddElement(LItem);
+    LQuery.DataSet.Next;
+  end;
+end;
+
+function TSyncThread.SafeGetInt(const AObj: TJSONObject; const AKey: string; ADefault: Integer): Integer;
+var
+  LVal: TJSONValue;
+begin
+  Result := ADefault;
+  if not Assigned(AObj) then Exit;
+  LVal := AObj.GetValue(AKey);
+  if not Assigned(LVal) or LVal.InheritsFrom(TJSONNull) then Exit;
+
+  if LVal is TJSONNumber then
+    Result := TJSONNumber(LVal).AsInt
+  else if LVal is TJSONString then
+    Result := StrToIntDef(TJSONString(LVal).Value, ADefault);
+end;
+
+function TSyncThread.SafeGetFloat(const AObj: TJSONObject; const AKey: string; ADefault: Double): Double;
+var
+  LVal: TJSONValue;
+  LStr: string;
+  LSettings: TFormatSettings;
+begin
+  Result := ADefault;
+  if not Assigned(AObj) then Exit;
+  LVal := AObj.GetValue(AKey);
+  if not Assigned(LVal) or LVal.InheritsFrom(TJSONNull) then Exit;
+
+  if LVal is TJSONNumber then
+    Result := TJSONNumber(LVal).AsDouble
+  else if LVal is TJSONString then
+  begin
+    LStr := TJSONString(LVal).Value;
+    LSettings.DecimalSeparator := '.';
+    if not TryStrToFloat(LStr, Result, LSettings) then
+    begin
+      LSettings.DecimalSeparator := ',';
+      if not TryStrToFloat(LStr, Result, LSettings) then
+        Result := ADefault;
+    end;
+  end;
+end;
+
+function TSyncThread.SafeGetString(const AObj: TJSONObject; const AKey, ADefault: string): string;
+var
+  LVal: TJSONValue;
+begin
+  Result := ADefault;
+  if not Assigned(AObj) then Exit;
+  LVal := AObj.GetValue(AKey);
+  if not Assigned(LVal) or LVal.InheritsFrom(TJSONNull) then Exit;
+  Result := LVal.Value;
+end;
+
+function TSyncThread.SafeGetDateParam(const AObj: TJSONObject; const AKey: string): Variant;
+var
+  LStr: string;
+begin
+  LStr := SafeGetString(AObj, AKey, '');
+  if (Trim(LStr) = '') or (LStr = '1899-12-30') or (LStr = '30/12/1899') then
+    Result := Null
+  else
+    Result := LStr;
+end;
+
 procedure TSyncThread.SyncDashboard;
 var
   LPayload: TJSONObject;
@@ -348,11 +602,13 @@ begin
     LPayload.AddPair('vendas_grupo', QueryVendasGrupoJson(LStartDate, LEndDate));
     LPayload.AddPair('clientes_cidade', QueryClientesCidadeJson);
     LPayload.AddPair('vendas_hora', QueryVendasHoraJson(LStartDate, LEndDate));
+    LPayload.AddPair('estoque', QueryEstoqueJson);
 
     LURL := TConstants.URL_CD + '/v1/sync/dashboard';
     LBody := TStringStream.Create(LPayload.ToString, TEncoding.UTF8);
     try
       FClient.CustomHeaders['Authorization'] := 'Bearer ' + FToken;
+      FClient.CustomHeaders['X-Empresa-Id'] := FEmpresaId.ToString;
       LResponse := FClient.Post(LURL, LBody);
       if (LResponse.StatusCode = 200) or (LResponse.StatusCode = 201) then
         Writeln('-> Dashboard enviado com sucesso para o CD.')
@@ -372,18 +628,19 @@ var
   LLastSync, LURL, LResponseStr, LNewSync: string;
   LResponse: IHTTPResponse;
   LJSON, LObj: TJSONObject;
-  LArrGrupos, LArrFornecedores, LArrProdutos, LArrTransf, LArrItens: TJSONArray;
-  I, J: Integer;
-  LQuery: iQuery;
-  LTransfId: Integer;
+  LArrGrupos, LArrSubgrupos, LArrGrades, LArrTamanhos, LArrFornecedores, LArrProdutos, LArrTransf, LArrItens: TJSONArray;
+  I, J, LTransfId, LGru, LFor: Integer;
   LXmlVal: TJSONValue;
   LObjItem: TJSONObject;
+  LQuery: iQuery;
+  Null: Variant;
 begin
   LLastSync := FIniFile.ReadString('Sincronia', 'CD_LastSync', '');
   LURL := TConstants.URL_CD + '/v1/sync/pending?last_sync=' + LLastSync;
 
   try
     FClient.CustomHeaders['Authorization'] := 'Bearer ' + FToken;
+    FClient.CustomHeaders['X-Empresa-Id'] := FEmpresaId.ToString;
     LResponse := FClient.Get(LURL);
     if LResponse.StatusCode <> 200 then
     begin
@@ -398,122 +655,222 @@ begin
 
     try
       // 1. Grupos
-      LArrGrupos := LJSON.GetValue<TJSONArray>('grupos', nil);
-      if Assigned(LArrGrupos) and (LArrGrupos.Count > 0) then
-      begin
-        LQuery := TDatabase.Query;
-        for I := 0 to LArrGrupos.Count - 1 do
+      try
+        LArrGrupos := LJSON.GetValue<TJSONArray>('grupos', nil);
+        if Assigned(LArrGrupos) and (LArrGrupos.Count > 0) then
         begin
-          LObj := TJSONObject(LArrGrupos.Items[I]);
-          LQuery.Clear;
-          LQuery.Add('UPDATE OR INSERT INTO GRUPOS (GRU_CODIGO, GRU_NOME) VALUES (:COD, :NOME) MATCHING (GRU_CODIGO)');
-          LQuery.AddParam('COD', LObj.GetValue<Integer>('gru_codigo'));
-          LQuery.AddParam('NOME', LObj.GetValue<string>('gru_nome'));
-          LQuery.ExecSQL;
+          LQuery := TDatabase.Query;
+          for I := 0 to LArrGrupos.Count - 1 do
+          begin
+            LObj := TJSONObject(LArrGrupos.Items[I]);
+            LQuery.Clear;
+            LQuery.Add('UPDATE OR INSERT INTO GRUPOS (GRU_CODIGO, GRU_NOME) VALUES (:COD, :NOME) MATCHING (GRU_CODIGO)');
+            LQuery.AddParam('COD', SafeGetInt(LObj, 'gru_codigo', 0));
+            LQuery.AddParam('NOME', SafeGetString(LObj, 'gru_nome'));
+            LQuery.ExecSQL;
+          end;
+          Writeln('-> Sincronizados ' + LArrGrupos.Count.ToString + ' grupos da matriz.');
         end;
-        Writeln('-> Sincronizados ' + LArrGrupos.Count.ToString + ' grupos da matriz.');
+      except
+        on E: Exception do Writeln('-> Erro ao sincronizar grupos: ' + E.Message);
       end;
 
       // 2. Fornecedores
-      LArrFornecedores := LJSON.GetValue<TJSONArray>('fornecedores', nil);
-      if Assigned(LArrFornecedores) and (LArrFornecedores.Count > 0) then
-      begin
-        LQuery := TDatabase.Query;
-        for I := 0 to LArrFornecedores.Count - 1 do
+      try
+        LArrFornecedores := LJSON.GetValue<TJSONArray>('fornecedores', nil);
+        if Assigned(LArrFornecedores) and (LArrFornecedores.Count > 0) then
         begin
-          LObj := TJSONObject(LArrFornecedores.Items[I]);
-          LQuery.Clear;
-          LQuery.Add('UPDATE OR INSERT INTO FORNECEDORES (FOR_CODIGO, FOR_NOME, FOR_NOMEFANTASIA, FOR_CNPJ_CPF, FOR_INSC_ESTADUAL)');
-          LQuery.Add('VALUES (:COD, :NOME, :FANTASIA, :CNPJ, :IE) MATCHING (FOR_CODIGO)');
-          LQuery.AddParam('COD', LObj.GetValue<Integer>('for_codigo'));
-          LQuery.AddParam('NOME', LObj.GetValue<string>('for_nome'));
-          LQuery.AddParam('FANTASIA', LObj.GetValue<string>('for_nomefantasia'));
-          LQuery.AddParam('CNPJ', LObj.GetValue<string>('for_cnpj_cpf'));
-          LQuery.AddParam('IE', LObj.GetValue<string>('for_insc_estadual'));
-          LQuery.ExecSQL;
+          LQuery := TDatabase.Query;
+          for I := 0 to LArrFornecedores.Count - 1 do
+          begin
+            LObj := TJSONObject(LArrFornecedores.Items[I]);
+            LQuery.Clear;
+            LQuery.Add('UPDATE OR INSERT INTO FORNECEDORES (FOR_CODIGO, FOR_NOME, FOR_NOMEFANTASIA, FOR_CNPJ_CPF, FOR_INSC_ESTADUAL)');
+            LQuery.Add('VALUES (:COD, :NOME, :FANTASIA, :CNPJ, :IE) MATCHING (FOR_CODIGO)');
+            LQuery.AddParam('COD', SafeGetInt(LObj, 'for_codigo', 0));
+            LQuery.AddParam('NOME', SafeGetString(LObj, 'for_nome'));
+            LQuery.AddParam('FANTASIA', SafeGetString(LObj, 'for_nomefantasia'));
+            LQuery.AddParam('CNPJ', SafeGetString(LObj, 'for_cnpj_cpf'));
+            LQuery.AddParam('IE', SafeGetString(LObj, 'for_insc_estadual'));
+            LQuery.ExecSQL;
+          end;
+          Writeln('-> Sincronizados ' + LArrFornecedores.Count.ToString + ' fornecedores da matriz.');
         end;
-        Writeln('-> Sincronizados ' + LArrFornecedores.Count.ToString + ' fornecedores da matriz.');
+      except
+        on E: Exception do Writeln('-> Erro ao sincronizar fornecedores: ' + E.Message);
       end;
 
       // 3. Produtos
-      LArrProdutos := LJSON.GetValue<TJSONArray>('produtos', nil);
-      if Assigned(LArrProdutos) and (LArrProdutos.Count > 0) then
-      begin
-        LQuery := TDatabase.Query;
-        for I := 0 to LArrProdutos.Count - 1 do
+      try
+        LArrProdutos := LJSON.GetValue<TJSONArray>('produtos', nil);
+        if Assigned(LArrProdutos) and (LArrProdutos.Count > 0) then
         begin
-          LObj := TJSONObject(LArrProdutos.Items[I]);
-          LQuery.Clear;
-          LQuery.Add('UPDATE OR INSERT INTO PRODUTOS (PRO_CODIGO, PRO_NOME, PRO_DESCRICAO, PRO_CODBARRA, PRO_VALORV, PRO_VALORC, PRO_EMBALAGEM, PRO_FABRICANTE, PRO_GRU, PRO_FOR, PRO_DATAUA)');
-          LQuery.Add('VALUES (:COD, :NOME, :DESC, :BARRA, :VALORV, :VALORC, :EMB, :FAB, :GRU, :FOR, :DATAUA) MATCHING (PRO_CODIGO)');
-          LQuery.AddParam('COD', LObj.GetValue<Integer>('pro_codigo'));
-          LQuery.AddParam('NOME', LObj.GetValue<string>('pro_nome'));
-          LQuery.AddParam('DESC', LObj.GetValue<string>('pro_descricao'));
-          LQuery.AddParam('BARRA', LObj.GetValue<string>('pro_codbarra'));
-          LQuery.AddParam('VALORV', LObj.GetValue<Double>('pro_valorv'));
-          LQuery.AddParam('VALORC', LObj.GetValue<Double>('pro_valorc'));
-          LQuery.AddParam('EMB', LObj.GetValue<string>('pro_embalagem'));
-          LQuery.AddParam('FAB', LObj.GetValue<string>('pro_fabricante'));
-          LQuery.AddParam('GRU', LObj.GetValue<Integer>('pro_gru'));
-          LQuery.AddParam('FOR', LObj.GetValue<Integer>('pro_for'));
-          LQuery.AddParam('DATAUA', LObj.GetValue<string>('pro_dataua'));
-          LQuery.ExecSQL;
+          LQuery := TDatabase.Query;
+          for I := 0 to LArrProdutos.Count - 1 do
+          begin
+            LObj := TJSONObject(LArrProdutos.Items[I]);
+            LGru := SafeGetInt(LObj, 'pro_gru', 0);
+            LFor := SafeGetInt(LObj, 'pro_for', 0);
+
+            LQuery.Clear;
+            LQuery.Add('UPDATE OR INSERT INTO PRODUTOS (PRO_CODIGO, PRO_NOME, PRO_DESCRICAO, PRO_CODBARRA, PRO_VALORV, PRO_VALORC, PRO_EMBALAGEM, PRO_FABRICANTE, PRO_GRU, PRO_FOR, PRO_DATAUA)');
+            LQuery.Add('VALUES (:COD, :NOME, :DESC, :BARRA, :VALORV, :VALORC, :EMB, :FAB, :GRU, :FOR, :DATAUA) MATCHING (PRO_CODIGO)');
+            LQuery.AddParam('COD', SafeGetInt(LObj, 'pro_codigo', 0));
+            LQuery.AddParam('NOME', SafeGetString(LObj, 'pro_nome'));
+            LQuery.AddParam('DESC', SafeGetString(LObj, 'pro_descricao'));
+            LQuery.AddParam('BARRA', SafeGetString(LObj, 'pro_codbarra'));
+            LQuery.AddParam('VALORV', SafeGetFloat(LObj, 'pro_valorv', 0));
+            LQuery.AddParam('VALORC', SafeGetFloat(LObj, 'pro_valorc', 0));
+            LQuery.AddParam('EMB', SafeGetString(LObj, 'pro_embalagem'));
+            LQuery.AddParam('FAB', SafeGetString(LObj, 'pro_fabricante'));
+
+            if LGru > 0 then
+              LQuery.AddParam('GRU', LGru)
+            else
+              LQuery.AddParam('GRU', Null);
+
+            if LFor > 0 then
+              LQuery.AddParam('FOR', LFor)
+            else
+              LQuery.AddParam('FOR', Null);
+
+            LQuery.AddParam('DATAUA', SafeGetDateParam(LObj, 'pro_dataua'));
+            LQuery.ExecSQL;
+          end;
+          Writeln('-> Sincronizados ' + LArrProdutos.Count.ToString + ' produtos da matriz.');
         end;
-        Writeln('-> Sincronizados ' + LArrProdutos.Count.ToString + ' produtos da matriz.');
+      except
+        on E: Exception do Writeln('-> Erro ao sincronizar produtos: ' + E.Message);
       end;
 
       // 4. Transferencias
-      LArrTransf := LJSON.GetValue<TJSONArray>('transferencias', nil);
-      if Assigned(LArrTransf) and (LArrTransf.Count > 0) then
-      begin
-        LQuery := TDatabase.Query;
-        for I := 0 to LArrTransf.Count - 1 do
+      try
+        LArrTransf := LJSON.GetValue<TJSONArray>('transferencias', nil);
+        if Assigned(LArrTransf) and (LArrTransf.Count > 0) then
         begin
-          LObj := TJSONObject(LArrTransf.Items[I]);
-          LTransfId := LObj.GetValue<Integer>('id');
-
-          LQuery.Clear;
-          LQuery.Add('UPDATE OR INSERT INTO CDD_TRANSFERENCIAS (ID, CODIGO, STATUS, DATA_CRIACAO, DATA_XML, DATA_RECEBIMENTO, DATA_CANCELAMENTO, CONTEUDO_XML)');
-          LQuery.Add('VALUES (:ID, :CODIGO, :STATUS, :DATA_CRIACAO, :DATA_XML, :DATA_RECEBIMENTO, :DATA_CANCELAMENTO, :CONTEUDO_XML) MATCHING (ID)');
-          LQuery.AddParam('ID', LTransfId);
-          LQuery.AddParam('CODIGO', LObj.GetValue<string>('codigo'));
-          LQuery.AddParam('STATUS', LObj.GetValue<string>('status'));
-          LQuery.AddParam('DATA_CRIACAO', LObj.GetValue<string>('data_criacao'));
-          LQuery.AddParam('DATA_XML', LObj.GetValue<string>('data_xml'));
-          LQuery.AddParam('DATA_RECEBIMENTO', LObj.GetValue<string>('data_recebimento'));
-          LQuery.AddParam('DATA_CANCELAMENTO', LObj.GetValue<string>('data_cancelamento'));
-
-          LXmlVal := LObj.GetValue('conteudo_xml');
-          if Assigned(LXmlVal) and not LXmlVal.InheritsFrom(TJSONNull) then
-            LQuery.AddParam('CONTEUDO_XML', LXmlVal.Value)
-          else
-            LQuery.AddParam('CONTEUDO_XML', '');
-          LQuery.ExecSQL;
-
-          // Clear items
-          LQuery.Clear;
-          LQuery.Add('DELETE FROM CDD_TRANSFERENCIAS_ITENS WHERE TRANSFERENCIA_ID = :TID');
-          LQuery.AddParam('TID', LTransfId).ExecSQL;
-
-          // Insert items
-          LArrItens := LObj.GetValue<TJSONArray>('itens', nil);
-          if Assigned(LArrItens) then
+          LQuery := TDatabase.Query;
+          for I := 0 to LArrTransf.Count - 1 do
           begin
-            for J := 0 to LArrItens.Count - 1 do
+            LObj := TJSONObject(LArrTransf.Items[I]);
+            LTransfId := SafeGetInt(LObj, 'id', 0);
+
+            LQuery.Clear;
+            LQuery.Add('UPDATE OR INSERT INTO CDD_TRANSFERENCIAS (ID, CODIGO, STATUS, DATA_CRIACAO, DATA_XML, DATA_RECEBIMENTO, DATA_CANCELAMENTO, CONTEUDO_XML)');
+            LQuery.Add('VALUES (:ID, :CODIGO, :STATUS, :DATA_CRIACAO, :DATA_XML, :DATA_RECEBIMENTO, :DATA_CANCELAMENTO, :CONTEUDO_XML) MATCHING (ID)');
+            LQuery.AddParam('ID', LTransfId);
+            LQuery.AddParam('CODIGO', SafeGetString(LObj, 'codigo'));
+            LQuery.AddParam('STATUS', SafeGetString(LObj, 'status'));
+            LQuery.AddParam('DATA_CRIACAO', SafeGetString(LObj, 'data_criacao'));
+            LQuery.AddParam('DATA_XML', SafeGetString(LObj, 'data_xml'));
+            LQuery.AddParam('DATA_RECEBIMENTO', SafeGetString(LObj, 'data_recebimento'));
+            LQuery.AddParam('DATA_CANCELAMENTO', SafeGetString(LObj, 'data_cancelamento'));
+
+            LXmlVal := LObj.GetValue('conteudo_xml');
+            if Assigned(LXmlVal) and not LXmlVal.InheritsFrom(TJSONNull) then
+              LQuery.AddParam('CONTEUDO_XML', LXmlVal.Value)
+            else
+              LQuery.AddParam('CONTEUDO_XML', '');
+            LQuery.ExecSQL;
+
+            // Clear items
+            LQuery.Clear;
+            LQuery.Add('DELETE FROM CDD_TRANSFERENCIAS_ITENS WHERE TRANSFERENCIA_ID = :TID');
+            LQuery.AddParam('TID', LTransfId).ExecSQL;
+
+            // Insert items
+            LArrItens := LObj.GetValue<TJSONArray>('itens', nil);
+            if Assigned(LArrItens) then
             begin
-              LObjItem := TJSONObject(LArrItens.Items[J]);
-              LQuery.Clear;
-              LQuery.Add('INSERT INTO CDD_TRANSFERENCIAS_ITENS (ID, TRANSFERENCIA_ID, PRO_CODIGO, QUANTIDADE)');
-              // Simple sequential sub-id generation for items locally
-              LQuery.Add('VALUES ((SELECT COALESCE(MAX(ID), 0) + 1 FROM CDD_TRANSFERENCIAS_ITENS), :TID, :PRO_CODIGO, :QUANTIDADE)');
-              LQuery.AddParam('TID', LTransfId);
-              LQuery.AddParam('PRO_CODIGO', LObjItem.GetValue<Integer>('pro_codigo'));
-              LQuery.AddParam('QUANTIDADE', LObjItem.GetValue<Double>('quantidade'));
-              LQuery.ExecSQL;
+              for J := 0 to LArrItens.Count - 1 do
+              begin
+                LObjItem := TJSONObject(LArrItens.Items[J]);
+                LQuery.Clear;
+                LQuery.Add('INSERT INTO CDD_TRANSFERENCIAS_ITENS (ID, TRANSFERENCIA_ID, PRO_CODIGO, QUANTIDADE)');
+                LQuery.Add('VALUES ((SELECT COALESCE(MAX(ID), 0) + 1 FROM CDD_TRANSFERENCIAS_ITENS), :TID, :PRO_CODIGO, :QUANTIDADE)');
+                LQuery.AddParam('TID', LTransfId);
+                LQuery.AddParam('PRO_CODIGO', SafeGetInt(LObjItem, 'pro_codigo', 0));
+                LQuery.AddParam('QUANTIDADE', SafeGetFloat(LObjItem, 'quantidade', 0));
+                LQuery.ExecSQL;
+              end;
             end;
           end;
+          Writeln('-> Sincronizadas ' + LArrTransf.Count.ToString + ' transferencias da matriz.');
         end;
-        Writeln('-> Sincronizadas ' + LArrTransf.Count.ToString + ' transferencias da matriz.');
+      except
+        on E: Exception do Writeln('-> Erro ao sincronizar transferencias: ' + E.Message);
+      end;
+
+      // 5. Subgrupos
+      try
+        LArrSubgrupos := LJSON.GetValue<TJSONArray>('subgrupos', nil);
+        if Assigned(LArrSubgrupos) and (LArrSubgrupos.Count > 0) then
+        begin
+          LQuery := TDatabase.Query;
+          for I := 0 to LArrSubgrupos.Count - 1 do
+          begin
+            LObj := TJSONObject(LArrSubgrupos.Items[I]);
+            LQuery.Clear;
+            LQuery.Add('UPDATE OR INSERT INTO GRUPOS (GRU_CODIGO, GRU_NOME, GRU_G1, GRU_TR) VALUES (:COD, :NOME, :G1, :TR) MATCHING (GRU_CODIGO)');
+            LQuery.AddParam('COD', SafeGetInt(LObj, 'codigo', 0));
+            LQuery.AddParam('NOME', SafeGetString(LObj, 'nome'));
+            LQuery.AddParam('G1', SafeGetInt(LObj, 'g1', 0));
+            LQuery.AddParam('TR', SafeGetInt(LObj, 'tr', 0));
+            LQuery.ExecSQL;
+          end;
+          Writeln('-> Sincronizados ' + LArrSubgrupos.Count.ToString + ' subgrupos da matriz.');
+        end;
+      except
+        on E: Exception do Writeln('-> Erro ao sincronizar subgrupos: ' + E.Message);
+      end;
+
+      // 6. Grades
+      try
+        LArrGrades := LJSON.GetValue<TJSONArray>('grades', nil);
+        if Assigned(LArrGrades) and (LArrGrades.Count > 0) then
+        begin
+          LQuery := TDatabase.Query;
+          for I := 0 to LArrGrades.Count - 1 do
+          begin
+            LObj := TJSONObject(LArrGrades.Items[I]);
+            LQuery.Clear;
+            LQuery.Add('UPDATE OR INSERT INTO GRADES (GRA_CODIGO, GRA_PRO, GRA_VALOR, GRA_TAM, GRA_QUANTIDADE, GRA_CODBARRA, GRA_COR) VALUES (:COD, :PRO, :VALOR, :TAM, :QTD, :BARRA, :COR) MATCHING (GRA_CODIGO)');
+            LQuery.AddParam('COD', SafeGetInt(LObj, 'codigo', 0));
+            LQuery.AddParam('PRO', SafeGetInt(LObj, 'pro', 0));
+            LQuery.AddParam('VALOR', SafeGetFloat(LObj, 'valor', 0));
+            LQuery.AddParam('TAM', SafeGetInt(LObj, 'tam', 0));
+            LQuery.AddParam('QTD', SafeGetFloat(LObj, 'quantidade', 0));
+            LQuery.AddParam('BARRA', SafeGetString(LObj, 'codbarra'));
+            LQuery.AddParam('COR', SafeGetString(LObj, 'cor'));
+            LQuery.ExecSQL;
+          end;
+          Writeln('-> Sincronizadas ' + LArrGrades.Count.ToString + ' grades da matriz.');
+        end;
+      except
+        on E: Exception do Writeln('-> Erro ao sincronizar grades: ' + E.Message);
+      end;
+
+      // 7. Tamanhos
+      try
+        LArrTamanhos := LJSON.GetValue<TJSONArray>('tamanhos', nil);
+        if Assigned(LArrTamanhos) and (LArrTamanhos.Count > 0) then
+        begin
+          LQuery := TDatabase.Query;
+          for I := 0 to LArrTamanhos.Count - 1 do
+          begin
+            LObj := TJSONObject(LArrTamanhos.Items[I]);
+            LQuery.Clear;
+            LQuery.Add('UPDATE OR INSERT INTO TAMANHOS (TAM_CODIGO, TAM_PRO, TAM_TAMANHO, TAM_SIGLA, TAM_VALOR) VALUES (:COD, :PRO, :TAM, :SIGLA, :VALOR) MATCHING (TAM_CODIGO)');
+            LQuery.AddParam('COD', SafeGetInt(LObj, 'codigo', 0));
+            LQuery.AddParam('PRO', SafeGetInt(LObj, 'pro', 0));
+            LQuery.AddParam('TAM', SafeGetString(LObj, 'tamanho'));
+            LQuery.AddParam('SIGLA', SafeGetString(LObj, 'sigla'));
+            LQuery.AddParam('VALOR', SafeGetFloat(LObj, 'valor', 0));
+            LQuery.ExecSQL;
+          end;
+          Writeln('-> Sincronizados ' + LArrTamanhos.Count.ToString + ' tamanhos da matriz.');
+        end;
+      except
+        on E: Exception do Writeln('-> Erro ao sincronizar tamanhos: ' + E.Message);
       end;
 
       LNewSync := LJSON.GetValue<string>('timestamp', '');

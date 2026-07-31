@@ -14,7 +14,6 @@ type
     FPro: integer;
     FSigla: string;
     FTamanho: string;
-    FCadastrar: string;
 	public
 		[TCampo('TAM_CODIGO', 'INTEGER NOT NULL PRIMARY KEY')]
 		property Codigo: integer read FCodigo write FCodigo;
@@ -26,8 +25,6 @@ type
 		property Sigla: string read FSigla write FSigla;
 		[TCampo('TAM_VALOR', 'NUMERIC(9,4)')]
 		property Valor: double read FValor write FValor;
-    [TCampo('TAM_CADASTRAR', 'CHAR(1) DEFAULT ''N''')]
-    property Cadastrar: string read FCadastrar write FCadastrar;
 	end;
 
 implementation

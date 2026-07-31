@@ -11,19 +11,54 @@ export function formatPercentage(val) {
 
 
 export function formatDate(dateString) {
-  if (!dateString) return '-';
-  const match = dateString.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (!match) return dateString;
-  const [, yyyy, mm, dd] = match;
-  return `${dd}/${mm}/${yyyy}`;
+  if (!dateString || dateString === '-' || dateString === '1899-12-30' || dateString === 'Recentemente' || dateString === 'Atualizado') return '-';
+  try {
+    const str = String(dateString).trim();
+    const match = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (match) {
+      const [, yyyy, mm, dd] = match;
+      return `${dd}/${mm}/${yyyy}`;
+    }
+    const d = new Date(str);
+    if (!isNaN(d.getTime())) {
+      return d.toLocaleDateString('pt-BR', {
+        timeZone: 'America/Campo_Grande'
+      });
+    }
+    return str;
+  } catch (err) {
+    return dateString;
+  }
 }
 
 export function formatDatehora(dateString) {
-  if (!dateString) return '-';
-  const match = dateString.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/);
-  if (!match) return dateString;
-  const [, yyyy, mm, dd, hh, min, ss] = match;
-  return `${dd}/${mm}/${yyyy} ${hh}:${min}:${ss}`;
+  if (!dateString || dateString === '-' || dateString === '1899-12-30' || dateString === 'Recentemente' || dateString === 'Atualizado') return '-';
+  try {
+    const str = String(dateString).trim();
+    const match = str.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})/);
+    if (match) {
+      const [, yyyy, mm, dd, hh, min, ss] = match;
+      if (hh !== '00' || min !== '00' || ss !== '00') {
+        return `${dd}/${mm}/${yyyy} ${hh}:${min}:${ss}`;
+      }
+      return `${dd}/${mm}/${yyyy}`;
+    }
+    const d = new Date(str);
+    if (!isNaN(d.getTime())) {
+      return d.toLocaleString('pt-BR', {
+        timeZone: 'America/Campo_Grande',
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      });
+    }
+    return formatDate(str);
+  } catch (err) {
+    return dateString;
+  }
 }
 
 export function formatExcelDate(serial) {

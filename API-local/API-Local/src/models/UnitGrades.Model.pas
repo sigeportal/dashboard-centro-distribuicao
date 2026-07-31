@@ -21,7 +21,6 @@ type
     FTamanho: TTamanho;
     FValorDinheiro: Currency;
     FValorPrazo: Currency;
-    FCadastrar: string;
 	public
 		[TCampo('GRA_CODIGO', 'INTEGER NOT NULL PRIMARY KEY')]
 		property Codigo: integer read FCodigo write FCodigo;
@@ -41,8 +40,6 @@ type
 		property ValorDinheiro: Currency read FValorDinheiro write FValorDinheiro;
 		[TCampo('GRA_VALOR_PRAZO', 'NUMERIC(9,2)')]
 		property ValorPrazo: Currency read FValorPrazo write FValorPrazo;
-    [TCampo('GRA_CADASTRAR', 'CHAR(1) DEFAULT ''N''')]
-    property Cadastrar: string read FCadastrar write FCadastrar;
     [TRelacionamento('TAMANHOS', 'TAM_CODIGO', 'GRA_TAM', TTamanho, TTipoRelacionamento.UmPraUm)]
     property Tamanho: TTamanho read FTamanho write FTamanho;
 	end;

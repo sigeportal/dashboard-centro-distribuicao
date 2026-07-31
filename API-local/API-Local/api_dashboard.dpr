@@ -39,7 +39,10 @@ uses
   UnitOrdens.Model in 'modulos\Ordens\UnitOrdens.Model.pas',
   UnitOrdEst.Model in 'modulos\OrdEst\UnitOrdEst.Model.pas',
   UnitOrdens.Controller in 'modulos\Ordens\UnitOrdens.Controller.pas',
-  SyncService in 'src\services\SyncService.pas';
+  UnitGrades.Model in 'src\models\UnitGrades.Model.pas',
+  UnitTamanho.Model in 'src\models\UnitTamanho.Model.pas',
+  SyncService in 'src\services\SyncService.pas',
+  UnitCddTransferencia.Model in 'src\models\UnitCddTransferencia.Model.pas';
 
 //function GetConsoleWindow: HWND; stdcall; external kernel32;
 //
@@ -57,10 +60,8 @@ begin
   THorseLoggerManager.RegisterProvider(THorseLoggerProviderLogFile.New());
 
   // Iniciar ngrok
-//  TProcessRunner.StartNgrok('ngrok http ' + ObterPorta.ToString);
-
-  Writeln(TConstants.BancoDados);
-
+  //TProcessRunner.StartNgrok('ngrok http ' + ObterPorta.ToString);
+    
   // Ocultar janela do console
 //  ConsoleWindow := GetConsoleWindow;
 //  if ConsoleWindow <> 0 then
@@ -96,6 +97,8 @@ begin
     begin
       Writeln('==================================');
       Writeln('API Local rodando na porta: ' + THorse.Port.ToString);
+      Writeln('BD: ' + TConstants.BancoDados);
+      Writeln('URL CD: ' + TConstants.URL_CD);
       Writeln('==================================');
       Readln;
       THorse.StopListen;

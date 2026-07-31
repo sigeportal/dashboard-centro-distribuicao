@@ -67,7 +67,9 @@ export default function Login() {
     }
 
     login({ access_token, refresh_token, cpf: normalizedCpf });
-    navigate('/empresas', { replace: true });
+    // Ao logar, abre diretamente o ambiente do Centro de Distribuição (CD)
+    localStorage.setItem('selected_company_id', '5');
+    navigate('/dashboard', { replace: true });
   };
 
   const handleSubmit = async (e) => {

@@ -11,6 +11,7 @@ import SalesTab from '../components/tabs/SalesTab';
 import ServiceOrdersTab from '../components/tabs/ServiceOrdersTab';
 import TransferTab from '../components/tabs/TransferTab';
 import CadastrosTab from '../components/tabs/CadastrosTab';
+import PurchasesTab from '../components/tabs/PurchasesTab';
 
 export default function Dashboard() {
   const [searchParams] = useSearchParams();
@@ -139,6 +140,7 @@ export default function Dashboard() {
         />
       )}
 
+      {activeTab === 'compras' && <PurchasesTab />}
       {activeTab === 'transferencias' && <TransferTab />}
       {activeTab === 'cadastros' && <CadastrosTab />}
     </div>

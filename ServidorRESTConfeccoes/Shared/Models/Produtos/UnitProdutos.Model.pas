@@ -60,12 +60,15 @@ type
 		FFornecedor: TFornecedores;
 		FURL_Imagem: string;
     FTotalizador: TTotalizadores;
+    FEmp: integer;
     FCadastrar: string;
 		{ private declarations }
 	public
 		{ public declarations }
 		[TCampo('PRO_CODIGO', 'NUMERIC(8,0) NOT NULL PRIMARY KEY')]
 		property Codigo: integer read FCodigo write FCodigo;
+		[TCampo('PRO_EMP', 'NUMERIC(4,0)')]
+		property Emp: integer read FEmp write FEmp;
 		[TCampo('PRO_NOME', 'VARCHAR(200)')]
     property Nome: string read FNome write FNome;
 		[TCampo('PRO_FOR', 'NUMERIC(4,0)')]
@@ -158,7 +161,7 @@ type
     property Totalizador: TTotalizadores read FTotalizador write FTotalizador;
 		[TCampo('PRO_URL_IMAGEM', 'VARCHAR(1000)')]
 		property URL_Imagem: string read FURL_Imagem write FURL_Imagem;
-    [TCampo('PRO_CADASTRAR', 'CHAR(1)')]
+    [TCampo('PRO_CADASTRAR', 'CHAR(1) DEFAULT ''N''')]
     property Cadastrar: string read FCadastrar write FCadastrar;
   end;
 

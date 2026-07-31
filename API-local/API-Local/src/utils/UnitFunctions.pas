@@ -5,7 +5,7 @@ interface
 uses
 	System.SysUtils,
   UnitConnection.Model.Interfaces,
-  Horse;
+  Horse, System.IniFiles;
 
 function GeraCodigo(Tabela, Campo: string): integer;
 function IncrementaGenerator(Generator: string): integer;
@@ -102,11 +102,20 @@ end;
 function ObterPorta: integer;
 var
   Porta: string;
+  Ini: TIniFile;
 begin
-  Porta :=  GetEnvironmentVariable('PORT');
+	Porta :=  GetEnvironmentVariable('PORT');
 	if Porta.IsEmpty then
   	Porta := '9000';
   Result := Porta.ToInteger;
+  {IFDEF DEBUG}
+  Ini := TIniFile.Create(ExtractFilePath(ParamStr(0)) + 'config.ini');
+  if (not Ini.SectionExists('SERVIDOR_DASHBOARD')) or (not Ini.ValueExists('SERVIDOR_DASHBOARD', 'PORT'))  then
+  begin  	
+    Ini.WriteInteger('SERVIDOR_DASHBOARD', 'PORT', 9000);
+  end;
+  Result := Ini.ReadInteger('SERVIDOR_DASHBOARD', 'PORT', 9000);
+  {ENDIF}  
 end;
 
 procedure SetaCookieHttpOnly(Res: THorseResponse; const Nome, Valor: string; const Path: string; const Secure: Boolean; const SameSite: string);

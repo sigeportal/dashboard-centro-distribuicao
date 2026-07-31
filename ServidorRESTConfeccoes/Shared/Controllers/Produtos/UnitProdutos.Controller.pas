@@ -67,69 +67,137 @@ end;
 
 class procedure TProdutosController.Get(Req: THorseRequest; Res: THorseResponse; Next: TProc);
 var
-	Produtos  : TProdutos;
-	aJson     : TJSONArray;
-	Query     : iQuery;
-	FiltroNome: string;
-	Total     : Integer;
-	Codigo    : string;
-	Codbarras : string;
-  Cadastrar: string;
+  Produtos: TProdutos;
+  aJson: TJSONArray;
+  LResponseObj, LMetaObj: TJSONObject;
+  QueryCount, QueryData: iQuery;
+  LSearch, LStockStatus, LCodigo, LNome, LCodbarra, LCadastrar, LWhereClause: string;
+  LPage, LLimit, LOffset, LTotalRecords, LTotalPages, I: Integer;
+  LWhereList: TStringList;
+  LIsPaginated: Boolean;
 begin
-	aJson    := TJSONArray.Create;
-	Query    := TDatabase.Query;
-	Produtos := TProdutos.Create(TDatabase.Connection);
-	try
-		if Req.Query.ContainsKey('total') then
-		begin
-			Total := Req.Query.Items['total'].ToInteger();
-			if Total > 0 then
-				Query.Add(Format('SELECT FIRST %d DISTINCT PRO_CODIGO FROM PRODUTOS ', [Total]))
-		end
-		else
-			Query.Add('SELECT PRO_CODIGO FROM PRODUTOS ');
-		if Req.Query.ContainsKey('codigo') then
-		begin
-			Codigo := Req.Query.Items['codigo'].Replace('''', '');
-			if not Codigo.IsEmpty then
-				Query.Add(Format('WHERE PRO_CODIGO LIKE %s', [QuotedStr('%' + Codigo + '%')]));
-		end;
-		if Req.Query.ContainsKey('nome') then
-		begin
-			FiltroNome := Req.Query.Items['nome'].Replace('''', '');
-			if not FiltroNome.IsEmpty then
-				Query.Add(Format('OR PRO_NOME LIKE %s', [QuotedStr('%' + FiltroNome + '%')]));
-		end;
-		if Req.Query.ContainsKey('codbarra') then
-		begin
-			Codbarras := Req.Query.Items['codbarra'].Replace('''', '');
-			if not Codbarras.IsEmpty then
-			begin
-				if Codigo.IsEmpty then
-					Query.Add(Format('WHERE PRO_CODBARRA LIKE %s', [QuotedStr('%' + Codbarras + '%')]))
-				else
-					Query.Add(Format('OR PRO_CODBARRA LIKE %s', [QuotedStr('%' + Codbarras + '%')]));
-			end;
-		end;
+  aJson := TJSONArray.Create;
+  QueryCount := TDatabase.Query;
+  QueryData := TDatabase.Query;
+  Produtos := TProdutos.Create(TDatabase.Connection);
+  LWhereList := TStringList.Create;
+  try
+    LIsPaginated := Req.Query.ContainsKey('page') or Req.Query.ContainsKey('limit') or Req.Query.ContainsKey('search') or Req.Query.ContainsKey('stockStatus');
+    LPage := StrToIntDef(Req.Query.Items['page'], 1);
+    if LPage < 1 then LPage := 1;
+
+    LLimit := StrToIntDef(Req.Query.Items['limit'], 10);
+    if Req.Query.ContainsKey('total') then
+      LLimit := StrToIntDef(Req.Query.Items['total'], LLimit);
+
+    if LLimit < 1 then LLimit := 10;
+    if LLimit > 500 then LLimit := 500;
+
+    LOffset := (LPage - 1) * LLimit;
+
+    if Req.Query.ContainsKey('search') then
+    begin
+      LSearch := Trim(Req.Query.Items['search'].Replace('''', ''));
+      if not LSearch.IsEmpty then
+      begin
+        LWhereList.Add(Format('(LOWER(PRO_NOME) LIKE %s OR LOWER(PRO_FABRICANTE) LIKE %s OR PRO_CODBARRA LIKE %s OR CAST(PRO_CODIGO AS VARCHAR(20)) LIKE %s)',
+          [QuotedStr('%' + LowerCase(LSearch) + '%'),
+           QuotedStr('%' + LowerCase(LSearch) + '%'),
+           QuotedStr('%' + LSearch + '%'),
+           QuotedStr('%' + LSearch + '%')]));
+      end;
+    end;
+
+    if Req.Query.ContainsKey('codigo') then
+    begin
+      LCodigo := Trim(Req.Query.Items['codigo'].Replace('''', ''));
+      if not LCodigo.IsEmpty then
+        LWhereList.Add(Format('CAST(PRO_CODIGO AS VARCHAR(20)) LIKE %s', [QuotedStr('%' + LCodigo + '%')]));
+    end;
+
+    if Req.Query.ContainsKey('nome') then
+    begin
+      LNome := Trim(Req.Query.Items['nome'].Replace('''', ''));
+      if not LNome.IsEmpty then
+        LWhereList.Add(Format('LOWER(PRO_NOME) LIKE %s', [QuotedStr('%' + LowerCase(LNome) + '%')]));
+    end;
+
+    if Req.Query.ContainsKey('codbarra') then
+    begin
+      LCodbarra := Trim(Req.Query.Items['codbarra'].Replace('''', ''));
+      if not LCodbarra.IsEmpty then
+        LWhereList.Add(Format('PRO_CODBARRA LIKE %s', [QuotedStr('%' + LCodbarra + '%')]));
+    end;
+
     if Req.Query.ContainsKey('cadastrar') then
     begin
-      Cadastrar := Req.Query.Items['cadastrar'];
-      if Cadastrar.Contains('S') then
-      	Query.Add('WHERE PRO_CADASTRAR = ''S''')
+      LCadastrar := Req.Query.Items['cadastrar'];
+      if LCadastrar.Contains('S') then
+        LWhereList.Add('PRO_CADASTRAR = ''S''');
     end;
-		Query.Add('ORDER BY PRO_CODIGO');
-		Query.Open();
-		Query.Dataset.First;
-		while not Query.Dataset.Eof do
-		begin
-			Produtos.BuscaDadosTabela(Query.Dataset.FieldByName('PRO_CODIGO').AsInteger);
-			aJson.Add(TJSONObject.ParseJSONValue(Produtos.ToJson) as TJSONObject);
-			Query.Dataset.Next;
-		end;
-		Res.Send<TJSONArray>(aJson);
-	finally
-		Produtos.DisposeOf;
-	end;
+
+    if Req.Query.ContainsKey('stockStatus') then
+    begin
+      LStockStatus := LowerCase(Trim(Req.Query.Items['stockStatus']));
+      if LStockStatus = 'sem_estoque' then
+        LWhereList.Add('(PRO_QUANTIDADE <= 0 OR PRO_QUANTIDADE IS NULL)')
+      else if LStockStatus = 'acabando' then
+        LWhereList.Add('(PRO_QUANTIDADE > 0 AND PRO_QUANTIDADE <= 5)');
+    end;
+
+    LWhereClause := '';
+    if LWhereList.Count > 0 then
+    begin
+      LWhereClause := ' WHERE ' + LWhereList[0];
+      for I := 1 to LWhereList.Count - 1 do
+        LWhereClause := LWhereClause + ' AND ' + LWhereList[I];
+    end;
+
+    QueryCount.Clear;
+    QueryCount.Add('SELECT COUNT(*) AS TOTAL FROM PRODUTOS' + LWhereClause);
+    QueryCount.Open;
+    LTotalRecords := QueryCount.Dataset.FieldByName('TOTAL').AsInteger;
+
+    if LLimit > 0 then
+      LTotalPages := (LTotalRecords + LLimit - 1) div LLimit
+    else
+      LTotalPages := 1;
+
+    QueryData.Clear;
+    QueryData.Add(Format('SELECT FIRST %d SKIP %d PRO_CODIGO FROM PRODUTOS %s ORDER BY PRO_CODIGO', [LLimit, LOffset, LWhereClause]));
+    QueryData.Open;
+    QueryData.Dataset.First;
+
+    while not QueryData.Dataset.Eof do
+    begin
+      Produtos.BuscaDadosTabela(QueryData.Dataset.FieldByName('PRO_CODIGO').AsInteger);
+      aJson.Add(TJSONObject.ParseJSONValue(Produtos.ToJson) as TJSONObject);
+      QueryData.Dataset.Next;
+    end;
+
+    if LIsPaginated then
+    begin
+      LResponseObj := TJSONObject.Create;
+      LMetaObj := TJSONObject.Create;
+
+      LMetaObj.AddPair('page', TJSONNumber.Create(LPage));
+      LMetaObj.AddPair('limit', TJSONNumber.Create(LLimit));
+      LMetaObj.AddPair('total', TJSONNumber.Create(LTotalRecords));
+      LMetaObj.AddPair('pages', TJSONNumber.Create(LTotalPages));
+
+      LResponseObj.AddPair('data', aJson);
+      LResponseObj.AddPair('meta', LMetaObj);
+
+      Res.Send<TJSONObject>(LResponseObj);
+    end
+    else
+    begin
+      Res.Send<TJSONArray>(aJson);
+    end;
+  finally
+    LWhereList.Free;
+    Produtos.DisposeOf;
+  end;
 end;
 
 class procedure TProdutosController.GetForID(Req: THorseRequest; Res: THorseResponse; Next: TProc);
@@ -155,6 +223,7 @@ var
 begin
 	try
 		Produtos := TProdutos.Create(TDatabase.Connection).fromJson<TProdutos>(Req.Body);
+		Produtos.Cadastrar := 'S';
 		Produtos.SalvaNoBanco(1);
 		Res.Send<TJSONObject>(TJSONObject.ParseJSONValue(Produtos.ToJson) as TJSONObject);
 	finally
@@ -194,7 +263,7 @@ begin
 	FDQuery.SQL.Add(':PRO_SIT_TRIB, :PRO_CST, :PRO_TT, :PRO_MAR, :PRO_COD_AGRUP, :PRO_VALORP,');
 	FDQuery.SQL.Add(':PRO_URL_IMAGEM, :PRO_CADASTRAR)');
 	FDQuery.SQL.Add('MATCHING (PRO_CODIGO)');
-	// preparando para usar inser��es via ArrayDML
+	// preparando para usar inseres via ArrayDML
 	FDQuery.Params.ArraySize := aJson.Count;
 	for i                    := 0 to Pred(aJson.Count) do
 	begin
@@ -245,12 +314,12 @@ begin
 			FDQuery.ParamByName('PRO_COD_AGRUP').AsStrings[i]            := Itens.Cod_agrup;
 			FDQuery.ParamByName('PRO_VALORP').AsCurrencys[i]             := Itens.Valorp;
 			FDQuery.ParamByName('PRO_URL_IMAGEM').AsStrings[i]           := Itens.URL_Imagem;
-			FDQuery.ParamByName('PRO_CADASTRAR').AsStrings[i]            := Itens.Cadastrar;
+			FDQuery.ParamByName('PRO_CADASTRAR').AsStrings[i]            := 'S';
 		finally
 			Itens.DisposeOf;
 		end;
 	end;
-	// Executa as inser��es em lote
+	// Executa as inseres em lote
 	FDQuery.Execute(aJson.Count, 0);
 	Res.Send<TJSONObject>(oJson);
 end;
@@ -261,6 +330,7 @@ var
 begin
 	try
 		Produtos := TProdutos.Create(TDatabase.Connection).fromJson<TProdutos>(Req.Body);
+		Produtos.Cadastrar := 'S';
 		Produtos.SalvaNoBanco(1);
 		Res.Send<TJSONObject>(TJSONObject.ParseJSONValue(Produtos.ToJson) as TJSONObject);
 	finally

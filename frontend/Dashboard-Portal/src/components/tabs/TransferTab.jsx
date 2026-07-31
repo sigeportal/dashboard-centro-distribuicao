@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
-import { ArrowRightLeft, Plus, CheckCircle, AlertCircle, Eye, RefreshCw, Send, ShieldCheck, XCircle } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { ArrowRightLeft, Plus, CheckCircle, AlertCircle, Eye, RefreshCw, Send, ShieldCheck, XCircle, Search, Package, X } from 'lucide-react';
 import { createApi } from '../../services/api';
+import SearchBar from '../SearchBar';
+import { formatCurrency, formatDate } from '../../utils/formatters';
 import './TransferTab.css';
 
 export default function TransferTab() {
@@ -19,6 +22,9 @@ export default function TransferTab() {
   // Nova Transferência
   const [origin, setOrigin] = useState('');
   const [destination, setDestination] = useState('');
+  const [tipoFiscal, setTipoFiscal] = useState('FISCAL'); // 'FISCAL' (Com NF-e) ou 'NAO_FISCAL' (Sem Nota)
+  const [numeroNf, setNumeroNf] = useState('');
+  const [chaveNfe, setChaveNfe] = useState('');
   const [obs, setObs] = useState('');
   const [transferItems, setTransferItems] = useState([]); // { produto_id, quantidade, valor }
   
@@ -26,6 +32,52 @@ export default function TransferTab() {
   const [selectedProduct, setSelectedProduct] = useState('');
   const [quantity, setQuantity] = useState('');
   const [price, setPrice] = useState('');
+  const [loadingNf, setLoadingNf] = useState(false);
+
+  const handleFetchNfItems = async () => {
+    const term = (chaveNfe || '').trim() || (numeroNf || '').trim();
+    if (!term) {
+      alert('Por favor, informe a Chave de Acesso ou o Número da Nota Fiscal.');
+      return;
+    }
+    setLoadingNf(true);
+    try {
+      const res = await api.get(`/v1/compras/buscar-nf?termo=${encodeURIComponent(term)}`);
+      const compraData = res.data;
+      if (compraData && Array.isArray(compraData.itens) && compraData.itens.length > 0) {
+        const importedItems = compraData.itens.map(it => ({
+          produto_id: it.produto_codigo,
+          nome: it.produto_nome || `Produto #${it.produto_codigo}`,
+          quantidade: Number(it.quantidade) || 1,
+          valor: Number(it.valor_unitario) || 0
+        }));
+        
+        setTransferItems(prev => {
+          const map = new Map();
+          prev.forEach(item => map.set(item.produto_id, item));
+          importedItems.forEach(item => map.set(item.produto_id, item));
+          return Array.from(map.values());
+        });
+
+        if (compraData.numero_nf && !numeroNf) setNumeroNf(compraData.numero_nf);
+        if (compraData.chave_nfe && !chaveNfe) setChaveNfe(compraData.chave_nfe);
+
+        alert(`Sucesso! ${importedItems.length} itens da NF #${compraData.numero_nf || term} foram carregados no lote.`);
+      } else {
+        alert('Nenhum item encontrado nesta Nota Fiscal.');
+      }
+    } catch (err) {
+      console.error('Erro ao buscar itens da NF:', err);
+      alert('Nota Fiscal não encontrada. Verifique se o número ou a chave foram digitados corretamente.');
+    } finally {
+      setLoadingNf(false);
+    }
+  };
+
+  // Modal de Pesquisa de Produtos (Igual à tela de Produtos)
+  const [showProductSearchModal, setShowProductSearchModal] = useState(false);
+  const [modalSearchTerm, setModalSearchTerm] = useState('');
+  const [modalStockFilter, setModalStockFilter] = useState('todos'); // 'todos', 'low', 'out'
 
   // Conferência de Recebimento
   const [receptionTransfer, setReceptionTransfer] = useState(null);
@@ -94,9 +146,11 @@ export default function TransferTab() {
 
   const fetchProducts = async () => {
     try {
-      const response = await api.get('/v1/produtos');
+      const response = await api.get('/v1/produtos?limit=500');
       if (Array.isArray(response.data)) {
         setProducts(response.data);
+      } else if (response.data?.data && Array.isArray(response.data.data)) {
+        setProducts(response.data.data);
       }
     } catch (err) {
       console.error('Erro ao buscar produtos para transferência:', err);
@@ -107,16 +161,55 @@ export default function TransferTab() {
     try {
       const response = await api.get('/v1/empresa');
       if (Array.isArray(response.data)) {
-        const formattedUnits = response.data.map(u => ({
-          id: u.codigo || u.Codigo,
-          name: `${u.codigo || u.Codigo} - ${u.fantasia || u.Fantasia || u.razao_social || u.Razao_social || 'Unidade'}`,
-          ccCodigo: u.ccCodigo || u.CcCodigo
-        }));
+        const formattedUnits = response.data.map(u => {
+          const rawName = u.fantasia || u.Fantasia || u.razao_social || u.Razao_social || 'Unidade';
+          const code = u.codigo || u.Codigo;
+          const isCd = rawName.toUpperCase().includes('CD') || code === 5 || rawName.toUpperCase().includes('DOURADINA');
+          return {
+            id: code,
+            name: `${code} - ${rawName}`,
+            ccCodigo: u.ccCodigo || u.CcCodigo,
+            isCd: isCd
+          };
+        });
+
+        // Ordena para que o Centro de Distribuição (CD) seja SEMPRE a 1ª OPÇÃO!
+        formattedUnits.sort((a, b) => (b.isCd ? 1 : 0) - (a.isCd ? 1 : 0));
+
         setUnits(formattedUnits);
+
+        // Define a unidade de origem padrão como o Centro de Distribuição (1ª opção)
+        if (formattedUnits.length > 0) {
+          setOrigin(String(formattedUnits[0].id));
+        }
       }
     } catch (err) {
       console.error('Erro ao buscar unidades (empresas):', err);
     }
+  };
+
+  // Filtro de Produtos no Modal Popup
+  const getFilteredModalProducts = () => {
+    return products.filter(p => {
+      const matchesSearch = !modalSearchTerm || (
+        (p.nome && p.nome.toLowerCase().includes(modalSearchTerm.toLowerCase())) ||
+        (p.fabricante && p.fabricante.toLowerCase().includes(modalSearchTerm.toLowerCase())) ||
+        (p.codbarra && p.codbarra.toLowerCase().includes(modalSearchTerm.toLowerCase())) ||
+        (p.codigo && String(p.codigo).includes(modalSearchTerm))
+      );
+
+      const matchesStock = modalStockFilter === 'todos' ? true :
+        modalStockFilter === 'low' ? (p.quantidade > 0 && p.quantidade <= 5) :
+        (p.quantidade <= 0);
+
+      return matchesSearch && matchesStock;
+    });
+  };
+
+  const handleSelectProductFromModal = (prod) => {
+    setSelectedProduct(String(prod.codigo));
+    setPrice(prod.valorv || '');
+    setShowProductSearchModal(false);
   };
 
   const handleViewDetails = async (transfer) => {
@@ -196,7 +289,10 @@ export default function TransferTab() {
         status: 'Em Trânsito',
         obs: obs,
         usuarioRecebimento: '',
-        dataRecebimento: '1899-12-30' // Data padrão nula Delphi
+        dataRecebimento: '1899-12-30', // Data padrão nula Delphi
+        tipoFiscal: tipoFiscal,
+        numeroNf: tipoFiscal === 'FISCAL' ? numeroNf : '',
+        chaveNfe: tipoFiscal === 'FISCAL' ? chaveNfe : ''
       };
 
       // Cria cabeçalho
@@ -214,11 +310,14 @@ export default function TransferTab() {
 
       await api.post('/v1/transferenciaItens/emLote', { itens: formattedItems });
 
-      alert('Transferência enviada com sucesso!');
+      alert(`Transferência (${tipoFiscal === 'FISCAL' ? 'Fiscal com NF-e' : 'Não Fiscal / Sem Nota'}) enviada com sucesso!`);
       
       // Reset formulário
       setOrigin('');
       setDestination('');
+      setTipoFiscal('FISCAL');
+      setNumeroNf('');
+      setChaveNfe('');
       setObs('');
       setTransferItems([]);
       setActiveSubTab('list');
@@ -360,6 +459,7 @@ export default function TransferTab() {
               <thead>
                 <tr>
                   <th>Cod. Lote</th>
+                  <th>Tipo</th>
                   <th>Origem</th>
                   <th>Destino</th>
                   <th>Data Envio</th>
@@ -372,9 +472,18 @@ export default function TransferTab() {
                 {transfers.map((item, idx) => (
                   <tr key={item.id || idx}>
                     <td><span className="item-code">#{item.id}</span></td>
+                    <td>
+                      {item.tipoFiscal === 'NAO_FISCAL' ? (
+                        <span className="badge badge-warning" title="Produtos comprados sem nota fiscal">📦 Não Fiscal</span>
+                      ) : (
+                        <span className="badge badge-info" title={item.numeroNf ? `NF-e #${item.numeroNf}` : 'NF-e de Transferência'}>
+                          📄 Fiscal {item.numeroNf ? `#${item.numeroNf}` : ''}
+                        </span>
+                      )}
+                    </td>
                     <td>{getUnitName(item.origem)}</td>
                     <td>{getUnitName(item.destino)}</td>
-                    <td>{item.data}</td>
+                    <td>{formatDate(item.data)}</td>
                     <td>{getStatusBadge(item.status)}</td>
                     <td>{item.obs || '-'}</td>
                     <td className="actions-cell">
@@ -427,7 +536,7 @@ export default function TransferTab() {
             </div>
             <div>
               <p><strong>Responsável Recepção:</strong> {selectedTransfer.usuarioRecebimento || 'Não recebido ainda'}</p>
-              <p><strong>Data Recepção:</strong> {selectedTransfer.dataRecebimento !== '1899-12-30' ? selectedTransfer.dataRecebimento : '-'}</p>
+              <p><strong>Data Recepção:</strong> {formatDate(selectedTransfer.dataRecebimento)}</p>
               <p><strong>Obs:</strong> {selectedTransfer.obs || '-'}</p>
             </div>
           </div>
@@ -486,13 +595,93 @@ export default function TransferTab() {
               </label>
             </div>
 
+            {/* SELEÇÃO FISCAL VS NÃO FISCAL */}
+            <div style={{ background: 'rgba(255, 255, 255, 0.7)', padding: '1rem', borderRadius: '10px', border: '1px solid rgba(0, 0, 0, 0.08)', margin: '0.5rem 0 1rem 0' }}>
+              <label style={{ fontWeight: 600, display: 'block', marginBottom: '0.6rem', color: 'var(--text-primary)' }}>
+                Tipo de Transferência de Estoque *
+              </label>
+              <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', marginBottom: tipoFiscal === 'FISCAL' ? '1rem' : '0' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontWeight: 500 }}>
+                  <input 
+                    type="radio" 
+                    name="tipoFiscal" 
+                    value="FISCAL" 
+                    checked={tipoFiscal === 'FISCAL'} 
+                    onChange={() => setTipoFiscal('FISCAL')} 
+                  />
+                  📄 <strong>Fiscal (Com NF-e de Transferência)</strong>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontWeight: 500 }}>
+                  <input 
+                    type="radio" 
+                    name="tipoFiscal" 
+                    value="NAO_FISCAL" 
+                    checked={tipoFiscal === 'NAO_FISCAL'} 
+                    onChange={() => setTipoFiscal('NAO_FISCAL')} 
+                  />
+                  📦 <strong>Não Fiscal (Produtos comprados Sem Nota / Interna)</strong>
+                </label>
+              </div>
+
+              {tipoFiscal === 'FISCAL' && (
+                <div style={{ marginTop: '0.75rem' }}>
+                  <div className="grid-2">
+                    <label className="cd-input-container">
+                      Número da Nota Fiscal (NF-e)
+                      <input 
+                        type="text" 
+                        value={numeroNf} 
+                        onChange={(e) => setNumeroNf(e.target.value)} 
+                        placeholder="Ex: 000.124.890" 
+                        className="cd-text-input" 
+                      />
+                    </label>
+                    <label className="cd-input-container">
+                      Chave de Acesso da NF-e (44 Dígitos)
+                      <input 
+                        type="text" 
+                        value={chaveNfe} 
+                        onChange={(e) => setChaveNfe(e.target.value)} 
+                        placeholder="3523..." 
+                        maxLength={44} 
+                        className="cd-text-input" 
+                      />
+                    </label>
+                  </div>
+                  <div style={{ marginTop: '0.65rem', display: 'flex', justifyContent: 'flex-end' }}>
+                    <button 
+                      type="button" 
+                      onClick={handleFetchNfItems}
+                      disabled={loadingNf}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        background: 'linear-gradient(135deg, #2563eb, #3b82f6)',
+                        color: '#ffffff',
+                        border: 'none',
+                        padding: '0.6rem 1.2rem',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        fontWeight: 600,
+                        fontSize: '0.88rem',
+                        boxShadow: '0 2px 6px rgba(37, 99, 235, 0.3)'
+                      }}
+                    >
+                      {loadingNf ? '⌛ Buscando Itens da Nota Fiscal...' : '📥 Puxar Todos os Itens Desta Nota Fiscal'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
             <label className="cd-input-container">
               Observações gerais
               <input 
                 type="text" 
                 value={obs} 
                 onChange={(e) => setObs(e.target.value)} 
-                placeholder="Ex: Envio emergencial de grade de vestuário" 
+                placeholder="Ex: Envio de mercadorias entre filiais" 
                 className="cd-text-input" 
               />
             </label>
@@ -501,25 +690,40 @@ export default function TransferTab() {
             <div className="cd-add-item-box">
               <h4>Adicionar Produtos ao Lote</h4>
               <div className="grid-3">
-                <label className="cd-input-container">
-                  Produto
-                  <select 
-                    value={selectedProduct} 
-                    onChange={(e) => {
-                      setSelectedProduct(e.target.value);
-                      const prod = products.find(p => p.codigo === Number(e.target.value));
-                      if (prod) setPrice(prod.valorv || '');
-                    }} 
-                    className="cd-select"
+                <div className="cd-input-container">
+                  <label>Produto Selecionado *</label>
+                  <button
+                    type="button"
+                    onClick={() => setShowProductSearchModal(true)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justify: 'space-between',
+                      padding: '0.65rem 0.9rem',
+                      backgroundColor: '#ffffff',
+                      border: '1px solid rgba(0, 0, 0, 0.15)',
+                      borderRadius: '8px',
+                      color: selectedProduct ? 'var(--text-primary)' : '#6b7280',
+                      fontWeight: selectedProduct ? 600 : 400,
+                      cursor: 'pointer',
+                      fontSize: '0.88rem',
+                      width: '100%',
+                      textAlign: 'left'
+                    }}
                   >
-                    <option value="">Selecione um produto...</option>
-                    {products.map(p => (
-                      <option key={p.codigo} value={p.codigo}>
-                        {p.nome} (Cod: #{p.codigo})
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {selectedProduct ? (
+                        (() => {
+                          const p = products.find(prod => prod.codigo === Number(selectedProduct));
+                          return p ? `#${p.codigo} - ${p.nome}` : 'Produto Selecionado';
+                        })()
+                      ) : (
+                        '🔍 Buscar produto no estoque (Popup)...'
+                      )}
+                    </span>
+                    <Search size={16} style={{ color: 'var(--accent-primary)', flexShrink: 0, marginLeft: '6px' }} />
+                  </button>
+                </div>
 
                 <label className="cd-input-container">
                   Quantidade
@@ -660,6 +864,84 @@ export default function TransferTab() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* MODAL POPUP DE BUSCA DE PRODUTOS PARA TRANSFERÊNCIA (IGUAL À TELA PRODUTOS) */}
+      {showProductSearchModal && createPortal(
+        <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowProductSearchModal(false); }}>
+          <div className="modal-content glass" style={{ maxWidth: '900px', width: '92vw' }}>
+            <div className="modal-header">
+              <h4><Package size={20} style={{ color: 'var(--accent-primary)' }} /> Selecionar Produto do Estoque</h4>
+              <button className="btn-close" onClick={() => setShowProductSearchModal(false)}><X size={18} /></button>
+            </div>
+
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1rem 0' }}>
+              <SearchBar
+                value={modalSearchTerm}
+                onChange={(val) => setModalSearchTerm(val)}
+                onSearch={() => {}}
+                onClear={() => setModalSearchTerm('')}
+                placeholder="Buscar por nome, fabricante, código de barras..."
+              />
+
+              <div className="filter-bar" style={{ margin: 0 }}>
+                <button className={`filter-btn ${modalStockFilter === 'todos' ? 'active' : ''}`} onClick={() => setModalStockFilter('todos')}>Todos</button>
+                <button className={`filter-btn ${modalStockFilter === 'low' ? 'active' : ''}`} onClick={() => setModalStockFilter('low')}>Quase Acabando</button>
+                <button className={`filter-btn ${modalStockFilter === 'out' ? 'active' : ''}`} onClick={() => setModalStockFilter('out')}>Sem Estoque</button>
+              </div>
+
+              <div className="table-responsive" style={{ maxHeight: '380px', overflowY: 'auto' }}>
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Código</th>
+                      <th>Nome</th>
+                      <th>Fabricante</th>
+                      <th>Cód. Barras</th>
+                      <th>Estoque Geral</th>
+                      <th>Valor (Venda)</th>
+                      <th>Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {getFilteredModalProducts().length === 0 ? (
+                      <tr>
+                        <td colSpan="7" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+                          Nenhum produto encontrado.
+                        </td>
+                      </tr>
+                    ) : (
+                      getFilteredModalProducts().map(p => (
+                        <tr key={p.codigo} style={{ cursor: 'pointer' }} onClick={() => handleSelectProductFromModal(p)}>
+                          <td><span className="item-code">#{p.codigo}</span></td>
+                          <td><strong>{p.nome}</strong></td>
+                          <td>{p.fabricante || '-'}</td>
+                          <td>{p.codbarra || '-'}</td>
+                          <td>
+                            <span className={`badge ${p.quantidade > 5 ? 'badge-success' : p.quantidade > 0 ? 'badge-warning' : 'badge-danger'}`}>
+                              {p.quantidade || 0}
+                            </span>
+                          </td>
+                          <td><strong style={{ color: 'var(--accent-primary)' }}>{formatCurrency(p.valorv || 0)}</strong></td>
+                          <td>
+                            <button type="button" className="btn-primary" style={{ padding: '4px 10px', fontSize: '0.8rem' }}>
+                              + Selecionar
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
+              <button type="button" className="btn-secondary" onClick={() => setShowProductSearchModal(false)}>Fechar</button>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
 
     </div>

@@ -40,7 +40,8 @@ uses
   UnitTabela.Helpers,
   FireDAC.Comp.Client,
   UnitTransferencia.Model,
-  UnitTransferenciaItem.Model;
+  UnitTransferenciaItem.Model,
+  UnitHisPro.Controller;
 
 class procedure TTransferenciasController.Delete(Req: THorseRequest; Res: THorseResponse; Next: TProc);
 var Transferencia: TTransferencia;
@@ -198,8 +199,8 @@ begin
     LQuery  := TDatabase.Query;
     FDQuery := TFDQuery(LQuery.Query);
     FDQuery.Close;
-    FDQuery.SQL.Add('UPDATE OR INSERT INTO TRANSFERENCIA (TR_ID, TR_ORIGEM, TR_DESTINO, TR_DATA, TR_STATUS, TR_OBS, TR_USUARIO_RECEBIMENTO, TR_DATA_RECEBIMENTO)');
-    FDQuery.SQL.Add('VALUES (:TR_ID, :TR_ORIGEM, :TR_DESTINO, :TR_DATA, :TR_STATUS, :TR_OBS, :TR_USUARIO_RECEBIMENTO, :TR_DATA_RECEBIMENTO)');
+    FDQuery.SQL.Add('UPDATE OR INSERT INTO TRANSFERENCIA (TR_ID, TR_ORIGEM, TR_DESTINO, TR_DATA, TR_STATUS, TR_OBS, TR_USUARIO_RECEBIMENTO, TR_DATA_RECEBIMENTO, TR_TIPO_FISCAL, TR_NUMERO_NF, TR_CHAVE_NFE)');
+    FDQuery.SQL.Add('VALUES (:TR_ID, :TR_ORIGEM, :TR_DESTINO, :TR_DATA, :TR_STATUS, :TR_OBS, :TR_USUARIO_RECEBIMENTO, :TR_DATA_RECEBIMENTO, :TR_TIPO_FISCAL, :TR_NUMERO_NF, :TR_CHAVE_NFE)');
     FDQuery.SQL.Add('MATCHING (TR_ID)');  
     // preparando para usar inserções via ArrayDML
     FDQuery.Params.ArraySize := aJson.Count;
@@ -215,6 +216,9 @@ begin
         FDQuery.ParamByName('TR_STATUS').AsStrings[i] := Itens.Status;
         FDQuery.ParamByName('TR_OBS').AsStrings[i] := Itens.Obs;
         FDQuery.ParamByName('TR_USUARIO_RECEBIMENTO').AsStrings[i] := Itens.UsuarioRecebimento;
+        FDQuery.ParamByName('TR_TIPO_FISCAL').AsStrings[i] := Itens.TipoFiscal;
+        FDQuery.ParamByName('TR_NUMERO_NF').AsStrings[i] := Itens.NumeroNf;
+        FDQuery.ParamByName('TR_CHAVE_NFE').AsStrings[i] := Itens.ChaveNfe;
         if Itens.DataRecebimento > 0 then
           FDQuery.ParamByName('TR_DATA_RECEBIMENTO').AsDateTimes[i] := Itens.DataRecebimento
         else
@@ -253,6 +257,8 @@ var
   FDQuery   : TFDQuery;
   i         : Integer;
   TransferenciaItem: TTransferenciaItem;
+  LQueryEst, LQueryCheck, LQueryUpsert: iQuery;
+  LDestinoId: Integer;
 begin
   TransferenciaItem := TTransferenciaItem.Create(TDatabase.Connection);
   try
@@ -282,6 +288,55 @@ begin
         FDQuery.ParamByName('TRI_QUANTIDADE').AsFloats[i] := Itens.Quantidade;
         FDQuery.ParamByName('TRI_VALOR').AsFloats[i] := Itens.Valor;
         FDQuery.ParamByName('TRI_QTD_CONFERIDA').AsFloats[i] := Itens.QuantidadeConferida;
+
+        THisProController.RegistrarMovimentacao(
+          Itens.ProdutoId,
+          Date,
+          'TRANSFERENCIA DE ESTOQUE',
+          IntToStr(Itens.TransferenciaId),
+          Itens.Quantidade,
+          Itens.Valor,
+          Itens.Valor,
+          Itens.Valor,
+          0,
+          Itens.Valor,
+          'T',
+          2,
+          0
+        );
+
+        // Grava fisicamente na tabela ESTOQUE_EMPRESA com a chave EE_ID
+        try
+          LQueryEst := TDatabase.Query;
+          LQueryEst.Open(Format('SELECT TR_DESTINO FROM TRANSFERENCIA WHERE TR_ID = %d', [Itens.TransferenciaId]));
+          if not LQueryEst.DataSet.Eof then
+          begin
+            LDestinoId := LQueryEst.DataSet.FieldByName('TR_DESTINO').AsInteger;
+            LQueryCheck := TDatabase.Query;
+            LQueryCheck.Open(Format('SELECT EE_ID FROM ESTOQUE_EMPRESA WHERE EE_EMPRESA_ID = %d AND EE_PRO_CODIGO = %d', [LDestinoId, Itens.ProdutoId]));
+            LQueryUpsert := TDatabase.Query;
+            if not LQueryCheck.DataSet.Eof then
+            begin
+              LQueryUpsert.Add(Format(
+                'UPDATE ESTOQUE_EMPRESA SET EE_QUANTIDADE = EE_QUANTIDADE + %s, EE_DATA_ATUALIZACAO = CURRENT_TIMESTAMP WHERE EE_EMPRESA_ID = %d AND EE_PRO_CODIGO = %d',
+                [FloatToStr(Itens.Quantidade).Replace(',', '.'), LDestinoId, Itens.ProdutoId]
+              ));
+              LQueryUpsert.ExecSQL;           
+            end
+            else
+            begin
+              LQueryUpsert.Add(Format(
+                'INSERT INTO ESTOQUE_EMPRESA (EE_ID, EE_EMPRESA_ID, EE_PRO_CODIGO, EE_QUANTIDADE, EE_DATA_ATUALIZACAO) ' +
+                'VALUES (%d, %d, %d, %s, CURRENT_TIMESTAMP)',
+                [GeraCodigo('ESTOQUE_EMPRESA', 'EE_ID'), LDestinoId, Itens.ProdutoId, FloatToStr(Itens.Quantidade).Replace(',', '.')]
+              ));
+              LQueryUpsert.ExecSQL;            
+            end;
+          end;
+        except
+          on E: Exception do
+            Writeln('-> Erro ao atualizar ESTOQUE_EMPRESA em PostItensEmLote: ' + E.Message);
+        end;
       finally
         Itens.DisposeOf;
       end;

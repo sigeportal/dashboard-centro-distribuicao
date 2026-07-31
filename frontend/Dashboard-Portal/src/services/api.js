@@ -37,6 +37,25 @@ export function createApi(useCdApi = false) {
     headers
   });
 
+  api.interceptors.request.use((config) => {
+    const empId = localStorage.getItem('selected_company_id') || 
+                  localStorage.getItem('empresa_id') || 
+                  localStorage.getItem('emp_id') || '1';
+    const empCc = localStorage.getItem('emp_cc') || empId;
+
+    config.headers['X-Empresa-Id'] = empId;
+    config.headers['X-Empresa-CC'] = empCc;
+
+    if (useCdApi) {
+      config.params = {
+        emp_id: empId,
+        emp_cc: empCc,
+        ...config.params
+      };
+    }
+    return config;
+  });
+
   api.interceptors.response.use(
     (response) => response,
     async (error) => {

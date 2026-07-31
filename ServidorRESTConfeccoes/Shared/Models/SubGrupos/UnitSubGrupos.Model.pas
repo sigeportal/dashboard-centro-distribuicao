@@ -14,6 +14,7 @@ type
     FG1: smallint;
     FTr: smallint;
     FNome: string;
+    FCadastrar: string;
     { private declarations }
   public
     { public declarations }
@@ -25,6 +26,8 @@ type
     property G1: smallint read FG1 write FG1;
     [TCampo('GRU_TR', 'SMALLINT')]
     property Tr: smallint read FTr write FTr;
+    [TCampo('GRU_CADASTRAR', 'CHAR(1) DEFAULT ''N''')]
+    property Cadastrar: string read FCadastrar write FCadastrar;
   end;
 
 implementation

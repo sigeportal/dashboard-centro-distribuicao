@@ -1,4 +1,4 @@
-program ServidorConsole;
+program api_centro_distribuicao;
 
 {$APPTYPE CONSOLE}
 
@@ -55,7 +55,12 @@ uses
   UnitInicializaClasses in '..\Shared\Utils\UnitInicializaClasses.pas',
   UnitLancamentoCentroCusto.Controller in '..\..\..\FormsComuns\Classes\LancamentoCentroCustos\UnitLancamentoCentroCusto.Controller.pas',
   UnitLancamentoCentroCusto.Model in '..\..\..\FormsComuns\Classes\LancamentoCentroCustos\UnitLancamentoCentroCusto.Model.pas',
-  UnitDashboardSync.Model in '..\Shared\Models\DashboardSync\UnitDashboardSync.Model.pas';
+  UnitDashboardSync.Model in '..\Shared\Models\DashboardSync\UnitDashboardSync.Model.pas',
+  UnitEstoqueEmpresa.Model in '..\Shared\Models\Estoque\UnitEstoqueEmpresa.Model.pas',
+  UnitCompras.Model in '..\Shared\Models\Compras\UnitCompras.Model.pas',
+  UnitCompras.Controller in '..\Shared\Controllers\Compras\UnitCompras.Controller.pas',
+  UnitHisPro.Model in '..\Shared\Models\HistoricoEstoque\UnitHisPro.Model.pas',
+  UnitHisPro.Controller in '..\Shared\Controllers\HistoricoEstoque\UnitHisPro.Controller.pas';
 
 var
 	LLogFileConfig: THorseLoggerConsoleConfig;
@@ -91,7 +96,9 @@ begin
     TTamanhoController.Router;
     TLancamentoCentroCustoController.Router;
     TTransferenciasController.Router;
+    TComprasController.Router;
     TSyncController.Router;
+    THisProController.Router;
     
     //inicializa classes
     TInicializarClasses.Iniciar;  

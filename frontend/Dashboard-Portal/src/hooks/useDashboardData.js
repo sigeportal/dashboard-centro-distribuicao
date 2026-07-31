@@ -5,6 +5,18 @@ import { logError } from '../utils/logger';
 
 const emptyChartResponse = { data: { data: [] } };
 
+const extractArrayData = (res) => {
+  if (!res || !res.data) return [];
+  if (Array.isArray(res.data)) return res.data;
+  if (Array.isArray(res.data.data)) return res.data.data;
+  return [];
+};
+
+const extractChartObject = (res) => {
+  const arr = extractArrayData(res);
+  return { data: arr, meta: res?.data?.meta || {} };
+};
+
 const allowEmptyExceptUnauthorized = (fallback) => (err) => {
   if (isUnauthorizedError(err)) {
     throw err;
@@ -80,27 +92,27 @@ export default function useDashboardData(showServiceOrders = false, isFinancialA
   });
 
   const [overviewDates, setOverviewDates] = useState(() => ({
-    startDate: new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0],
+    startDate: new Date(Date.now() - 90 * 86400000).toISOString().split('T')[0],
     endDate: new Date().toISOString().split('T')[0]
   }));
 
   const [movimentacoesDates, setMovimentacoesDates] = useState(() => ({
-    startDate: new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0],
+    startDate: new Date(Date.now() - 90 * 86400000).toISOString().split('T')[0],
     endDate: new Date().toISOString().split('T')[0]
   }));
 
   const [recebimentosDates, setRecebimentosDates] = useState(() => ({
-    startDate: new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0],
+    startDate: new Date(Date.now() - 90 * 86400000).toISOString().split('T')[0],
     endDate: new Date().toISOString().split('T')[0]
   }));
 
   const [vendasDates, setVendasDates] = useState(() => ({
-    startDate: new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0],
+    startDate: new Date(Date.now() - 90 * 86400000).toISOString().split('T')[0],
     endDate: new Date().toISOString().split('T')[0]
   }));
 
   const [osDates, setOsDates] = useState(() => ({
-    startDate: new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0],
+    startDate: new Date(Date.now() - 90 * 86400000).toISOString().split('T')[0],
     endDate: new Date().toISOString().split('T')[0]
   }));
 
@@ -116,7 +128,7 @@ export default function useDashboardData(showServiceOrders = false, isFinancialA
     return Array.isArray(data[type].data) ? data[type].data : [];
   };
 
-  const fetchPage = async (type, newPage, searchTerm = searchTerms[type], startDate = null, endDate = null, stockStatus = prodFilter, account = selectedAccount) => {
+  const fetchPage = async (type, newPage = 'last', searchTerm = searchTerms[type], startDate = null, endDate = null, stockStatus = prodFilter, account = selectedAccount) => {
     try {
       const api = getApi(true); // Tudo vem do CD_API (ServidorRESTConfeccoes) conforme sincronizado
       const searchParam = searchTerm ? `&search=${encodeURIComponent(searchTerm)}` : '';
@@ -158,16 +170,28 @@ export default function useDashboardData(showServiceOrders = false, isFinancialA
         conParam = `&con=${account}`;
       }
 
-      const res = await api.get(`/v1/${type}?page=${newPage}&limit=10${searchParam}${dateParam}${stockParam}${conParam}`);
-      const isArray = Array.isArray(res.data);
+      let targetNum = newPage === 'last' ? 1 : newPage;
+      let res = await api.get(`/v1/${type}?page=${targetNum}&limit=10${searchParam}${dateParam}${stockParam}${conParam}`);
+      let isArray = Array.isArray(res.data);
+      let items = isArray ? res.data : (res.data?.data || []);
+      let metaData = isArray ? { total: res.data.length, pages: 1 } : (res.data?.meta || {});
+
+      if (newPage === 'last' && metaData.pages > 1) {
+        targetNum = metaData.pages;
+        res = await api.get(`/v1/${type}?page=${targetNum}&limit=10${searchParam}${dateParam}${stockParam}${conParam}`);
+        isArray = Array.isArray(res.data);
+        items = isArray ? res.data : (res.data?.data || []);
+        metaData = isArray ? { total: res.data.length, pages: 1 } : (res.data?.meta || {});
+      }
+
       setData(prev => ({
         ...prev,
         [type]: {
-          data: isArray ? res.data : (res.data?.data || []),
-          meta: isArray ? { total: res.data.length, pages: 1 } : (res.data?.meta || {})
+          data: items,
+          meta: metaData
         }
       }));
-      setPages(prev => ({ ...prev, [type]: newPage }));
+      setPages(prev => ({ ...prev, [type]: metaData.page || targetNum }));
     } catch (err) {
       logError(`Erro ao buscar página ${newPage} de ${type}:`, err);
     }
@@ -193,7 +217,7 @@ export default function useDashboardData(showServiceOrders = false, isFinancialA
     const api = getApi(true);
     api.get('/v1/dashboard/clientes-cidade')
       .then(res => {
-        setChartData(prev => ({ ...prev, clientes: res.data?.data || [] }));
+        setChartData(prev => ({ ...prev, clientes: extractArrayData(res) }));
       })
       .catch(allowEmptyExceptUnauthorized(emptyChartResponse))
       .finally(() => {
@@ -229,7 +253,7 @@ export default function useDashboardData(showServiceOrders = false, isFinancialA
     if (isFinancialAllowed && !isTodayRange) {
       api.get('/v1/dashboard/movimentacoes', { params })
         .then(res => {
-          setChartData(prev => ({ ...prev, movimentacoes: res.data?.data || [] }));
+          setChartData(prev => ({ ...prev, movimentacoes: extractArrayData(res) }));
         })
         .catch(allowEmptyExceptUnauthorized(emptyChartResponse))
         .finally(() => {
@@ -242,7 +266,7 @@ export default function useDashboardData(showServiceOrders = false, isFinancialA
 
     api.get('/v1/dashboard/vendas-diarias', { params })
       .then(res => {
-        setChartData(prev => ({ ...prev, vendasDiarias: res.data?.data || [] }));
+        setChartData(prev => ({ ...prev, vendasDiarias: extractArrayData(res) }));
       })
       .catch(allowEmptyExceptUnauthorized(emptyChartResponse))
       .finally(() => {
@@ -252,7 +276,7 @@ export default function useDashboardData(showServiceOrders = false, isFinancialA
     if (isTodayRange) {
       api.get('/v1/dashboard/vendas-diarias/hora', { params })
         .then(res => {
-          setChartData(prev => ({ ...prev, vendasPorHora: res.data?.data || [] }));
+          setChartData(prev => ({ ...prev, vendasPorHora: extractArrayData(res) }));
         })
         .catch(allowEmptyExceptUnauthorized(emptyChartResponse))
         .finally(() => {
@@ -268,10 +292,7 @@ export default function useDashboardData(showServiceOrders = false, isFinancialA
       .then(res => {
         setChartData(prev => ({
           ...prev,
-          meiosPagamento: {
-            data: res.data?.data || [],
-            meta: res.data?.meta || {}
-          }
+          meiosPagamento: extractChartObject(res)
         }));
       })
       .catch(allowEmptyExceptUnauthorized(emptyChartResponse))
@@ -284,10 +305,7 @@ export default function useDashboardData(showServiceOrders = false, isFinancialA
         .then(res => {
           setChartData(prev => ({
             ...prev,
-            meiosPagamentoCompras: {
-              data: res.data?.data || [],
-              meta: res.data?.meta || {}
-            }
+            meiosPagamentoCompras: extractChartObject(res)
           }));
         })
         .catch(allowEmptyExceptUnauthorized(emptyChartResponse))
@@ -299,10 +317,7 @@ export default function useDashboardData(showServiceOrders = false, isFinancialA
         .then(res => {
           setChartData(prev => ({
             ...prev,
-            meiosPagamentoRecebimentos: {
-              data: res.data?.data || [],
-              meta: res.data?.meta || {}
-            }
+            meiosPagamentoRecebimentos: extractChartObject(res)
           }));
         })
         .catch(allowEmptyExceptUnauthorized(emptyChartResponse))
@@ -314,10 +329,7 @@ export default function useDashboardData(showServiceOrders = false, isFinancialA
         .then(res => {
           setChartData(prev => ({
             ...prev,
-            meiosPagamentoPagamentos: {
-              data: res.data?.data || [],
-              meta: res.data?.meta || {}
-            }
+            meiosPagamentoPagamentos: extractChartObject(res)
           }));
         })
         .catch(allowEmptyExceptUnauthorized(emptyChartResponse))
@@ -327,7 +339,7 @@ export default function useDashboardData(showServiceOrders = false, isFinancialA
 
       api.get('/v1/dashboard/vendas-margem-lucro', { params })
         .then(res => {
-          setChartData(prev => ({ ...prev, vendasMargemLucro: res.data?.data || [] }));
+          setChartData(prev => ({ ...prev, vendasMargemLucro: extractArrayData(res) }));
         })
         .catch(allowEmptyExceptUnauthorized(emptyChartResponse))
         .finally(() => {
@@ -336,7 +348,7 @@ export default function useDashboardData(showServiceOrders = false, isFinancialA
 
       api.get('/v1/dashboard/despesas-tipo-pagamento', { params })
         .then(res => {
-          setChartData(prev => ({ ...prev, despesasTipoPagamento: res.data?.data || [] }));
+          setChartData(prev => ({ ...prev, despesasTipoPagamento: extractArrayData(res) }));
         })
         .catch(allowEmptyExceptUnauthorized(emptyChartResponse))
         .finally(() => {
@@ -347,10 +359,7 @@ export default function useDashboardData(showServiceOrders = false, isFinancialA
         .then(res => {
           setChartData(prev => ({
             ...prev,
-            vendasLucroGrupo: {
-              data: res.data?.data || [],
-              meta: res.data?.meta || {}
-            }
+            vendasLucroGrupo: extractChartObject(res)
           }));
         })
         .catch(allowEmptyExceptUnauthorized(emptyChartResponse))
@@ -390,7 +399,7 @@ export default function useDashboardData(showServiceOrders = false, isFinancialA
     // 11. OS Diarias
     api.get('/v1/dashboard/os-diarias', { params })
       .then(res => {
-        setChartData(prev => ({ ...prev, osDiarias: res.data?.data || [] }));
+        setChartData(prev => ({ ...prev, osDiarias: extractArrayData(res) }));
       })
       .catch(allowEmptyExceptUnauthorized(emptyChartResponse))
       .finally(() => {
@@ -400,7 +409,7 @@ export default function useDashboardData(showServiceOrders = false, isFinancialA
     // 12. OS Margem Lucro
     api.get('/v1/dashboard/os-margem-lucro', { params })
       .then(res => {
-        setChartData(prev => ({ ...prev, osMargemLucro: res.data?.data || [] }));
+        setChartData(prev => ({ ...prev, osMargemLucro: extractArrayData(res) }));
       })
       .catch(allowEmptyExceptUnauthorized(emptyChartResponse))
       .finally(() => {
@@ -418,17 +427,17 @@ export default function useDashboardData(showServiceOrders = false, isFinancialA
           fetchChartData(overviewDates.startDate, overviewDates.endDate);
         } else if (activeTab === 'clientes') {
           fetchCustomersChartData();
-          await fetchPage('clientes', 1, searchTerms.clientes);
+          await fetchPage('clientes', 'last', searchTerms.clientes);
         } else if (activeTab === 'produtos') {
-          await fetchPage('produtos', 1, searchTerms.produtos, null, null, prodFilter);
+          await fetchPage('produtos', 'last', searchTerms.produtos, null, null, prodFilter);
         } else if (activeTab === 'vendas') {
-          await fetchPage('vendas', 1, searchTerms.vendas, vendasDates.startDate, vendasDates.endDate);
+          await fetchPage('vendas', 'last', searchTerms.vendas, vendasDates.startDate, vendasDates.endDate);
         } else if (activeTab === 'os') {
-          await fetchPage('os', 1, searchTerms.os, osDates.startDate, osDates.endDate);
+          await fetchPage('os', 'last', searchTerms.os, osDates.startDate, osDates.endDate);
         } else if (activeTab === 'movimentacoes' && isFinancialAllowed) {
-          await fetchPage('movimentacoes', 1, searchTerms.movimentacoes, movimentacoesDates.startDate, movimentacoesDates.endDate);
+          await fetchPage('movimentacoes', 'last', searchTerms.movimentacoes, movimentacoesDates.startDate, movimentacoesDates.endDate);
         } else if (activeTab === 'recebimentos' && isFinancialAllowed) {
-          await fetchPage('recebimentos', 1, searchTerms.recebimentos, recebimentosDates.startDate, recebimentosDates.endDate);
+          await fetchPage('recebimentos', 'last', searchTerms.recebimentos, recebimentosDates.startDate, recebimentosDates.endDate);
         }
       } catch (err) {
         logError('Erro ao buscar dados:', err);
