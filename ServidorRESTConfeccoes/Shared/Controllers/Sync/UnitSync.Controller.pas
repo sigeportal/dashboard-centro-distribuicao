@@ -181,10 +181,12 @@ begin
 
           LQuery.Clear;
           LQuery.Add(Format(
-            'UPDATE OR INSERT INTO DASHBOARD_DIARIO (EMPRESA_ID, DATA_REF, VENDAS_VALOR, VENDAS_LUCRO, VENDAS_MAIOR, VENDAS_QTD, OS_VALOR, OS_LUCRO, OS_MAIOR, OS_QTD, MOV_CREDITO, MOV_DEBITO) ' +
-            'VALUES (%d, %s, %s, %s, %s, %d, %s, %s, %s, %d, %s, %s) MATCHING (EMPRESA_ID, DATA_REF)',
-            [LEmpresaId, LDataRefSql,
-             FloatToStr(LObj.GetValue<Double>('vendas_valor', 0)).Replace(',', '.'),
+            'UPDATE DASHBOARD_DIARIO SET ' +
+            'VENDAS_VALOR = %s, VENDAS_LUCRO = %s, VENDAS_MAIOR = %s, VENDAS_QTD = %d, ' +
+            'OS_VALOR = %s, OS_LUCRO = %s, OS_MAIOR = %s, OS_QTD = %d, ' +
+            'MOV_CREDITO = %s, MOV_DEBITO = %s ' +
+            'WHERE EMPRESA_ID = %d AND DATA_REF = %s',
+            [FloatToStr(LObj.GetValue<Double>('vendas_valor', 0)).Replace(',', '.'),
              FloatToStr(LObj.GetValue<Double>('vendas_lucro', 0)).Replace(',', '.'),
              FloatToStr(LObj.GetValue<Double>('vendas_maior', 0)).Replace(',', '.'),
              LObj.GetValue<Integer>('vendas_qtd', 0),
@@ -193,9 +195,31 @@ begin
              FloatToStr(LObj.GetValue<Double>('os_maior', 0)).Replace(',', '.'),
              LObj.GetValue<Integer>('os_qtd', 0),
              FloatToStr(LObj.GetValue<Double>('mov_credito', 0)).Replace(',', '.'),
-             FloatToStr(LObj.GetValue<Double>('mov_debito', 0)).Replace(',', '.')]
+             FloatToStr(LObj.GetValue<Double>('mov_debito', 0)).Replace(',', '.'),
+             LEmpresaId, LDataRefSql]
           ));
           LQuery.ExecSQL;
+
+          if TFDQuery(LQuery.Query).RowsAffected = 0 then
+          begin
+            LQuery.Clear;
+            LQuery.Add(Format(
+              'INSERT INTO DASHBOARD_DIARIO (ID, EMPRESA_ID, DATA_REF, VENDAS_VALOR, VENDAS_LUCRO, VENDAS_MAIOR, VENDAS_QTD, OS_VALOR, OS_LUCRO, OS_MAIOR, OS_QTD, MOV_CREDITO, MOV_DEBITO) ' +
+              'VALUES (%d, %d, %s, %s, %s, %s, %d, %s, %s, %s, %d, %s, %s)',
+              [GeraCodigo('DASHBOARD_DIARIO', 'ID'), LEmpresaId, LDataRefSql,
+               FloatToStr(LObj.GetValue<Double>('vendas_valor', 0)).Replace(',', '.'),
+               FloatToStr(LObj.GetValue<Double>('vendas_lucro', 0)).Replace(',', '.'),
+               FloatToStr(LObj.GetValue<Double>('vendas_maior', 0)).Replace(',', '.'),
+               LObj.GetValue<Integer>('vendas_qtd', 0),
+               FloatToStr(LObj.GetValue<Double>('os_valor', 0)).Replace(',', '.'),
+               FloatToStr(LObj.GetValue<Double>('os_lucro', 0)).Replace(',', '.'),
+               FloatToStr(LObj.GetValue<Double>('os_maior', 0)).Replace(',', '.'),
+               LObj.GetValue<Integer>('os_qtd', 0),
+               FloatToStr(LObj.GetValue<Double>('mov_credito', 0)).Replace(',', '.'),
+               FloatToStr(LObj.GetValue<Double>('mov_debito', 0)).Replace(',', '.')]
+            ));
+            LQuery.ExecSQL;
+          end;
         except
           on E: Exception do Writeln('-> Erro ao salvar DASHBOARD_DIARIO: ' + E.Message);
         end;
