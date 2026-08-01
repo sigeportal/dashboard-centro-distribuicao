@@ -42,6 +42,7 @@ uses
   UnitGrades.Model in 'src\models\UnitGrades.Model.pas',
   UnitTamanho.Model in 'src\models\UnitTamanho.Model.pas',
   SyncService in 'src\services\SyncService.pas',
+  AutoUpdateService in 'src\services\AutoUpdateService.pas',
   UnitCddTransferencia.Model in 'src\models\UnitCddTransferencia.Model.pas';
 
 //function GetConsoleWindow: HWND; stdcall; external kernel32;
@@ -70,6 +71,8 @@ begin
   TAuthMiddleware.RegisterAuthMiddleware;
 
   TURLService.TrySendURL;  // Validar retorno da requisicao de atualizacao/autocadastro
+
+  TAutoUpdate.CheckUpdate; // Verificar se existe nova versao e atualizar
 
   TSyncService.Start; // Inicializar a sincronizacao automatica a cada 10 min
 
