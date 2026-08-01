@@ -5,7 +5,7 @@
 #define MyAppName "API Dashboard Sincronizador"
 #define MyAppVersion "1.0.0"
 #define MyAppPublisher "Portal ORM / CD"
-#define MyAppExeName "api_dashboard.exe"
+#define MyAppExeName "\dist\api_dashboard.exe"
 #define MyAppURL "https://github.com/sigeportal/dashboard-centro-distribuicao"
 
 [Setup]
@@ -85,7 +85,7 @@ begin
   // Buscar caminho existente ou valor padrao
   CaminhoBDPage.Values[0] := GetEnv('CAMINHO_BD');
   if CaminhoBDPage.Values[0] = '' then
-    CaminhoBDPage.Values[0] := 'C:\Estagio\API-Local\Dados\PRINCIPAL.FDB';
+    CaminhoBDPage.Values[0] := './PRINCIPAL.FDB';
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
