@@ -152,7 +152,9 @@ var
   LArrDiario, LArrPag, LArrGrupo, LArrCidade, LArrHora, LArrEstoque: TJSONArray;
   LQuery: iQuery;
   LEmpresaId, I, cod: Integer;
+  LValQtd: Double;
   LDataRefStr, LDataRefSql: string;
+  LDeletedDates: TStringList;
 begin
   EnsureEstoqueEmpresaTable;
   EnsureDashboardTables;
@@ -230,37 +232,46 @@ begin
     LArrPag := LBody.GetValue<TJSONArray>('pagamentos', nil);
     if Assigned(LArrPag) and (LArrPag.Count > 0) then
     begin
-      for I := 0 to LArrPag.Count - 1 do
-      begin
-        LObj := TJSONObject(LArrPag.Items[I]);
-        try
-          if (LObj.GetValue<string>('data_ref', '') <> '') then
-            LDataRefStr := FormatDateTime('yyyy-mm-dd', ISOToDate(LObj.GetValue<string>('data_ref', '')))
-          else
-            LDataRefStr := FormatDateTime('yyyy-mm-dd', Date);
-          LDataRefSql := QuotedStr(LDataRefStr);
+      LDeletedDates := TStringList.Create;
+      try
+        LDeletedDates.Sorted := True;
+        LDeletedDates.Duplicates := dupIgnore;
 
-          if I = 0 then
-          begin
+        for I := 0 to LArrPag.Count - 1 do
+        begin
+          LObj := TJSONObject(LArrPag.Items[I]);
+          try
+            if (LObj.GetValue<string>('data_ref', '') <> '') then
+              LDataRefStr := FormatDateTime('yyyy-mm-dd', ISOToDate(LObj.GetValue<string>('data_ref', '')))
+            else
+              LDataRefStr := FormatDateTime('yyyy-mm-dd', Date);
+            LDataRefSql := QuotedStr(LDataRefStr);
+
+            if LDeletedDates.IndexOf(LDataRefStr) < 0 then
+            begin
+              LDeletedDates.Add(LDataRefStr);
+              LQuery.Clear;
+              LQuery.Add(Format('DELETE FROM DASHBOARD_PAGAMENTOS WHERE EMPRESA_ID = %d AND (DATA_REF IS NULL OR DATA_REF = %s)', [LEmpresaId, LDataRefSql]));
+              LQuery.ExecSQL;
+            end;
+
             LQuery.Clear;
-            LQuery.Add(Format('DELETE FROM DASHBOARD_PAGAMENTOS WHERE EMPRESA_ID = %d AND (DATA_REF IS NULL OR DATA_REF = %s)', [LEmpresaId, LDataRefSql]));
+            LQuery.Add(Format(
+              'INSERT INTO DASHBOARD_PAGAMENTOS (ID, EMPRESA_ID, TIPO_REGISTRO, TIPO_OPERACAO, TIPO_PAGAMENTO, VALOR, DATA_REF) VALUES (%d, %d, %s, %s, %s, %s, %s)',
+              [GeraCodigo('DASHBOARD_PAGAMENTOS', 'ID'), LEmpresaId,
+               QuotedStr(LObj.GetValue<string>('tipo_registro', '')),
+               QuotedStr(LObj.GetValue<string>('tipo_operacao', '')),
+               QuotedStr(LObj.GetValue<string>('tipo_pagamento', '')),
+               FloatToStr(LObj.GetValue<Double>('valor', 0)).Replace(',', '.'),
+               LDataRefSql]
+            ));
             LQuery.ExecSQL;
+          except
+            on E: Exception do Writeln('-> Erro ao salvar DASHBOARD_PAGAMENTOS: ' + E.Message);
           end;
-
-          LQuery.Clear;
-          LQuery.Add(Format(
-            'INSERT INTO DASHBOARD_PAGAMENTOS (ID, EMPRESA_ID, TIPO_REGISTRO, TIPO_OPERACAO, TIPO_PAGAMENTO, VALOR, DATA_REF) VALUES (%d, %d, %s, %s, %s, %s, %s)',
-            [GeraCodigo('DASHBOARD_PAGAMENTOS', 'ID'), LEmpresaId,
-             QuotedStr(LObj.GetValue<string>('tipo_registro', '')),
-             QuotedStr(LObj.GetValue<string>('tipo_operacao', '')),
-             QuotedStr(LObj.GetValue<string>('tipo_pagamento', '')),
-             FloatToStr(LObj.GetValue<Double>('valor', 0)).Replace(',', '.'),
-             LDataRefSql]
-          ));
-          LQuery.ExecSQL;
-        except
-          on E: Exception do Writeln('-> Erro ao salvar DASHBOARD_PAGAMENTOS: ' + E.Message);
         end;
+      finally
+        LDeletedDates.Free;
       end;
     end;
 
@@ -268,36 +279,45 @@ begin
     LArrGrupo := LBody.GetValue<TJSONArray>('vendas_grupo', nil);
     if Assigned(LArrGrupo) and (LArrGrupo.Count > 0) then
     begin
-      for I := 0 to LArrGrupo.Count - 1 do
-      begin
-        LObj := TJSONObject(LArrGrupo.Items[I]);
-        try
-          if (LObj.GetValue<string>('data_ref', '') <> '') then
-            LDataRefStr := FormatDateTime('yyyy-mm-dd', ISOToDate(LObj.GetValue<string>('data_ref', '')))
-          else
-            LDataRefStr := FormatDateTime('yyyy-mm-dd', Date);
-          LDataRefSql := QuotedStr(LDataRefStr);
+      LDeletedDates := TStringList.Create;
+      try
+        LDeletedDates.Sorted := True;
+        LDeletedDates.Duplicates := dupIgnore;
 
-          if I = 0 then
-          begin
+        for I := 0 to LArrGrupo.Count - 1 do
+        begin
+          LObj := TJSONObject(LArrGrupo.Items[I]);
+          try
+            if (LObj.GetValue<string>('data_ref', '') <> '') then
+              LDataRefStr := FormatDateTime('yyyy-mm-dd', ISOToDate(LObj.GetValue<string>('data_ref', '')))
+            else
+              LDataRefStr := FormatDateTime('yyyy-mm-dd', Date);
+            LDataRefSql := QuotedStr(LDataRefStr);
+
+            if LDeletedDates.IndexOf(LDataRefStr) < 0 then
+            begin
+              LDeletedDates.Add(LDataRefStr);
+              LQuery.Clear;
+              LQuery.Add(Format('DELETE FROM DASHBOARD_VENDAS_GRUPO WHERE EMPRESA_ID = %d AND (DATA_REF IS NULL OR DATA_REF = %s)', [LEmpresaId, LDataRefSql]));
+              LQuery.ExecSQL;
+            end;
+
             LQuery.Clear;
-            LQuery.Add(Format('DELETE FROM DASHBOARD_VENDAS_GRUPO WHERE EMPRESA_ID = %d AND (DATA_REF IS NULL OR DATA_REF = %s)', [LEmpresaId, LDataRefSql]));
+            LQuery.Add(Format(
+              'INSERT INTO DASHBOARD_VENDAS_GRUPO (ID, EMPRESA_ID, NOME_GRUPO, VALOR, LUCRO, DATA_REF) VALUES (%d, %d, %s, %s, %s, %s)',
+              [GeraCodigo('DASHBOARD_VENDAS_GRUPO', 'ID'), LEmpresaId,
+               QuotedStr(LObj.GetValue<string>('nome_grupo', '')),
+               FloatToStr(LObj.GetValue<Double>('valor', 0)).Replace(',', '.'),
+               FloatToStr(LObj.GetValue<Double>('lucro', 0)).Replace(',', '.'),
+               LDataRefSql]
+            ));
             LQuery.ExecSQL;
+          except
+            on E: Exception do Writeln('-> Erro ao salvar DASHBOARD_VENDAS_GRUPO: ' + E.Message);
           end;
-
-          LQuery.Clear;
-          LQuery.Add(Format(
-            'INSERT INTO DASHBOARD_VENDAS_GRUPO (ID, EMPRESA_ID, NOME_GRUPO, VALOR, LUCRO, DATA_REF) VALUES (%d, %d, %s, %s, %s, %s)',
-            [GeraCodigo('DASHBOARD_VENDAS_GRUPO', 'ID'), LEmpresaId,
-             QuotedStr(LObj.GetValue<string>('nome_grupo', '')),
-             FloatToStr(LObj.GetValue<Double>('valor', 0)).Replace(',', '.'),
-             FloatToStr(LObj.GetValue<Double>('lucro', 0)).Replace(',', '.'),
-             LDataRefSql]
-          ));
-          LQuery.ExecSQL;
-        except
-          on E: Exception do Writeln('-> Erro ao salvar DASHBOARD_VENDAS_GRUPO: ' + E.Message);
         end;
+      finally
+        LDeletedDates.Free;
       end;
     end;
 
@@ -305,35 +325,44 @@ begin
     LArrCidade := LBody.GetValue<TJSONArray>('clientes_cidade', nil);
     if Assigned(LArrCidade) and (LArrCidade.Count > 0) then
     begin
-      for I := 0 to LArrCidade.Count - 1 do
-      begin
-        LObj := TJSONObject(LArrCidade.Items[I]);
-        try
-          if (LObj.GetValue<string>('data_ref', '') <> '') then
-            LDataRefStr := FormatDateTime('yyyy-mm-dd', ISOToDate(LObj.GetValue<string>('data_ref', '')))
-          else
-            LDataRefStr := FormatDateTime('yyyy-mm-dd', Date);
-          LDataRefSql := QuotedStr(LDataRefStr);
+      LDeletedDates := TStringList.Create;
+      try
+        LDeletedDates.Sorted := True;
+        LDeletedDates.Duplicates := dupIgnore;
 
-          if I = 0 then
-          begin
+        for I := 0 to LArrCidade.Count - 1 do
+        begin
+          LObj := TJSONObject(LArrCidade.Items[I]);
+          try
+            if (LObj.GetValue<string>('data_ref', '') <> '') then
+              LDataRefStr := FormatDateTime('yyyy-mm-dd', ISOToDate(LObj.GetValue<string>('data_ref', '')))
+            else
+              LDataRefStr := FormatDateTime('yyyy-mm-dd', Date);
+            LDataRefSql := QuotedStr(LDataRefStr);
+
+            if LDeletedDates.IndexOf(LDataRefStr) < 0 then
+            begin
+              LDeletedDates.Add(LDataRefStr);
+              LQuery.Clear;
+              LQuery.Add(Format('DELETE FROM DASHBOARD_CLIENTES_CIDADE WHERE EMPRESA_ID = %d AND (DATA_REF IS NULL OR DATA_REF = %s)', [LEmpresaId, LDataRefSql]));
+              LQuery.ExecSQL;
+            end;
+
             LQuery.Clear;
-            LQuery.Add(Format('DELETE FROM DASHBOARD_CLIENTES_CIDADE WHERE EMPRESA_ID = %d AND (DATA_REF IS NULL OR DATA_REF = %s)', [LEmpresaId, LDataRefSql]));
+            LQuery.Add(Format(
+              'INSERT INTO DASHBOARD_CLIENTES_CIDADE (ID, EMPRESA_ID, CIDADE, QUANTIDADE, DATA_REF) VALUES (%d, %d, %s, %d, %s)',
+              [GeraCodigo('DASHBOARD_CLIENTES_CIDADE', 'ID'), LEmpresaId,
+               QuotedStr(LObj.GetValue<string>('cidade', '')),
+               LObj.GetValue<Integer>('quantidade', 0),
+               LDataRefSql]
+            ));
             LQuery.ExecSQL;
+          except
+            on E: Exception do Writeln('-> Erro ao salvar DASHBOARD_CLIENTES_CIDADE: ' + E.Message);
           end;
-
-          LQuery.Clear;
-          LQuery.Add(Format(
-            'INSERT INTO DASHBOARD_CLIENTES_CIDADE (ID, EMPRESA_ID, CIDADE, QUANTIDADE, DATA_REF) VALUES (%d, %d, %s, %d, %s)',
-            [GeraCodigo('DASHBOARD_CLIENTES_CIDADE', 'ID'), LEmpresaId,
-             QuotedStr(LObj.GetValue<string>('cidade', '')),
-             LObj.GetValue<Integer>('quantidade', 0),
-             LDataRefSql]
-          ));
-          LQuery.ExecSQL;
-        except
-          on E: Exception do Writeln('-> Erro ao salvar DASHBOARD_CLIENTES_CIDADE: ' + E.Message);
         end;
+      finally
+        LDeletedDates.Free;
       end;
     end;
 
@@ -341,35 +370,44 @@ begin
     LArrHora := LBody.GetValue<TJSONArray>('vendas_hora', nil);
     if Assigned(LArrHora) and (LArrHora.Count > 0) then
     begin
-      for I := 0 to LArrHora.Count - 1 do
-      begin
-        LObj := TJSONObject(LArrHora.Items[I]);
-        try
-          if (LObj.GetValue<string>('data_ref', '') <> '') then
-            LDataRefStr := FormatDateTime('yyyy-mm-dd', ISOToDate(LObj.GetValue<string>('data_ref', '')))
-          else
-            LDataRefStr := FormatDateTime('yyyy-mm-dd', Date);
-          LDataRefSql := QuotedStr(LDataRefStr);
+      LDeletedDates := TStringList.Create;
+      try
+        LDeletedDates.Sorted := True;
+        LDeletedDates.Duplicates := dupIgnore;
 
-          if I = 0 then
-          begin
+        for I := 0 to LArrHora.Count - 1 do
+        begin
+          LObj := TJSONObject(LArrHora.Items[I]);
+          try
+            if (LObj.GetValue<string>('data_ref', '') <> '') then
+              LDataRefStr := FormatDateTime('yyyy-mm-dd', ISOToDate(LObj.GetValue<string>('data_ref', '')))
+            else
+              LDataRefStr := FormatDateTime('yyyy-mm-dd', Date);
+            LDataRefSql := QuotedStr(LDataRefStr);
+
+            if LDeletedDates.IndexOf(LDataRefStr) < 0 then
+            begin
+              LDeletedDates.Add(LDataRefStr);
+              LQuery.Clear;
+              LQuery.Add(Format('DELETE FROM DASHBOARD_VENDAS_HORA WHERE EMPRESA_ID = %d AND (DATA_REF IS NULL OR DATA_REF = %s)', [LEmpresaId, LDataRefSql]));
+              LQuery.ExecSQL;
+            end;
+
             LQuery.Clear;
-            LQuery.Add(Format('DELETE FROM DASHBOARD_VENDAS_HORA WHERE EMPRESA_ID = %d AND (DATA_REF IS NULL OR DATA_REF = %s)', [LEmpresaId, LDataRefSql]));
+            LQuery.Add(Format(
+              'INSERT INTO DASHBOARD_VENDAS_HORA (ID, EMPRESA_ID, HORA, VALOR, DATA_REF) VALUES (%d, %d, %s, %s, %s)',
+              [GeraCodigo('DASHBOARD_VENDAS_HORA', 'ID'), LEmpresaId,
+               QuotedStr(LObj.GetValue<string>('hora', '')),
+               FloatToStr(LObj.GetValue<Double>('valor', 0)).Replace(',', '.'),
+               LDataRefSql]
+            ));
             LQuery.ExecSQL;
+          except
+            on E: Exception do Writeln('-> Erro ao salvar DASHBOARD_VENDAS_HORA: ' + E.Message);
           end;
-
-          LQuery.Clear;
-          LQuery.Add(Format(
-            'INSERT INTO DASHBOARD_VENDAS_HORA (ID, EMPRESA_ID, HORA, VALOR, DATA_REF) VALUES (%d, %d, %s, %s, %s)',
-            [GeraCodigo('DASHBOARD_VENDAS_HORA', 'ID'), LEmpresaId,
-             QuotedStr(LObj.GetValue<string>('hora', '')),
-             FloatToStr(LObj.GetValue<Double>('valor', 0)).Replace(',', '.'),
-             LDataRefSql]
-          ));
-          LQuery.ExecSQL;
-        except
-          on E: Exception do Writeln('-> Erro ao salvar DASHBOARD_VENDAS_HORA: ' + E.Message);
         end;
+      finally
+        LDeletedDates.Free;
       end;
     end;
 

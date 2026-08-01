@@ -38,3 +38,11 @@
   - XML Autorizado: `GET /v1/nfe/{chave}/xml` (`Accept: application/xml`).
   - Status SEFAZ: `GET /v1/nfe/{chave}`.
   - Cancelamento: `POST /v1/nfe/{chave}/cancelar` (`{ "protocolo": "...", "justificativa": "..." }`).
+
+## 5. Mapeamento de Datas de Referência do Dashboard (`DATA_REF`)
+- **Origem das Datas Locais (`api_dashboard`)**:
+  - **Vendas / Grupos / Horas**: As datas de referência são extraídas dos lançamentos reais das tabelas locais `VENDAS` (campo `VEN_DATA`) ou `PED_FAT` com `PF_TABELA = 'VENDAS'` (campo `PF_DATA`).
+  - **Recebimentos / Formas de Pagamento / Movimentações**: As datas utilizam os registros reais da tabela local `REC_PGM` (campo `RP_DATAPGM`).
+- **Sincronização Cloud Central (`/v1/sync/dashboard`)**:
+  - Toda estrutura do Dashboard (`DASHBOARD_DIARIO`, `DASHBOARD_PAGAMENTOS`, `DASHBOARD_VENDAS_GRUPO`, `DASHBOARD_CLIENTES_CIDADE`, `DASHBOARD_VENDAS_HORA`) preserva e filtra por `DATA_REF` (DATE).
+  - No envio do sync, o servidor central apaga e substitui pontualmente apenas os registros pertencentes àquela `EMPRESA_ID` e `DATA_REF` específica de cada lançamento real, garantindo a fidelidade dos filtros por período (`De` / `Até`) no portal.
