@@ -662,11 +662,11 @@ export default function CadastrosTab() {
                   <input type="number" step="0.01" value={prodForm.pro_valor_dinheiro} onChange={(e) => setProdForm({ ...prodForm, pro_valor_dinheiro: e.target.value })} placeholder="Ex: 55.00" />
                 </label>
                 <label className="crud-input">
-                  Preço à Vista (R$) *
+                  Preço Vista (Débito / PIX) (R$) *
                   <input type="number" step="0.01" value={prodForm.valorv} onChange={(e) => setProdForm({ ...prodForm, valorv: e.target.value })} placeholder="Ex: 59.90" required />
                 </label>
                 <label className="crud-input">
-                  Preço a Prazo (R$)
+                  Preço a Prazo (Cartão Prazo) (R$)
                   <input type="number" step="0.01" value={prodForm.pro_valorv_prazo} onChange={(e) => setProdForm({ ...prodForm, pro_valorv_prazo: e.target.value })} placeholder="Ex: 65.90" />
                 </label>
                 <label className="crud-input">
@@ -738,11 +738,11 @@ export default function CadastrosTab() {
                   <input type="number" step="0.01" value={gradeForm.valor_dinheiro} onChange={(e) => setGradeForm({ ...gradeForm, valor_dinheiro: e.target.value })} placeholder="Ex: 55.00" />
                 </label>
                 <label className="crud-input">
-                  Preço à Vista (R$)
+                  Preço Vista (Débito / PIX) (R$)
                   <input type="number" step="0.01" value={gradeForm.valor} onChange={(e) => setGradeForm({ ...gradeForm, valor: e.target.value })} placeholder="Ex: 59.90" />
                 </label>
                 <label className="crud-input">
-                  Preço a Prazo (R$)
+                  Preço a Prazo (Cartão Prazo) (R$)
                   <input type="number" step="0.01" value={gradeForm.valor_prazo} onChange={(e) => setGradeForm({ ...gradeForm, valor_prazo: e.target.value })} placeholder="Ex: 65.90" />
                 </label>
                 <label className="crud-input">
@@ -832,12 +832,12 @@ export default function CadastrosTab() {
                         <td><strong style={{ color: getProductStockForActiveUnit(item) > 0 ? '#10b981' : '#ef4444' }}>{getProductStockForActiveUnit(item)}</strong></td>
                         <td className="prices-cell">
                           <div className="price-badge-container">
-                            <div className="price-primary" title="Preço à Vista">
-                              <span className="price-label">Vista:</span> R$ {(Number(item.valorv) || 0).toFixed(2)}
+                            <div className="price-primary" title="Preço Vista (Débito / PIX)">
+                              <span className="price-label">Vista (Déb/PIX):</span> R$ {(Number(item.valorv) || 0).toFixed(2)}
                             </div>
                             <div className="price-secondary-row">
                               <span className="price-tag" title="Valor Dinheiro">Din: R$ {(Number(item.pro_valor_dinheiro ?? item.valorDinheiro ?? item.valor_dinheiro ?? item.valorv) || 0).toFixed(2)}</span>
-                              <span className="price-tag" title="Preço a Prazo">Prz: R$ {(Number(item.pro_valorv_prazo ?? item.valorPrazo ?? item.valor_prazo ?? item.valorv) || 0).toFixed(2)}</span>
+                              <span className="price-tag" title="Preço a Prazo (Cartão Prazo)">Cartão Prazo: R$ {(Number(item.pro_valorv_prazo ?? item.valorPrazo ?? item.valor_prazo ?? item.valorv) || 0).toFixed(2)}</span>
                             </div>
                           </div>
                         </td>
@@ -937,12 +937,12 @@ export default function CadastrosTab() {
                             <td><strong>{item.quantidade}</strong></td>
                             <td className="prices-cell">
                               <div className="price-badge-container">
-                                <div className="price-primary" title="Preço à Vista">
-                                  <span className="price-label">Vista:</span> R$ {(Number(item.valor) || 0).toFixed(2)}
+                                <div className="price-primary" title="Preço Vista (Débito / PIX)">
+                                  <span className="price-label">Vista (Déb/PIX):</span> R$ {(Number(item.valor) || 0).toFixed(2)}
                                 </div>
                                 <div className="price-secondary-row">
                                   <span className="price-tag" title="Valor Dinheiro">Din: R$ {(Number(item.valor_dinheiro ?? item.valordinheiro ?? item.valorDinheiro ?? item.gra_valor_dinheiro ?? item.valor) || 0).toFixed(2)}</span>
-                                  <span className="price-tag" title="Preço a Prazo">Prz: R$ {(Number(item.valor_prazo ?? item.valorprazo ?? item.valorPrazo ?? item.gra_valor_prazo ?? item.valor) || 0).toFixed(2)}</span>
+                                  <span className="price-tag" title="Preço a Prazo (Cartão Prazo)">Cartão Prazo: R$ {(Number(item.valor_prazo ?? item.valorprazo ?? item.valorPrazo ?? item.gra_valor_prazo ?? item.valor) || 0).toFixed(2)}</span>
                                 </div>
                               </div>
                             </td>
@@ -1174,7 +1174,7 @@ export default function CadastrosTab() {
                     </label>
 
                     <label className="crud-input">
-                      Preço à Vista (R$)
+                      Preço Vista (Débito / PIX) (R$)
                       <input 
                         type="number" 
                         step="0.01" 
@@ -1185,7 +1185,7 @@ export default function CadastrosTab() {
                     </label>
 
                     <label className="crud-input">
-                      Preço a Prazo (R$)
+                      Preço a Prazo (Cartão Prazo) (R$)
                       <input 
                         type="number" 
                         step="0.01" 
@@ -1253,12 +1253,12 @@ export default function CadastrosTab() {
                             <td><strong style={{ color: Number(item.quantidade) > 0 ? '#10b981' : '#ef4444' }}>{item.quantidade}</strong></td>
                             <td className="prices-cell">
                               <div className="price-badge-container">
-                                <div className="price-primary" title="Preço à Vista">
-                                  <span className="price-label">Vista:</span> R$ {(Number(item.valor) || 0).toFixed(2)}
+                                <div className="price-primary" title="Preço Vista (Débito / PIX)">
+                                  <span className="price-label">Vista (Déb/PIX):</span> R$ {(Number(item.valor) || 0).toFixed(2)}
                                 </div>
                                 <div className="price-secondary-row">
                                   <span className="price-tag" title="Valor Dinheiro">Din: R$ {(Number(item.valor_dinheiro ?? item.valordinheiro ?? item.valorDinheiro ?? item.gra_valor_dinheiro ?? item.valor) || 0).toFixed(2)}</span>
-                                  <span className="price-tag" title="Preço a Prazo">Prz: R$ {(Number(item.valor_prazo ?? item.valorprazo ?? item.valorPrazo ?? item.gra_valor_prazo ?? item.valor) || 0).toFixed(2)}</span>
+                                  <span className="price-tag" title="Preço a Prazo (Cartão Prazo)">Cartão Prazo: R$ {(Number(item.valor_prazo ?? item.valorprazo ?? item.valorPrazo ?? item.gra_valor_prazo ?? item.valor) || 0).toFixed(2)}</span>
                                 </div>
                               </div>
                             </td>
