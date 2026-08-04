@@ -364,16 +364,20 @@
 }
 
 .product-name-cell {
-  max-width: 320px;
-  min-width: 200px;
-  line-height: 1.35;
-  font-weight: 500;
+  min-width: 250px;
+  max-width: 420px;
+}
+
+.product-name-text {
+  font-weight: 600;
+  font-size: 0.88rem;
+  color: var(--text-primary);
+  line-height: 1.4;
+  word-break: break-word;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
-  word-break: break-word;
 }
 
 .prices-cell {

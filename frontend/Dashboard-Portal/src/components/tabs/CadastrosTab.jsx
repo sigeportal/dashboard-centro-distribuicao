@@ -783,13 +783,13 @@ export default function CadastrosTab() {
                   <thead>
                     <tr>
                       <th>Código</th>
-                      <th>Nome</th>
+                      <th>Nome do Produto</th>
                       <th>Marca</th>
                       <th>NCM</th>
                       <th>UM</th>
-                      <th>Totalizador</th>
-                      <th>Estoque ({activeUnitName})</th>
-                      <th>Preços (Vista / Din. / Prazo)</th>
+                      <th title="Totalizador Fiscal">Tot.</th>
+                      <th title={`Estoque na unidade ${activeUnitName}`}>Estoque</th>
+                      <th title="Preços de Venda: à Vista / Dinheiro / a Prazo">Preços (Vista / Din / Prazo)</th>
                       <th>Cód. Barras</th>
                       <th>Ações</th>
                     </tr>
@@ -798,7 +798,9 @@ export default function CadastrosTab() {
                     {produtos.map((item, idx) => (
                       <tr key={item.codigo || idx}>
                         <td><span className="item-code">#{item.codigo}</span></td>
-                        <td className="product-name-cell" title={item.nome}>{item.nome}</td>
+                        <td className="product-name-cell">
+                          <div className="product-name-text" title={item.nome}>{item.nome}</div>
+                        </td>
                         <td>{item.fabricante || '-'}</td>
                         <td><span className="badge badge-info">{item.ncm || item.pro_ncm || '6109.10.00'}</span></td>
                         <td><strong>{item.um || item.embalagem || item.pro_um || 'UN'}</strong></td>
