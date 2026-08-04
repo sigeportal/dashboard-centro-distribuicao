@@ -96,8 +96,10 @@ var Cidade: TCidade;
 begin
   try
     Cidade := TCidade.Create(TDatabase.Connection).fromJson<TCidade>(Req.Body);
-    Cidade.SalvaNoBanco(1);
-    Res.Send<TJSONObject>(TJSONObject.ParseJSONValue(Cidade.ToJson) as TJSONObject);
+    if Cidade.Codigo = 0 then
+      Cidade.Codigo := Cidade.GeraCodigo('CID_CODIGO');
+    Cidade.SalvaNoBanco(0);
+    Res.Send<TJSONObject>(TJSONObject.ParseJSONValue(Cidade.ToJson) as TJSONObject).Status(THTTPStatus.Created);
   finally
     Cidade.DisposeOf;
   end;

@@ -188,6 +188,8 @@ var
 begin
   try
     Clientes := TClientes.Create(TDatabase.Connection).fromJson<TClientes>(Req.Body);
+    if Clientes.Codigo = 0 then
+    	Clientes.Codigo := Clientes.GeraCodigo('CLI_CODIGO');
     Clientes.Cadastrar := 'S';
     Clientes.SalvaNoBanco(0);
     Res.Send<TJSONObject>(TJSONObject.ParseJSONValue(Clientes.ToJson) as TJSONObject).Status(THTTPStatus.Created);

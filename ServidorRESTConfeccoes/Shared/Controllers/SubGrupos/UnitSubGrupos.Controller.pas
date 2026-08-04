@@ -98,9 +98,11 @@ var
 begin
 	try
 		SubGrupos := TSubGrupos.Create(TDatabase.Connection).fromJson<TSubGrupos>(Req.Body);
+		if SubGrupos.Codigo = 0 then
+			SubGrupos.Codigo := SubGrupos.GeraCodigo('GRU_CODIGO');
 		SubGrupos.Cadastrar := 'S';
-		SubGrupos.SalvaNoBanco(1);
-		Res.Send<TJSONObject>(TJSONObject.ParseJSONValue(SubGrupos.ToJson) as TJSONObject);
+		SubGrupos.SalvaNoBanco(0);
+		Res.Send<TJSONObject>(TJSONObject.ParseJSONValue(SubGrupos.ToJson) as TJSONObject).Status(THTTPStatus.Created);
 	finally
 		SubGrupos.DisposeOf;
 	end;

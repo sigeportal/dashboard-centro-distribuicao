@@ -98,8 +98,10 @@ var
 begin
 	try
 		UnidadeMedida := TUnidadeMedida.Create(TDatabase.Connection).fromJson<TUnidadeMedida>(Req.Body);
-		UnidadeMedida.SalvaNoBanco(1);
-		Res.Send<TJSONObject>(TJSONObject.ParseJSONValue(UnidadeMedida.ToJson) as TJSONObject);
+		if UnidadeMedida.Codigo = 0 then
+			UnidadeMedida.Codigo := UnidadeMedida.GeraCodigo('UM_CODIGO');
+		UnidadeMedida.SalvaNoBanco(0);
+		Res.Send<TJSONObject>(TJSONObject.ParseJSONValue(UnidadeMedida.ToJson) as TJSONObject).Status(THTTPStatus.Created);
 	finally
 		UnidadeMedida.DisposeOf;
 	end;

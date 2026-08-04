@@ -92,8 +92,10 @@ var Funcionarios: TFuncionarios;
 begin
   try
 		Funcionarios := TFuncionarios.Create(TDatabase.Connection).fromJson<TFuncionarios>(Req.Body);
-		Funcionarios.SalvaNoBanco(1);
-		Res.Send<TJSONObject>(TJSONObject.ParseJSONValue(Funcionarios.ToJson) as TJSONObject);
+		if Funcionarios.Codigo = 0 then
+			Funcionarios.Codigo := Funcionarios.GeraCodigo('FUN_CODIGO');
+		Funcionarios.SalvaNoBanco(0);
+		Res.Send<TJSONObject>(TJSONObject.ParseJSONValue(Funcionarios.ToJson) as TJSONObject).Status(THTTPStatus.Created);
   finally
 		Funcionarios.DisposeOf;
   end;

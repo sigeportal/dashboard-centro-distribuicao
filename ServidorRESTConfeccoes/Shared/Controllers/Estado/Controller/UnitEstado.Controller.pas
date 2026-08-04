@@ -88,8 +88,10 @@ var Estado: TEstado;
 begin
   try
     Estado := TEstado.Create(TDatabase.Connection).fromJson<TEstado>(Req.Body);
-    Estado.SalvaNoBanco(1);
-    Res.Send<TJSONObject>(TJSONObject.ParseJSONValue(Estado.ToJson) as TJSONObject);
+    if Estado.Codigo = 0 then
+      Estado.Codigo := Estado.GeraCodigo('EST_CODIGO');
+    Estado.SalvaNoBanco(0);
+    Res.Send<TJSONObject>(TJSONObject.ParseJSONValue(Estado.ToJson) as TJSONObject).Status(THTTPStatus.Created);
   finally
     Estado.DisposeOf;
   end;

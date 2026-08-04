@@ -1,4 +1,4 @@
-﻿unit UnitTotalizadores.Controller;
+unit UnitTotalizadores.Controller;
 
 interface
 
@@ -136,8 +136,10 @@ var
 begin
 	try
 		Totalizadores := TTotalizadores.Create(TDatabase.Connection).fromJson<TTotalizadores>(Req.Body);
-		Totalizadores.SalvaNoBanco(1);
-		Res.Send<TJSONObject>(TJSONObject.ParseJSONValue(Totalizadores.ToJson) as TJSONObject);
+		if Totalizadores.Codigo = 0 then
+			Totalizadores.Codigo := Totalizadores.GeraCodigo('TOT_CODIGO');
+		Totalizadores.SalvaNoBanco(0);
+		Res.Send<TJSONObject>(TJSONObject.ParseJSONValue(Totalizadores.ToJson) as TJSONObject).Status(THTTPStatus.Created);
 	finally
 		Totalizadores.DisposeOf;
 	end;

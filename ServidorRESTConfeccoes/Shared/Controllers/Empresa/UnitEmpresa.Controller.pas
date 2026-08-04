@@ -87,10 +87,15 @@ end;
 class procedure TEmpresaController.Post(Req: THorseRequest; Res: THorseResponse; Next: TProc);
 var Empresa: TEmpresa;
 begin
-  Empresa := TEmpresa.Create(TDatabase.Connection).fromJson<TEmpresa>(Req.Body);
-  Empresa.SalvaNoBanco(1);
-  Res.Send<TJSONObject>(TJSONObject.ParseJSONValue(Empresa.ToJson) as TJSONObject);
-  Empresa.DisposeOf;
+  try
+    Empresa := TEmpresa.Create(TDatabase.Connection).fromJson<TEmpresa>(Req.Body);
+    if Empresa.Codigo = 0 then
+      Empresa.Codigo := Empresa.GeraCodigo('EMP_CODIGO');
+    Empresa.SalvaNoBanco(0);
+    Res.Send<TJSONObject>(TJSONObject.ParseJSONValue(Empresa.ToJson) as TJSONObject).Status(THTTPStatus.Created);
+  finally
+    Empresa.DisposeOf;
+  end;
 end;
 
 class procedure TEmpresaController.Put(Req: THorseRequest; Res: THorseResponse; Next: TProc);

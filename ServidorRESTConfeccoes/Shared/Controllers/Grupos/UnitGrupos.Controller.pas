@@ -95,9 +95,11 @@ var Grupos: TGrupos;
 begin
   try
     Grupos := TGrupos.Create(TDatabase.Connection).fromJson<TGrupos>(Req.Body);
+    if Grupos.Codigo = 0 then
+      Grupos.Codigo := Grupos.GeraCodigo('G1_CODIGO');
     Grupos.Cadastrar := 'S';
-    Grupos.SalvaNoBanco(1);
-    Res.Send<TJSONObject>(TJSONObject.ParseJSONValue(Grupos.ToJson) as TJSONObject);
+    Grupos.SalvaNoBanco(0);
+    Res.Send<TJSONObject>(TJSONObject.ParseJSONValue(Grupos.ToJson) as TJSONObject).Status(THTTPStatus.Created);
   finally
     Grupos.DisposeOf;
   end;

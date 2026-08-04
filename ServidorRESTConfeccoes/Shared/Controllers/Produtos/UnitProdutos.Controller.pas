@@ -223,9 +223,11 @@ var
 begin
 	try
 		Produtos := TProdutos.Create(TDatabase.Connection).fromJson<TProdutos>(Req.Body);
+    if Produtos.Codigo = 0 then
+    	Produtos.Codigo := Produtos.GeraCodigo('PRO_CODIGO');
 		Produtos.Cadastrar := 'S';
-		Produtos.SalvaNoBanco(1);
-		Res.Send<TJSONObject>(TJSONObject.ParseJSONValue(Produtos.ToJson) as TJSONObject);
+		Produtos.SalvaNoBanco(0);
+		Res.Send<TJSONObject>(TJSONObject.ParseJSONValue(Produtos.ToJson) as TJSONObject).Status(THTTPStatus.Created);
 	finally
 		Produtos.DisposeOf;
 	end;

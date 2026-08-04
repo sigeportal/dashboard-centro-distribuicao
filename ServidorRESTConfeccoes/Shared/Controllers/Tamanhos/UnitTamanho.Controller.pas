@@ -93,8 +93,11 @@ var Tamanho: TTamanho;
 begin
   try
     Tamanho := TTamanho.Create(TDatabase.Connection).fromJson<TTamanho>(Req.Body);
-    Tamanho.SalvaNoBanco(1);
-    Res.Send<TJSONObject>(TJSONObject.ParseJSONValue(Tamanho.ToJson) as TJSONObject);
+    if Tamanho.Codigo = 0 then
+      Tamanho.Codigo := Tamanho.GeraCodigo('TAM_CODIGO');
+    Tamanho.Cadastrar := 'S';
+    Tamanho.SalvaNoBanco(0);
+    Res.Send<TJSONObject>(TJSONObject.ParseJSONValue(Tamanho.ToJson) as TJSONObject).Status(THTTPStatus.Created);
   finally
     Tamanho.DisposeOf;
   end;

@@ -121,9 +121,11 @@ var Fornecedores: TFornecedores;
 begin
   try
     Fornecedores := TFornecedores.Create(TDatabase.Connection).fromJson<TFornecedores>(Req.Body);
+    if Fornecedores.Codigo = 0 then
+      Fornecedores.Codigo := Fornecedores.GeraCodigo('FOR_CODIGO');
     Fornecedores.Cadastrar := 'S';
-    Fornecedores.SalvaNoBanco(1);
-    Res.Send<TJSONObject>(TJSONObject.ParseJSONValue(Fornecedores.ToJson) as TJSONObject);
+    Fornecedores.SalvaNoBanco(0);
+    Res.Send<TJSONObject>(TJSONObject.ParseJSONValue(Fornecedores.ToJson) as TJSONObject).Status(THTTPStatus.Created);
   finally
     Fornecedores.DisposeOf;
   end;

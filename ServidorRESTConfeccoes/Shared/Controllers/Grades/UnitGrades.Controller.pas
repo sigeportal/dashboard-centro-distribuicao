@@ -134,8 +134,11 @@ var
 begin
 	try
 		Grades := TGrades.Create(TDatabase.Connection).fromJson<TGrades>(Req.Body);
-		Grades.SalvaNoBanco(1);
-		Res.Send<TJSONObject>(TJSONObject.ParseJSONValue(Grades.ToJson) as TJSONObject);
+    if Grades.Codigo = 0 then
+    	Grades.Codigo := Grades.GeraCodigo('GRA_CODIGO');
+    Grades.Cadastrar := 'S';
+		Grades.SalvaNoBanco(0);
+		Res.Send<TJSONObject>(TJSONObject.ParseJSONValue(Grades.ToJson) as TJSONObject).Status(THTTPStatus.Created);
 	finally
 		Grades.DisposeOf;
 	end;
