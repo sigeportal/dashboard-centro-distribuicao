@@ -240,8 +240,8 @@ export default function CadastrosTab() {
     if (activeSubTab === 'produtos') {
       setProdForm({ 
         ...item,
-        pro_valor_dinheiro: item.pro_valor_dinheiro ?? item.valorDinheiro ?? item.valor_dinheiro ?? item.valorv ?? 0,
-        pro_valorv_prazo: item.pro_valorv_prazo ?? item.valorPrazo ?? item.valor_prazo ?? item.valorv ?? 0,
+        pro_valor_dinheiro: item.pro_valor_dinheiro ?? item.valorDinheiro ?? item.valordinheiro ?? item.valor_dinheiro ?? item.valorv ?? 0,
+        pro_valorv_prazo: item.pro_valorv_prazo ?? item.valorPrazo ?? item.valorprazo ?? item.valor_prazo ?? item.valorv ?? 0,
         codTotalizador: item.codTotalizador || item.pro_totalizador || 1,
         ncm: item.ncm || item.pro_ncm || '6109.10.00',
         um: item.um || item.embalagem || item.pro_um || 'UN'
@@ -253,8 +253,8 @@ export default function CadastrosTab() {
     } else if (activeSubTab === 'grades') {
       setGradeForm({ 
         ...item,
-        valor_dinheiro: item.valor_dinheiro ?? item.gra_valor_dinheiro ?? item.valor ?? 0,
-        valor_prazo: item.valor_prazo ?? item.gra_valor_prazo ?? item.valor ?? 0
+        valor_dinheiro: item.valor_dinheiro ?? item.valordinheiro ?? item.valorDinheiro ?? item.gra_valor_dinheiro ?? item.valor ?? 0,
+        valor_prazo: item.valor_prazo ?? item.valorprazo ?? item.valorPrazo ?? item.gra_valor_prazo ?? item.valor ?? 0
       });
     } else if (activeSubTab === 'tamanhos') {
       setTamanhoForm({ ...item });
@@ -292,6 +292,8 @@ export default function CadastrosTab() {
     try {
       if (activeSubTab === 'produtos') {
         const productCode = editingItem ? Number(prodForm.codigo) : Math.floor(Math.random() * 90000) + 10000;
+        const vDin = Number(prodForm.pro_valor_dinheiro) || Number(prodForm.valorv) || 0;
+        const vPrz = Number(prodForm.pro_valorv_prazo) || Number(prodForm.valorv) || 0;
         const payload = {
           codigo: productCode,
           nome: prodForm.nome,
@@ -299,8 +301,14 @@ export default function CadastrosTab() {
           codbarra: prodForm.codbarra,
           quantidade: Number(prodForm.quantidade) || 0,
           valorv: Number(prodForm.valorv) || 0,
-          pro_valor_dinheiro: Number(prodForm.pro_valor_dinheiro) || Number(prodForm.valorv) || 0,
-          pro_valorv_prazo: Number(prodForm.pro_valorv_prazo) || Number(prodForm.valorv) || 0,
+          pro_valor_dinheiro: vDin,
+          valor_dinheiro: vDin,
+          valordinheiro: vDin,
+          valorDinheiro: vDin,
+          pro_valorv_prazo: vPrz,
+          valor_prazo: vPrz,
+          valorprazo: vPrz,
+          valorPrazo: vPrz,
           codTotalizador: Number(prodForm.codTotalizador) || 1,
           ncm: prodForm.ncm || '6109.10.00',
           um: prodForm.um || 'UN',
@@ -371,12 +379,20 @@ export default function CadastrosTab() {
           await api.post('/v1/subgrupos', payload);
         }
       } else if (activeSubTab === 'grades') {
+        const gDin = Number(gradeForm.valor_dinheiro) || Number(gradeForm.valor) || 0;
+        const gPrz = Number(gradeForm.valor_prazo) || Number(gradeForm.valor) || 0;
         const payload = {
           codigo: editingItem ? Number(gradeForm.codigo) : Math.floor(Math.random() * 90000) + 10000,
           pro: Number(gradeForm.pro),
           valor: Number(gradeForm.valor) || 0,
-          valor_dinheiro: Number(gradeForm.valor_dinheiro) || Number(gradeForm.valor) || 0,
-          valor_prazo: Number(gradeForm.valor_prazo) || Number(gradeForm.valor) || 0,
+          valor_dinheiro: gDin,
+          valordinheiro: gDin,
+          valorDinheiro: gDin,
+          gra_valor_dinheiro: gDin,
+          valor_prazo: gPrz,
+          valorprazo: gPrz,
+          valorPrazo: gPrz,
+          gra_valor_prazo: gPrz,
           tam: Number(gradeForm.tam),
           quantidade: Number(gradeForm.quantidade) || 0,
           codbarra: gradeForm.codbarra,
@@ -499,14 +515,22 @@ export default function CadastrosTab() {
     }
     setLoadingProductGrades(true);
     try {
+      const pgDin = Number(productGradeForm.valor_dinheiro) || Number(productGradeForm.valor) || 0;
+      const pgPrz = Number(productGradeForm.valor_prazo) || Number(productGradeForm.valor) || 0;
       const payload = {
         codigo: editingProductGrade ? Number(productGradeForm.codigo) : Math.floor(Math.random() * 90000) + 10000,
         pro: Number(selectedProductGrades.codigo),
         tam: Number(productGradeForm.tam),
         quantidade: Number(productGradeForm.quantidade) || 0,
         valor: Number(productGradeForm.valor) || 0,
-        valor_dinheiro: Number(productGradeForm.valor_dinheiro) || Number(productGradeForm.valor) || 0,
-        valor_prazo: Number(productGradeForm.valor_prazo) || Number(productGradeForm.valor) || 0,
+        valor_dinheiro: pgDin,
+        valordinheiro: pgDin,
+        valorDinheiro: pgDin,
+        gra_valor_dinheiro: pgDin,
+        valor_prazo: pgPrz,
+        valorprazo: pgPrz,
+        valorPrazo: pgPrz,
+        gra_valor_prazo: pgPrz,
         codbarra: productGradeForm.codbarra || '',
         cor: productGradeForm.cor || ''
       };

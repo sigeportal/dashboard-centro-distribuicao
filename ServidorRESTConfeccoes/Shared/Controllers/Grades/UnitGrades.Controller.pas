@@ -131,12 +131,30 @@ end;
 class procedure TGradesController.Post(Req: THorseRequest; Res: THorseResponse; Next: TProc);
 var
 	Grades: TGrades;
+	LBodyObj: TJSONObject;
 begin
 	try
+		LBodyObj := Req.Body<TJSONObject>;
 		Grades := TGrades.Create(TDatabase.Connection).fromJson<TGrades>(Req.Body);
-    if Grades.Codigo = 0 then
-    	Grades.Codigo := Grades.GeraCodigo('GRA_CODIGO');
-    Grades.Cadastrar := 'S';
+		if Grades.Codigo = 0 then
+			Grades.Codigo := Grades.GeraCodigo('GRA_CODIGO');
+		if Assigned(LBodyObj) then
+		begin
+			if LBodyObj.GetValue('valor_dinheiro') <> nil then
+				Grades.ValorDinheiro := LBodyObj.GetValue<Double>('valor_dinheiro')
+			else if LBodyObj.GetValue('valordinheiro') <> nil then
+				Grades.ValorDinheiro := LBodyObj.GetValue<Double>('valordinheiro')
+			else if LBodyObj.GetValue('gra_valor_dinheiro') <> nil then
+				Grades.ValorDinheiro := LBodyObj.GetValue<Double>('gra_valor_dinheiro');
+
+			if LBodyObj.GetValue('valor_prazo') <> nil then
+				Grades.ValorPrazo := LBodyObj.GetValue<Double>('valor_prazo')
+			else if LBodyObj.GetValue('valorprazo') <> nil then
+				Grades.ValorPrazo := LBodyObj.GetValue<Double>('valorprazo')
+			else if LBodyObj.GetValue('gra_valor_prazo') <> nil then
+				Grades.ValorPrazo := LBodyObj.GetValue<Double>('gra_valor_prazo');
+		end;
+		Grades.Cadastrar := 'S';
 		Grades.SalvaNoBanco(0);
 		Res.Send<TJSONObject>(TJSONObject.ParseJSONValue(Grades.ToJson) as TJSONObject).Status(THTTPStatus.Created);
 	finally
@@ -153,6 +171,7 @@ var
 	LQuery    : iQuery;
 	FDQuery   : TFDQuery;
 	i         : Integer;
+	LItemObj  : TJSONObject;
 begin
 	oJson   := Req.Body<TJSONObject>;
 	aJson   := oJson.GetValue<TJSONArray>('itens');
@@ -160,28 +179,48 @@ begin
 	FDQuery := TFDQuery(LQuery.Query);
 	FDQuery.Close;
 	FDQuery.SQL.Clear;
-	FDQuery.SQL.Add('UPDATE OR INSERT INTO GRADES (GRA_CODIGO, GRA_PRO, GRA_VALOR, GRA_TAM, GRA_QUANTIDADE, GRA_CODBARRA, GRA_COR)');
-	FDQuery.SQL.Add('VALUES (:GRA_CODIGO, :GRA_PRO, :GRA_VALOR, :GRA_TAM, :GRA_QUANTIDADE, :GRA_CODBARRA, :GRA_COR)');
+	FDQuery.SQL.Add('UPDATE OR INSERT INTO GRADES (GRA_CODIGO, GRA_PRO, GRA_VALOR, GRA_VALOR_DINHEIRO, GRA_VALOR_PRAZO, GRA_TAM, GRA_QUANTIDADE, GRA_CODBARRA, GRA_COR, GRA_CADASTRAR)');
+	FDQuery.SQL.Add('VALUES (:GRA_CODIGO, :GRA_PRO, :GRA_VALOR, :GRA_VALOR_DINHEIRO, :GRA_VALOR_PRAZO, :GRA_TAM, :GRA_QUANTIDADE, :GRA_CODBARRA, :GRA_COR, ''S'')');
 	FDQuery.SQL.Add('MATCHING (GRA_CODIGO)');
-	// preparando para usar inser��es via ArrayDML
+	// preparando para usar inseres via ArrayDML
 	FDQuery.Params.ArraySize := aJson.Count;
 	for i                    := 0 to Pred(aJson.Count) do
 	begin
 		oJsonValue := aJson.Items[i];
 		Itens      := TGrades.Create(TDatabase.Connection).fromJson<TGrades>(oJsonValue.ToJson);
 		try
-			FDQuery.ParamByName('GRA_CODIGO').AsIntegers[i]   := Itens.Codigo;
-			FDQuery.ParamByName('GRA_PRO').AsIntegers[i]      := Itens.Pro;
-			FDQuery.ParamByName('GRA_VALOR').AsCurrencys[i]   := Itens.Valor;
-			FDQuery.ParamByName('GRA_TAM').AsIntegers[i]      := Itens.Tam;
-			FDQuery.ParamByName('GRA_QUANTIDADE').AsFloats[i] := Itens.Quantidade;
-			FDQuery.ParamByName('GRA_CODBARRA').AsStrings[i]  := Itens.Codbarra;
-			FDQuery.ParamByName('GRA_COR').AsStrings[i]       := Itens.Cor;
+			if oJsonValue is TJSONObject then
+			begin
+				LItemObj := TJSONObject(oJsonValue);
+				if LItemObj.GetValue('valor_dinheiro') <> nil then
+					Itens.ValorDinheiro := LItemObj.GetValue<Double>('valor_dinheiro')
+				else if LItemObj.GetValue('valordinheiro') <> nil then
+					Itens.ValorDinheiro := LItemObj.GetValue<Double>('valordinheiro')
+				else if LItemObj.GetValue('gra_valor_dinheiro') <> nil then
+					Itens.ValorDinheiro := LItemObj.GetValue<Double>('gra_valor_dinheiro');
+
+				if LItemObj.GetValue('valor_prazo') <> nil then
+					Itens.ValorPrazo := LItemObj.GetValue<Double>('valor_prazo')
+				else if LItemObj.GetValue('valorprazo') <> nil then
+					Itens.ValorPrazo := LItemObj.GetValue<Double>('valorprazo')
+				else if LItemObj.GetValue('gra_valor_prazo') <> nil then
+					Itens.ValorPrazo := LItemObj.GetValue<Double>('gra_valor_prazo');
+			end;
+
+			FDQuery.ParamByName('GRA_CODIGO').AsIntegers[i]         := Itens.Codigo;
+			FDQuery.ParamByName('GRA_PRO').AsIntegers[i]            := Itens.Pro;
+			FDQuery.ParamByName('GRA_VALOR').AsCurrencys[i]         := Itens.Valor;
+			FDQuery.ParamByName('GRA_VALOR_DINHEIRO').AsCurrencys[i]:= Itens.ValorDinheiro;
+			FDQuery.ParamByName('GRA_VALOR_PRAZO').AsCurrencys[i]   := Itens.ValorPrazo;
+			FDQuery.ParamByName('GRA_TAM').AsIntegers[i]            := Itens.Tam;
+			FDQuery.ParamByName('GRA_QUANTIDADE').AsFloats[i]       := Itens.Quantidade;
+			FDQuery.ParamByName('GRA_CODBARRA').AsStrings[i]        := Itens.Codbarra;
+			FDQuery.ParamByName('GRA_COR').AsStrings[i]             := Itens.Cor;
 		finally
 			Itens.DisposeOf;
 		end;
 	end;
-	// Executa as inser��es em lote
+	// Executa as inseres em lote
 	FDQuery.Execute(aJson.Count, 0);
 	Res.Send<TJSONObject>(oJson);
 end;
@@ -189,9 +228,28 @@ end;
 class procedure TGradesController.Put(Req: THorseRequest; Res: THorseResponse; Next: TProc);
 var
 	Grades: TGrades;
+	LBodyObj: TJSONObject;
 begin
 	try
+		LBodyObj := Req.Body<TJSONObject>;
 		Grades := TGrades.Create(TDatabase.Connection).fromJson<TGrades>(Req.Body);
+		if Assigned(LBodyObj) then
+		begin
+			if LBodyObj.GetValue('valor_dinheiro') <> nil then
+				Grades.ValorDinheiro := LBodyObj.GetValue<Double>('valor_dinheiro')
+			else if LBodyObj.GetValue('valordinheiro') <> nil then
+				Grades.ValorDinheiro := LBodyObj.GetValue<Double>('valordinheiro')
+			else if LBodyObj.GetValue('gra_valor_dinheiro') <> nil then
+				Grades.ValorDinheiro := LBodyObj.GetValue<Double>('gra_valor_dinheiro');
+
+			if LBodyObj.GetValue('valor_prazo') <> nil then
+				Grades.ValorPrazo := LBodyObj.GetValue<Double>('valor_prazo')
+			else if LBodyObj.GetValue('valorprazo') <> nil then
+				Grades.ValorPrazo := LBodyObj.GetValue<Double>('valorprazo')
+			else if LBodyObj.GetValue('gra_valor_prazo') <> nil then
+				Grades.ValorPrazo := LBodyObj.GetValue<Double>('gra_valor_prazo');
+		end;
+		Grades.Cadastrar := 'S';
 		Grades.SalvaNoBanco(1);
 		Res.Send<TJSONObject>(TJSONObject.ParseJSONValue(Grades.ToJson) as TJSONObject);
 	finally

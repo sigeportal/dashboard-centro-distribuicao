@@ -220,11 +220,29 @@ end;
 class procedure TProdutosController.Post(Req: THorseRequest; Res: THorseResponse; Next: TProc);
 var
 	Produtos: TProdutos;
+	LBodyObj: TJSONObject;
 begin
 	try
+		LBodyObj := Req.Body<TJSONObject>;
 		Produtos := TProdutos.Create(TDatabase.Connection).fromJson<TProdutos>(Req.Body);
-    if Produtos.Codigo = 0 then
-    	Produtos.Codigo := Produtos.GeraCodigo('PRO_CODIGO');
+		if Produtos.Codigo = 0 then
+			Produtos.Codigo := Produtos.GeraCodigo('PRO_CODIGO');
+		if Assigned(LBodyObj) then
+		begin
+			if LBodyObj.GetValue('pro_valor_dinheiro') <> nil then
+				Produtos.ValorDinheiro := LBodyObj.GetValue<Double>('pro_valor_dinheiro')
+			else if LBodyObj.GetValue('valor_dinheiro') <> nil then
+				Produtos.ValorDinheiro := LBodyObj.GetValue<Double>('valor_dinheiro')
+			else if LBodyObj.GetValue('valordinheiro') <> nil then
+				Produtos.ValorDinheiro := LBodyObj.GetValue<Double>('valordinheiro');
+
+			if LBodyObj.GetValue('pro_valorv_prazo') <> nil then
+				Produtos.ValorPrazo := LBodyObj.GetValue<Double>('pro_valorv_prazo')
+			else if LBodyObj.GetValue('valor_prazo') <> nil then
+				Produtos.ValorPrazo := LBodyObj.GetValue<Double>('valor_prazo')
+			else if LBodyObj.GetValue('valorprazo') <> nil then
+				Produtos.ValorPrazo := LBodyObj.GetValue<Double>('valorprazo');
+		end;
 		Produtos.Cadastrar := 'S';
 		Produtos.SalvaNoBanco(0);
 		Res.Send<TJSONObject>(TJSONObject.ParseJSONValue(Produtos.ToJson) as TJSONObject).Status(THTTPStatus.Created);
@@ -329,9 +347,27 @@ end;
 class procedure TProdutosController.Put(Req: THorseRequest; Res: THorseResponse; Next: TProc);
 var
 	Produtos: TProdutos;
+	LBodyObj: TJSONObject;
 begin
 	try
+		LBodyObj := Req.Body<TJSONObject>;
 		Produtos := TProdutos.Create(TDatabase.Connection).fromJson<TProdutos>(Req.Body);
+		if Assigned(LBodyObj) then
+		begin
+			if LBodyObj.GetValue('pro_valor_dinheiro') <> nil then
+				Produtos.ValorDinheiro := LBodyObj.GetValue<Double>('pro_valor_dinheiro')
+			else if LBodyObj.GetValue('valor_dinheiro') <> nil then
+				Produtos.ValorDinheiro := LBodyObj.GetValue<Double>('valor_dinheiro')
+			else if LBodyObj.GetValue('valordinheiro') <> nil then
+				Produtos.ValorDinheiro := LBodyObj.GetValue<Double>('valordinheiro');
+
+			if LBodyObj.GetValue('pro_valorv_prazo') <> nil then
+				Produtos.ValorPrazo := LBodyObj.GetValue<Double>('pro_valorv_prazo')
+			else if LBodyObj.GetValue('valor_prazo') <> nil then
+				Produtos.ValorPrazo := LBodyObj.GetValue<Double>('valor_prazo')
+			else if LBodyObj.GetValue('valorprazo') <> nil then
+				Produtos.ValorPrazo := LBodyObj.GetValue<Double>('valorprazo');
+		end;
 		Produtos.Cadastrar := 'S';
 		Produtos.SalvaNoBanco(1);
 		Res.Send<TJSONObject>(TJSONObject.ParseJSONValue(Produtos.ToJson) as TJSONObject);
