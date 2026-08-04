@@ -62,7 +62,9 @@ uses
   UnitHisPro.Model in '..\Shared\Models\HistoricoEstoque\UnitHisPro.Model.pas',
   UnitHisPro.Controller in '..\Shared\Controllers\HistoricoEstoque\UnitHisPro.Controller.pas',
   UnitNfeCentral.Model in '..\Shared\Models\Nfe\UnitNfeCentral.Model.pas',
-  UnitNfe.Controller in '..\Shared\Controllers\Nfe\UnitNfe.Controller.pas';
+  UnitNfe.Controller in '..\Shared\Controllers\Nfe\UnitNfe.Controller.pas',
+  UnitClientes.Model in '..\Shared\Models\Clientes\UnitClientes.Model.pas',
+  UnitClientes.Controller in '..\Shared\Controllers\Clientes\UnitClientes.Controller.pas';
 
 var
 	LLogFileConfig: THorseLoggerConsoleConfig;
@@ -79,6 +81,7 @@ begin
           .Use(HandleException);
     //controllers
     TLoginController.Router;
+    TClientesController.Router;
     TProdutosController.Router;
     TGruposController.Router;
     TSubGruposController.Router;

@@ -475,6 +475,7 @@ begin
   try LQueryExec.Clear; LQueryExec.Add('UPDATE GRADES SET GRA_CADASTRAR = ''N'' WHERE GRA_CADASTRAR = ''S'' OR GRA_CADASTRAR IS NULL'); LQueryExec.ExecSQL; except end;
   try LQueryExec.Clear; LQueryExec.Add('UPDATE TAMANHOS SET TAM_CADASTRAR = ''N'' WHERE TAM_CADASTRAR = ''S'' OR TAM_CADASTRAR IS NULL'); LQueryExec.ExecSQL; except end;
   try LQueryExec.Clear; LQueryExec.Add('UPDATE TRANSFERENCIA SET TR_CADASTRAR = ''N'' WHERE TR_CADASTRAR = ''S'' OR TR_CADASTRAR IS NULL'); LQueryExec.ExecSQL; except end;
+  try LQueryExec.Clear; LQueryExec.Add('UPDATE CLIENTES SET CLI_CADASTRAR = ''N'' WHERE CLI_CADASTRAR = ''S'' OR CLI_CADASTRAR IS NULL'); LQueryExec.ExecSQL; except end;
 
   Res.Status(THTTPStatus.OK).Send('{"status": "acknowledged"}');
 end;
@@ -531,7 +532,7 @@ begin
 
     // 3. Produtos - Apenas pendentes (CADASTRAR = 'S')
     LQuery.Clear;
-    LQuery.Add('SELECT PRO_CODIGO, PRO_NOME, PRO_DESCRICAO, PRO_CODBARRA, PRO_VALORV, PRO_VALORC, PRO_EMBALAGEM, PRO_FABRICANTE, PRO_GRU, PRO_FOR,');
+    LQuery.Add('SELECT PRO_CODIGO, PRO_NOME, PRO_DESCRICAO, PRO_CODBARRA, PRO_VALORV, PRO_VALOR_DINHEIRO, PRO_VALORV_PRAZO, PRO_VALORC, PRO_EMBALAGEM, PRO_FABRICANTE, PRO_GRU, PRO_FOR,');
     LQuery.Add('PRO_EMP, PRO_TOTALIZADOR, PRO_NCM, PRO_UM, PRO_DATAUA FROM PRODUTOS WHERE PRO_CADASTRAR IS NULL OR PRO_CADASTRAR = ''S'' ORDER BY PRO_CODIGO');
     LQuery.Open();
     while not LQuery.DataSet.Eof do
@@ -543,6 +544,8 @@ begin
       LObj.AddPair('pro_descricao', LQuery.DataSet.FieldByName('PRO_DESCRICAO').AsString);
       LObj.AddPair('pro_codbarra', LQuery.DataSet.FieldByName('PRO_CODBARRA').AsString);
       LObj.AddPair('pro_valorv', TJSONNumber.Create(LQuery.DataSet.FieldByName('PRO_VALORV').AsFloat));
+      LObj.AddPair('pro_valor_dinheiro', TJSONNumber.Create(LQuery.DataSet.FieldByName('PRO_VALOR_DINHEIRO').AsFloat));
+      LObj.AddPair('pro_valorv_prazo', TJSONNumber.Create(LQuery.DataSet.FieldByName('PRO_VALORV_PRAZO').AsFloat));
       LObj.AddPair('pro_valorc', TJSONNumber.Create(LQuery.DataSet.FieldByName('PRO_VALORC').AsFloat));
       LObj.AddPair('pro_embalagem', LQuery.DataSet.FieldByName('PRO_EMBALAGEM').AsString);
       LObj.AddPair('pro_fabricante', LQuery.DataSet.FieldByName('PRO_FABRICANTE').AsString);
@@ -636,7 +639,7 @@ begin
 
     // 6. Grades - Apenas pendentes (CADASTRAR = 'S')
     LQuery.Clear;
-    LQuery.Open('SELECT GRA_CODIGO, GRA_PRO, GRA_VALOR, GRA_TAM, GRA_QUANTIDADE, GRA_CODBARRA, GRA_COR FROM GRADES WHERE GRA_CADASTRAR IS NULL OR GRA_CADASTRAR = ''S'' ORDER BY GRA_CODIGO');
+    LQuery.Open('SELECT GRA_CODIGO, GRA_PRO, GRA_VALOR, GRA_VALOR_DINHEIRO, GRA_VALOR_PRAZO, GRA_TAM, GRA_QUANTIDADE, GRA_CODBARRA, GRA_COR FROM GRADES WHERE GRA_CADASTRAR IS NULL OR GRA_CADASTRAR = ''S'' ORDER BY GRA_CODIGO');
     LGrades := TJSONArray.Create;
     while not LQuery.DataSet.Eof do
     begin
@@ -644,6 +647,8 @@ begin
       LItemObj.AddPair('codigo', TJSONNumber.Create(LQuery.DataSet.FieldByName('GRA_CODIGO').AsInteger));
       LItemObj.AddPair('pro', TJSONNumber.Create(LQuery.DataSet.FieldByName('GRA_PRO').AsInteger));
       LItemObj.AddPair('valor', TJSONNumber.Create(LQuery.DataSet.FieldByName('GRA_VALOR').AsFloat));
+      LItemObj.AddPair('valor_dinheiro', TJSONNumber.Create(LQuery.DataSet.FieldByName('GRA_VALOR_DINHEIRO').AsFloat));
+      LItemObj.AddPair('valor_prazo', TJSONNumber.Create(LQuery.DataSet.FieldByName('GRA_VALOR_PRAZO').AsFloat));
       LItemObj.AddPair('tam', TJSONNumber.Create(LQuery.DataSet.FieldByName('GRA_TAM').AsInteger));
       LItemObj.AddPair('quantidade', TJSONNumber.Create(LQuery.DataSet.FieldByName('GRA_QUANTIDADE').AsFloat));
       LItemObj.AddPair('codbarra', LQuery.DataSet.FieldByName('GRA_CODBARRA').AsString);
@@ -670,6 +675,31 @@ begin
     end;
     LResponse.AddPair('tamanhos', LTamanhos);
 
+    // 8. Clientes - Apenas pendentes (CADASTRAR = 'S')
+    LQuery.Clear;
+    LQuery.Open('SELECT CLI_CODIGO, CLI_NOME, CLI_CELULAR, CLI_FONE, CLI_EMAIL, CLI_CIDADE, CLI_UF, CLI_ENDERECO, CLI_BAIRRO, CLI_CEP, CLI_CNPJ_CPF, CLI_RG, CLI_LIMITE FROM CLIENTES WHERE CLI_CADASTRAR IS NULL OR CLI_CADASTRAR = ''S'' ORDER BY CLI_CODIGO');
+    LSubgrupos := TJSONArray.Create; // Reusing JSON array variable
+    while not LQuery.DataSet.Eof do
+    begin
+      LItemObj := TJSONObject.Create;
+      LItemObj.AddPair('codigo', TJSONNumber.Create(LQuery.DataSet.FieldByName('CLI_CODIGO').AsInteger));
+      LItemObj.AddPair('nome', LQuery.DataSet.FieldByName('CLI_NOME').AsString);
+      LItemObj.AddPair('celular', LQuery.DataSet.FieldByName('CLI_CELULAR').AsString);
+      LItemObj.AddPair('telefone', LQuery.DataSet.FieldByName('CLI_FONE').AsString);
+      LItemObj.AddPair('email', LQuery.DataSet.FieldByName('CLI_EMAIL').AsString);
+      LItemObj.AddPair('cidade', LQuery.DataSet.FieldByName('CLI_CIDADE').AsString);
+      LItemObj.AddPair('uf', LQuery.DataSet.FieldByName('CLI_UF').AsString);
+      LItemObj.AddPair('endereco', LQuery.DataSet.FieldByName('CLI_ENDERECO').AsString);
+      LItemObj.AddPair('bairro', LQuery.DataSet.FieldByName('CLI_BAIRRO').AsString);
+      LItemObj.AddPair('cep', LQuery.DataSet.FieldByName('CLI_CEP').AsString);
+      LItemObj.AddPair('cnpj_cpf', LQuery.DataSet.FieldByName('CLI_CNPJ_CPF').AsString);
+      LItemObj.AddPair('rg', LQuery.DataSet.FieldByName('CLI_RG').AsString);
+      LItemObj.AddPair('limite', TJSONNumber.Create(LQuery.DataSet.FieldByName('CLI_LIMITE').AsFloat));
+      LSubgrupos.AddElement(LItemObj);
+      LQuery.DataSet.Next;
+    end;
+    LResponse.AddPair('clientes', LSubgrupos);
+
     LResponse.AddPair('timestamp', FormatDateTime('yyyy-mm-dd hh:nn:ss', Now));
 
     // Baixa/limpa a flag de pendência (marcando 'N') para que na próxima chamada retorne 0 itens duplicados
@@ -681,6 +711,7 @@ begin
       LQuery.Clear; LQuery.Add('UPDATE GRADES SET GRA_CADASTRAR = ''N'' WHERE GRA_CADASTRAR = ''S'' OR GRA_CADASTRAR IS NULL'); LQuery.ExecSQL;
       LQuery.Clear; LQuery.Add('UPDATE TAMANHOS SET TAM_CADASTRAR = ''N'' WHERE TAM_CADASTRAR = ''S'' OR TAM_CADASTRAR IS NULL'); LQuery.ExecSQL;
       LQuery.Clear; LQuery.Add('UPDATE TRANSFERENCIA SET TR_CADASTRAR = ''N'' WHERE TR_CADASTRAR = ''S'' OR TR_CADASTRAR IS NULL'); LQuery.ExecSQL;
+      LQuery.Clear; LQuery.Add('UPDATE CLIENTES SET CLI_CADASTRAR = ''N'' WHERE CLI_CADASTRAR = ''S'' OR CLI_CADASTRAR IS NULL'); LQuery.ExecSQL;
     except end;
 
     Res.Status(THTTPStatus.OK).Send<TJSONObject>(LResponse);

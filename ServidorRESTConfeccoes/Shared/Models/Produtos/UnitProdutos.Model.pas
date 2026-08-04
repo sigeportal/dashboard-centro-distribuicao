@@ -60,6 +60,8 @@ type
 		FFornecedor: TFornecedores;
 		FURL_Imagem: string;
     FTotalizador: TTotalizadores;
+		FValor_dinheiro: Real;
+		FValorv_prazo: Real;
     FEmp: integer;
     FCadastrar: string;
 		{ private declarations }
@@ -81,6 +83,10 @@ type
 		property Quantidade: Real read FQuantidade write FQuantidade;
 		[TCampo('PRO_VALORV', 'NUMERIC(9,4)')]
 		property Valorv: Real read FValorv write FValorv;
+		[TCampo('PRO_VALOR_DINHEIRO', 'NUMERIC(9,4)')]
+		property ValorDinheiro: Real read FValor_dinheiro write FValor_dinheiro;
+		[TCampo('PRO_VALORV_PRAZO', 'NUMERIC(9,4)')]
+		property ValorPrazo: Real read FValorv_prazo write FValorv_prazo;
 		[TCampo('PRO_VALORCM', 'NUMERIC(9,4)')]
 		property Valorcm: Real read FValorcm write FValorcm;
 		[TCampo('PRO_VALORC', 'NUMERIC(9,4)')]

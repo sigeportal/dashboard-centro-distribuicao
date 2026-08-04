@@ -713,13 +713,15 @@ begin
             LFor := SafeGetInt(LObj, 'pro_for', 0);
 
             LQuery.Clear;
-            LQuery.Add('UPDATE OR INSERT INTO PRODUTOS (PRO_CODIGO, PRO_NOME, PRO_DESCRICAO, PRO_CODBARRA, PRO_VALORV, PRO_VALORC, PRO_EMBALAGEM, PRO_FABRICANTE, PRO_GRU, PRO_FOR, PRO_DATAUA)');
-            LQuery.Add('VALUES (:COD, :NOME, :DESC, :BARRA, :VALORV, :VALORC, :EMB, :FAB, :GRU, :FOR, :DATAUA) MATCHING (PRO_CODIGO)');
+            LQuery.Add('UPDATE OR INSERT INTO PRODUTOS (PRO_CODIGO, PRO_NOME, PRO_DESCRICAO, PRO_CODBARRA, PRO_VALORV, PRO_VALOR_DINHEIRO, PRO_VALORV_PRAZO, PRO_VALORC, PRO_EMBALAGEM, PRO_FABRICANTE, PRO_GRU, PRO_FOR, PRO_DATAUA)');
+            LQuery.Add('VALUES (:COD, :NOME, :DESC, :BARRA, :VALORV, :VALORD, :VALORP, :VALORC, :EMB, :FAB, :GRU, :FOR, :DATAUA) MATCHING (PRO_CODIGO)');
             LQuery.AddParam('COD', SafeGetInt(LObj, 'pro_codigo', 0));
             LQuery.AddParam('NOME', SafeGetString(LObj, 'pro_nome'));
             LQuery.AddParam('DESC', SafeGetString(LObj, 'pro_descricao'));
             LQuery.AddParam('BARRA', SafeGetString(LObj, 'pro_codbarra'));
             LQuery.AddParam('VALORV', SafeGetFloat(LObj, 'pro_valorv', 0));
+            LQuery.AddParam('VALORD', SafeGetFloat(LObj, 'pro_valor_dinheiro', 0));
+            LQuery.AddParam('VALORP', SafeGetFloat(LObj, 'pro_valorv_prazo', 0));
             LQuery.AddParam('VALORC', SafeGetFloat(LObj, 'pro_valorc', 0));
             LQuery.AddParam('EMB', SafeGetString(LObj, 'pro_embalagem'));
             LQuery.AddParam('FAB', SafeGetString(LObj, 'pro_fabricante'));
@@ -833,10 +835,12 @@ begin
           begin
             LObj := TJSONObject(LArrGrades.Items[I]);
             LQuery.Clear;
-            LQuery.Add('UPDATE OR INSERT INTO GRADES (GRA_CODIGO, GRA_PRO, GRA_VALOR, GRA_TAM, GRA_QUANTIDADE, GRA_CODBARRA, GRA_COR) VALUES (:COD, :PRO, :VALOR, :TAM, :QTD, :BARRA, :COR) MATCHING (GRA_CODIGO)');
+            LQuery.Add('UPDATE OR INSERT INTO GRADES (GRA_CODIGO, GRA_PRO, GRA_VALOR, GRA_VALOR_DINHEIRO, GRA_VALOR_PRAZO, GRA_TAM, GRA_QUANTIDADE, GRA_CODBARRA, GRA_COR) VALUES (:COD, :PRO, :VALOR, :VALORD, :VALORP, :TAM, :QTD, :BARRA, :COR) MATCHING (GRA_CODIGO)');
             LQuery.AddParam('COD', SafeGetInt(LObj, 'codigo', 0));
             LQuery.AddParam('PRO', SafeGetInt(LObj, 'pro', 0));
             LQuery.AddParam('VALOR', SafeGetFloat(LObj, 'valor', 0));
+            LQuery.AddParam('VALORD', SafeGetFloat(LObj, 'valor_dinheiro', 0));
+            LQuery.AddParam('VALORP', SafeGetFloat(LObj, 'valor_prazo', 0));
             LQuery.AddParam('TAM', SafeGetInt(LObj, 'tam', 0));
             LQuery.AddParam('QTD', SafeGetFloat(LObj, 'quantidade', 0));
             LQuery.AddParam('BARRA', SafeGetString(LObj, 'codbarra'));
@@ -871,6 +875,38 @@ begin
         end;
       except
         on E: Exception do Writeln('-> Erro ao sincronizar tamanhos: ' + E.Message);
+      end;
+
+      // 8. Clientes
+      try
+        LArrClientes := LJSON.GetValue<TJSONArray>('clientes', nil);
+        if Assigned(LArrClientes) and (LArrClientes.Count > 0) then
+        begin
+          LQuery := TDatabase.Query;
+          for I := 0 to LArrClientes.Count - 1 do
+          begin
+            LObj := TJSONObject(LArrClientes.Items[I]);
+            LQuery.Clear;
+            LQuery.Add('UPDATE OR INSERT INTO CLIENTES (CLI_CODIGO, CLI_NOME, CLI_CELULAR, CLI_FONE, CLI_EMAIL, CLI_CIDADE, CLI_UF, CLI_ENDERECO, CLI_BAIRRO, CLI_CEP, CLI_CNPJ_CPF, CLI_RG, CLI_LIMITE) VALUES (:COD, :NOME, :CEL, :TEL, :EMAIL, :CID, :UF, :END, :BAI, :CEP, :CNPJ, :RG, :LIM) MATCHING (CLI_CODIGO)');
+            LQuery.AddParam('COD', SafeGetInt(LObj, 'codigo', 0));
+            LQuery.AddParam('NOME', SafeGetString(LObj, 'nome'));
+            LQuery.AddParam('CEL', SafeGetString(LObj, 'celular'));
+            LQuery.AddParam('TEL', SafeGetString(LObj, 'telefone'));
+            LQuery.AddParam('EMAIL', SafeGetString(LObj, 'email'));
+            LQuery.AddParam('CID', SafeGetString(LObj, 'cidade'));
+            LQuery.AddParam('UF', SafeGetString(LObj, 'uf'));
+            LQuery.AddParam('END', SafeGetString(LObj, 'endereco'));
+            LQuery.AddParam('BAI', SafeGetString(LObj, 'bairro'));
+            LQuery.AddParam('CEP', SafeGetString(LObj, 'cep'));
+            LQuery.AddParam('CNPJ', SafeGetString(LObj, 'cnpj_cpf'));
+            LQuery.AddParam('RG', SafeGetString(LObj, 'rg'));
+            LQuery.AddParam('LIM', SafeGetFloat(LObj, 'limite', 0));
+            LQuery.ExecSQL;
+          end;
+          Writeln('-> Sincronizados ' + LArrClientes.Count.ToString + ' clientes da matriz.');
+        end;
+      except
+        on E: Exception do Writeln('-> Erro ao sincronizar clientes: ' + E.Message);
       end;
 
       LNewSync := LJSON.GetValue<string>('timestamp', '');

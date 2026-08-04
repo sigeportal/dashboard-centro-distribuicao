@@ -14,7 +14,7 @@ uses UnitFornecedores.Model, UnitDatabase, UnitCidade.Model, UnitEmpresa.Model,
   UnitEstado.Model, UnitFuncionarios.Model, UnitGrupos.Model,
   UnitSubGrupos.Model, UnitProdutos.Model, UnitTamanho.Model,
   UnitTotalizadores.Model, UnitUnidadeMedida.Model, UnitUsuarios.Model,
-  UnitGrades.Model, UnitTransferencia.Model, UnitTransferenciaItem.Model;
+  UnitGrades.Model, UnitTransferencia.Model, UnitTransferenciaItem.Model, UnitClientes.Model;
 
 class procedure TInicializarClasses.Iniciar;
 var
@@ -125,6 +125,15 @@ begin
     TransferenciaItem.CriaTabela;
   finally
     TransferenciaItem.DisposeOf;
+  end;
+  try
+    with TClientes.Create(TDatabase.Connection) do
+    try
+      CriaTabela;
+    finally
+      DisposeOf;
+    end;
+  except
   end;
   Writeln('Fim inicializacao de classes');	
 end;

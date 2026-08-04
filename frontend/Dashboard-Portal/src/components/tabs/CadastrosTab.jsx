@@ -34,6 +34,8 @@ export default function CadastrosTab() {
     cor: '',
     quantidade: '',
     valor: '',
+    valor_dinheiro: '',
+    valor_prazo: '',
     codbarra: ''
   });
   const [gradeProductFilter, setGradeProductFilter] = useState('');
@@ -97,7 +99,9 @@ export default function CadastrosTab() {
     fabricante: '', 
     codbarra: '', 
     quantidade: 0, 
-    valorv: 0, 
+    valorv: 0,
+    pro_valor_dinheiro: 0,
+    pro_valorv_prazo: 0,
     codTotalizador: 1, 
     ncm: '6109.10.00', 
     um: 'UN', 
@@ -107,7 +111,7 @@ export default function CadastrosTab() {
   });
   const [grupoForm, setGrupoForm] = useState({ codigo: '', nome: '' });
   const [subgrupoForm, setSubgrupoForm] = useState({ codigo: '', nome: '', g1: '', tr: '0' });
-  const [gradeForm, setGradeForm] = useState({ codigo: '', pro: '', valor: '', tam: '', quantidade: '', codbarra: '', cor: '' });
+  const [gradeForm, setGradeForm] = useState({ codigo: '', pro: '', valor: '', valor_dinheiro: '', valor_prazo: '', tam: '', quantidade: '', codbarra: '', cor: '' });
   const [tamanhoForm, setTamanhoForm] = useState({ codigo: '', pro: '', tamanho: '', sigla: '', valor: '' });
 
   useEffect(() => {
@@ -215,6 +219,8 @@ export default function CadastrosTab() {
       codbarra: '', 
       quantidade: '', 
       valorv: '', 
+      pro_valor_dinheiro: '',
+      pro_valorv_prazo: '',
       codTotalizador: 1, 
       ncm: '6109.10.00', 
       um: 'UN', 
@@ -224,7 +230,7 @@ export default function CadastrosTab() {
     });
     setGrupoForm({ codigo: '', nome: '' });
     setSubgrupoForm({ codigo: '', nome: '', g1: '', tr: '0' });
-    setGradeForm({ codigo: '', pro: '', valor: '', tam: '', quantidade: '', codbarra: '', cor: '' });
+    setGradeForm({ codigo: '', pro: '', valor: '', valor_dinheiro: '', valor_prazo: '', tam: '', quantidade: '', codbarra: '', cor: '' });
     setTamanhoForm({ codigo: '', pro: '', tamanho: '', sigla: '', valor: '' });
     setShowForm(true);
   };
@@ -234,6 +240,8 @@ export default function CadastrosTab() {
     if (activeSubTab === 'produtos') {
       setProdForm({ 
         ...item,
+        pro_valor_dinheiro: item.pro_valor_dinheiro ?? item.valorDinheiro ?? item.valor_dinheiro ?? item.valorv ?? 0,
+        pro_valorv_prazo: item.pro_valorv_prazo ?? item.valorPrazo ?? item.valor_prazo ?? item.valorv ?? 0,
         codTotalizador: item.codTotalizador || item.pro_totalizador || 1,
         ncm: item.ncm || item.pro_ncm || '6109.10.00',
         um: item.um || item.embalagem || item.pro_um || 'UN'
@@ -243,7 +251,11 @@ export default function CadastrosTab() {
     } else if (activeSubTab === 'subgrupos') {
       setSubgrupoForm({ ...item });
     } else if (activeSubTab === 'grades') {
-      setGradeForm({ ...item });
+      setGradeForm({ 
+        ...item,
+        valor_dinheiro: item.valor_dinheiro ?? item.gra_valor_dinheiro ?? item.valor ?? 0,
+        valor_prazo: item.valor_prazo ?? item.gra_valor_prazo ?? item.valor ?? 0
+      });
     } else if (activeSubTab === 'tamanhos') {
       setTamanhoForm({ ...item });
     }
@@ -287,6 +299,8 @@ export default function CadastrosTab() {
           codbarra: prodForm.codbarra,
           quantidade: Number(prodForm.quantidade) || 0,
           valorv: Number(prodForm.valorv) || 0,
+          pro_valor_dinheiro: Number(prodForm.pro_valor_dinheiro) || Number(prodForm.valorv) || 0,
+          pro_valorv_prazo: Number(prodForm.pro_valorv_prazo) || Number(prodForm.valorv) || 0,
           codTotalizador: Number(prodForm.codTotalizador) || 1,
           ncm: prodForm.ncm || '6109.10.00',
           um: prodForm.um || 'UN',
@@ -361,6 +375,8 @@ export default function CadastrosTab() {
           codigo: editingItem ? Number(gradeForm.codigo) : Math.floor(Math.random() * 90000) + 10000,
           pro: Number(gradeForm.pro),
           valor: Number(gradeForm.valor) || 0,
+          valor_dinheiro: Number(gradeForm.valor_dinheiro) || Number(gradeForm.valor) || 0,
+          valor_prazo: Number(gradeForm.valor_prazo) || Number(gradeForm.valor) || 0,
           tam: Number(gradeForm.tam),
           quantidade: Number(gradeForm.quantidade) || 0,
           codbarra: gradeForm.codbarra,
@@ -467,6 +483,8 @@ export default function CadastrosTab() {
       cor: '',
       quantidade: '',
       valor: product.valorv || 0,
+      valor_dinheiro: product.pro_valor_dinheiro || product.valorv || 0,
+      valor_prazo: product.pro_valorv_prazo || product.valorv || 0,
       codbarra: product.codbarra || ''
     });
 
@@ -487,6 +505,8 @@ export default function CadastrosTab() {
         tam: Number(productGradeForm.tam),
         quantidade: Number(productGradeForm.quantidade) || 0,
         valor: Number(productGradeForm.valor) || 0,
+        valor_dinheiro: Number(productGradeForm.valor_dinheiro) || Number(productGradeForm.valor) || 0,
+        valor_prazo: Number(productGradeForm.valor_prazo) || Number(productGradeForm.valor) || 0,
         codbarra: productGradeForm.codbarra || '',
         cor: productGradeForm.cor || ''
       };
@@ -614,8 +634,16 @@ export default function CadastrosTab() {
                   <input type="number" value={prodForm.quantidade} onChange={(e) => setProdForm({ ...prodForm, quantidade: e.target.value })} />
                 </label>
                 <label className="crud-input">
-                  Preço de Venda (R$)
-                  <input type="number" step="0.01" value={prodForm.valorv} onChange={(e) => setProdForm({ ...prodForm, valorv: e.target.value })} />
+                  Valor Dinheiro (R$)
+                  <input type="number" step="0.01" value={prodForm.pro_valor_dinheiro} onChange={(e) => setProdForm({ ...prodForm, pro_valor_dinheiro: e.target.value })} placeholder="Ex: 55.00" />
+                </label>
+                <label className="crud-input">
+                  Preço à Vista (R$) *
+                  <input type="number" step="0.01" value={prodForm.valorv} onChange={(e) => setProdForm({ ...prodForm, valorv: e.target.value })} placeholder="Ex: 59.90" required />
+                </label>
+                <label className="crud-input">
+                  Preço a Prazo (R$)
+                  <input type="number" step="0.01" value={prodForm.pro_valorv_prazo} onChange={(e) => setProdForm({ ...prodForm, pro_valorv_prazo: e.target.value })} placeholder="Ex: 65.90" />
                 </label>
                 <label className="crud-input">
                   URL da Imagem
@@ -682,8 +710,16 @@ export default function CadastrosTab() {
                   <input type="number" value={gradeForm.quantidade} onChange={(e) => setGradeForm({ ...gradeForm, quantidade: e.target.value })} />
                 </label>
                 <label className="crud-input">
-                  Valor Unitário da Variação (R$)
-                  <input type="number" step="0.01" value={gradeForm.valor} onChange={(e) => setGradeForm({ ...gradeForm, valor: e.target.value })} />
+                  Valor Dinheiro (R$)
+                  <input type="number" step="0.01" value={gradeForm.valor_dinheiro} onChange={(e) => setGradeForm({ ...gradeForm, valor_dinheiro: e.target.value })} placeholder="Ex: 55.00" />
+                </label>
+                <label className="crud-input">
+                  Preço à Vista (R$)
+                  <input type="number" step="0.01" value={gradeForm.valor} onChange={(e) => setGradeForm({ ...gradeForm, valor: e.target.value })} placeholder="Ex: 59.90" />
+                </label>
+                <label className="crud-input">
+                  Preço a Prazo (R$)
+                  <input type="number" step="0.01" value={gradeForm.valor_prazo} onChange={(e) => setGradeForm({ ...gradeForm, valor_prazo: e.target.value })} placeholder="Ex: 65.90" />
                 </label>
                 <label className="crud-input">
                   Código de Barras específico
@@ -753,7 +789,9 @@ export default function CadastrosTab() {
                       <th>UM</th>
                       <th>Totalizador</th>
                       <th>Estoque ({activeUnitName})</th>
-                      <th>Preço</th>
+                      <th>Vlr. Dinheiro</th>
+                      <th>Vlr. Vista</th>
+                      <th>Vlr. Prazo</th>
                       <th>Cód. Barras</th>
                       <th>Ações</th>
                     </tr>
@@ -768,7 +806,9 @@ export default function CadastrosTab() {
                         <td><strong>{item.um || item.embalagem || item.pro_um || 'UN'}</strong></td>
                         <td><span className="badge badge-success">#{item.codTotalizador || item.pro_totalizador || 1}</span></td>
                         <td><strong style={{ color: getProductStockForActiveUnit(item) > 0 ? '#10b981' : '#ef4444' }}>{getProductStockForActiveUnit(item)}</strong></td>
-                        <td>R$ {Number(item.valorv).toFixed(2)}</td>
+                        <td>R$ {(Number(item.pro_valor_dinheiro ?? item.valorDinheiro ?? item.valor_dinheiro ?? item.valorv) || 0).toFixed(2)}</td>
+                        <td><strong>R$ {(Number(item.valorv) || 0).toFixed(2)}</strong></td>
+                        <td>R$ {(Number(item.pro_valorv_prazo ?? item.valorPrazo ?? item.valor_prazo ?? item.valorv) || 0).toFixed(2)}</td>
                         <td>{item.codbarra || '-'}</td>
                         <td className="actions-cell">
                           <button className="crud-row-btn" onClick={() => handleOpenProductGradesModal(item)} title="Gerenciar Grades / Variações" style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b' }}><Grid size={14} /></button>
@@ -845,7 +885,9 @@ export default function CadastrosTab() {
                       <th>Produto</th>
                       <th>Tamanho</th>
                       <th>Estoque</th>
-                      <th>Preço</th>
+                      <th>Vlr. Dinheiro</th>
+                      <th>Vlr. Vista</th>
+                      <th>Vlr. Prazo</th>
                       <th>Cor</th>
                       <th>Cod. Barras</th>
                       <th>Ações</th>
@@ -863,7 +905,9 @@ export default function CadastrosTab() {
                             <td>{prod ? prod.nome : `Produto #${item.pro}`}</td>
                             <td>{tam ? `${tam.tamanho} (${tam.sigla})` : `Tamanho #${item.tam}`}</td>
                             <td>{item.quantidade}</td>
-                            <td>R$ {Number(item.valor).toFixed(2)}</td>
+                            <td>R$ {(Number(item.valor_dinheiro ?? item.gra_valor_dinheiro ?? item.valor) || 0).toFixed(2)}</td>
+                            <td><strong>R$ {(Number(item.valor) || 0).toFixed(2)}</strong></td>
+                            <td>R$ {(Number(item.valor_prazo ?? item.gra_valor_prazo ?? item.valor) || 0).toFixed(2)}</td>
                             <td>{item.cor || '-'}</td>
                             <td>{item.codbarra || '-'}</td>
                             <td className="actions-cell">
@@ -1081,13 +1125,35 @@ export default function CadastrosTab() {
                     </label>
 
                     <label className="crud-input">
-                      Preço Específico (R$)
+                      Valor Dinheiro (R$)
+                      <input 
+                        type="number" 
+                        step="0.01" 
+                        value={productGradeForm.valor_dinheiro} 
+                        onChange={(e) => setProductGradeForm({ ...productGradeForm, valor_dinheiro: e.target.value })}
+                        placeholder="Ex: 55.00" 
+                      />
+                    </label>
+
+                    <label className="crud-input">
+                      Preço à Vista (R$)
                       <input 
                         type="number" 
                         step="0.01" 
                         value={productGradeForm.valor} 
                         onChange={(e) => setProductGradeForm({ ...productGradeForm, valor: e.target.value })}
-                        placeholder="Ex: 49.90" 
+                        placeholder="Ex: 59.90" 
+                      />
+                    </label>
+
+                    <label className="crud-input">
+                      Preço a Prazo (R$)
+                      <input 
+                        type="number" 
+                        step="0.01" 
+                        value={productGradeForm.valor_prazo} 
+                        onChange={(e) => setProductGradeForm({ ...productGradeForm, valor_prazo: e.target.value })}
+                        placeholder="Ex: 65.90" 
                       />
                     </label>
 
@@ -1131,7 +1197,9 @@ export default function CadastrosTab() {
                         <th>Tamanho</th>
                         <th>Cor</th>
                         <th>Estoque</th>
-                        <th>Preço</th>
+                        <th>Vlr. Dinheiro</th>
+                        <th>Vlr. Vista</th>
+                        <th>Vlr. Prazo</th>
                         <th>Cód. Barras</th>
                         <th>Ações</th>
                       </tr>
@@ -1147,7 +1215,9 @@ export default function CadastrosTab() {
                             </td>
                             <td>{item.cor ? <span className="sigla-tag">{item.cor}</span> : '-'}</td>
                             <td><strong style={{ color: Number(item.quantidade) > 0 ? '#10b981' : '#ef4444' }}>{item.quantidade}</strong></td>
-                            <td>R$ {Number(item.valor).toFixed(2)}</td>
+                            <td>R$ {(Number(item.valor_dinheiro ?? item.gra_valor_dinheiro ?? item.valor) || 0).toFixed(2)}</td>
+                            <td><strong>R$ {(Number(item.valor) || 0).toFixed(2)}</strong></td>
+                            <td>R$ {(Number(item.valor_prazo ?? item.gra_valor_prazo ?? item.valor) || 0).toFixed(2)}</td>
                             <td>{item.codbarra || '-'}</td>
                             <td className="actions-cell">
                               <button 
@@ -1161,6 +1231,8 @@ export default function CadastrosTab() {
                                     cor: item.cor || '',
                                     quantidade: item.quantidade || 0,
                                     valor: item.valor || 0,
+                                    valor_dinheiro: item.valor_dinheiro ?? item.gra_valor_dinheiro ?? item.valor ?? 0,
+                                    valor_prazo: item.valor_prazo ?? item.gra_valor_prazo ?? item.valor ?? 0,
                                     codbarra: item.codbarra || ''
                                   });
                                   setShowProductGradeForm(true);
