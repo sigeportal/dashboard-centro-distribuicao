@@ -941,8 +941,8 @@ export default function CadastrosTab() {
                                   <span className="price-label">Vista:</span> R$ {(Number(item.valor) || 0).toFixed(2)}
                                 </div>
                                 <div className="price-secondary-row">
-                                  <span className="price-tag" title="Valor Dinheiro">Din: R$ {(Number(item.valor_dinheiro ?? item.gra_valor_dinheiro ?? item.valor) || 0).toFixed(2)}</span>
-                                  <span className="price-tag" title="Preço a Prazo">Prz: R$ {(Number(item.valor_prazo ?? item.gra_valor_prazo ?? item.valor) || 0).toFixed(2)}</span>
+                                  <span className="price-tag" title="Valor Dinheiro">Din: R$ {(Number(item.valor_dinheiro ?? item.valordinheiro ?? item.valorDinheiro ?? item.gra_valor_dinheiro ?? item.valor) || 0).toFixed(2)}</span>
+                                  <span className="price-tag" title="Preço a Prazo">Prz: R$ {(Number(item.valor_prazo ?? item.valorprazo ?? item.valorPrazo ?? item.gra_valor_prazo ?? item.valor) || 0).toFixed(2)}</span>
                                 </div>
                               </div>
                             </td>
@@ -1257,8 +1257,8 @@ export default function CadastrosTab() {
                                   <span className="price-label">Vista:</span> R$ {(Number(item.valor) || 0).toFixed(2)}
                                 </div>
                                 <div className="price-secondary-row">
-                                  <span className="price-tag" title="Valor Dinheiro">Din: R$ {(Number(item.valor_dinheiro ?? item.gra_valor_dinheiro ?? item.valor) || 0).toFixed(2)}</span>
-                                  <span className="price-tag" title="Preço a Prazo">Prz: R$ {(Number(item.valor_prazo ?? item.gra_valor_prazo ?? item.valor) || 0).toFixed(2)}</span>
+                                  <span className="price-tag" title="Valor Dinheiro">Din: R$ {(Number(item.valor_dinheiro ?? item.valordinheiro ?? item.valorDinheiro ?? item.gra_valor_dinheiro ?? item.valor) || 0).toFixed(2)}</span>
+                                  <span className="price-tag" title="Preço a Prazo">Prz: R$ {(Number(item.valor_prazo ?? item.valorprazo ?? item.valorPrazo ?? item.gra_valor_prazo ?? item.valor) || 0).toFixed(2)}</span>
                                 </div>
                               </div>
                             </td>
@@ -1275,8 +1275,8 @@ export default function CadastrosTab() {
                                     cor: item.cor || '',
                                     quantidade: item.quantidade || 0,
                                     valor: item.valor || 0,
-                                    valor_dinheiro: item.valor_dinheiro ?? item.gra_valor_dinheiro ?? item.valor ?? 0,
-                                    valor_prazo: item.valor_prazo ?? item.gra_valor_prazo ?? item.valor ?? 0,
+                                    valor_dinheiro: item.valor_dinheiro ?? item.valordinheiro ?? item.valorDinheiro ?? item.gra_valor_dinheiro ?? item.valor ?? 0,
+                                    valor_prazo: item.valor_prazo ?? item.valorprazo ?? item.valorPrazo ?? item.gra_valor_prazo ?? item.valor ?? 0,
                                     codbarra: item.codbarra || ''
                                   });
                                   setShowProductGradeForm(true);
