@@ -789,9 +789,7 @@ export default function CadastrosTab() {
                       <th>UM</th>
                       <th>Totalizador</th>
                       <th>Estoque ({activeUnitName})</th>
-                      <th>Vlr. Dinheiro</th>
-                      <th>Vlr. Vista</th>
-                      <th>Vlr. Prazo</th>
+                      <th>Preços (Vista / Din. / Prazo)</th>
                       <th>Cód. Barras</th>
                       <th>Ações</th>
                     </tr>
@@ -800,16 +798,24 @@ export default function CadastrosTab() {
                     {produtos.map((item, idx) => (
                       <tr key={item.codigo || idx}>
                         <td><span className="item-code">#{item.codigo}</span></td>
-                        <td>{item.nome}</td>
+                        <td className="product-name-cell" title={item.nome}>{item.nome}</td>
                         <td>{item.fabricante || '-'}</td>
                         <td><span className="badge badge-info">{item.ncm || item.pro_ncm || '6109.10.00'}</span></td>
                         <td><strong>{item.um || item.embalagem || item.pro_um || 'UN'}</strong></td>
                         <td><span className="badge badge-success">#{item.codTotalizador || item.pro_totalizador || 1}</span></td>
                         <td><strong style={{ color: getProductStockForActiveUnit(item) > 0 ? '#10b981' : '#ef4444' }}>{getProductStockForActiveUnit(item)}</strong></td>
-                        <td>R$ {(Number(item.pro_valor_dinheiro ?? item.valorDinheiro ?? item.valor_dinheiro ?? item.valorv) || 0).toFixed(2)}</td>
-                        <td><strong>R$ {(Number(item.valorv) || 0).toFixed(2)}</strong></td>
-                        <td>R$ {(Number(item.pro_valorv_prazo ?? item.valorPrazo ?? item.valor_prazo ?? item.valorv) || 0).toFixed(2)}</td>
-                        <td>{item.codbarra || '-'}</td>
+                        <td className="prices-cell">
+                          <div className="price-badge-container">
+                            <div className="price-primary" title="Preço à Vista">
+                              <span className="price-label">Vista:</span> R$ {(Number(item.valorv) || 0).toFixed(2)}
+                            </div>
+                            <div className="price-secondary-row">
+                              <span className="price-tag" title="Valor Dinheiro">Din: R$ {(Number(item.pro_valor_dinheiro ?? item.valorDinheiro ?? item.valor_dinheiro ?? item.valorv) || 0).toFixed(2)}</span>
+                              <span className="price-tag" title="Preço a Prazo">Prz: R$ {(Number(item.pro_valorv_prazo ?? item.valorPrazo ?? item.valor_prazo ?? item.valorv) || 0).toFixed(2)}</span>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="codbarra-cell">{item.codbarra || '-'}</td>
                         <td className="actions-cell">
                           <button className="crud-row-btn" onClick={() => handleOpenProductGradesModal(item)} title="Gerenciar Grades / Variações" style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b' }}><Grid size={14} /></button>
                           <button className="crud-row-btn" onClick={() => handleOpenHistoryModal(item)} title="Ver Histórico (HIS_PRO)" style={{ background: 'rgba(99, 102, 241, 0.15)', color: '#6366f1' }}><History size={14} /></button>
@@ -885,9 +891,7 @@ export default function CadastrosTab() {
                       <th>Produto</th>
                       <th>Tamanho</th>
                       <th>Estoque</th>
-                      <th>Vlr. Dinheiro</th>
-                      <th>Vlr. Vista</th>
-                      <th>Vlr. Prazo</th>
+                      <th>Preços (Vista / Din. / Prazo)</th>
                       <th>Cor</th>
                       <th>Cod. Barras</th>
                       <th>Ações</th>
@@ -902,14 +906,22 @@ export default function CadastrosTab() {
                         return (
                           <tr key={item.codigo || idx}>
                             <td><span className="item-code">#{item.codigo}</span></td>
-                            <td>{prod ? prod.nome : `Produto #${item.pro}`}</td>
+                            <td className="product-name-cell" title={prod ? prod.nome : `Produto #${item.pro}`}>{prod ? prod.nome : `Produto #${item.pro}`}</td>
                             <td>{tam ? `${tam.tamanho} (${tam.sigla})` : `Tamanho #${item.tam}`}</td>
-                            <td>{item.quantidade}</td>
-                            <td>R$ {(Number(item.valor_dinheiro ?? item.gra_valor_dinheiro ?? item.valor) || 0).toFixed(2)}</td>
-                            <td><strong>R$ {(Number(item.valor) || 0).toFixed(2)}</strong></td>
-                            <td>R$ {(Number(item.valor_prazo ?? item.gra_valor_prazo ?? item.valor) || 0).toFixed(2)}</td>
-                            <td>{item.cor || '-'}</td>
-                            <td>{item.codbarra || '-'}</td>
+                            <td><strong>{item.quantidade}</strong></td>
+                            <td className="prices-cell">
+                              <div className="price-badge-container">
+                                <div className="price-primary" title="Preço à Vista">
+                                  <span className="price-label">Vista:</span> R$ {(Number(item.valor) || 0).toFixed(2)}
+                                </div>
+                                <div className="price-secondary-row">
+                                  <span className="price-tag" title="Valor Dinheiro">Din: R$ {(Number(item.valor_dinheiro ?? item.gra_valor_dinheiro ?? item.valor) || 0).toFixed(2)}</span>
+                                  <span className="price-tag" title="Preço a Prazo">Prz: R$ {(Number(item.valor_prazo ?? item.gra_valor_prazo ?? item.valor) || 0).toFixed(2)}</span>
+                                </div>
+                              </div>
+                            </td>
+                            <td>{item.cor ? <span className="sigla-tag">{item.cor}</span> : '-'}</td>
+                            <td className="codbarra-cell">{item.codbarra || '-'}</td>
                             <td className="actions-cell">
                               <button className="crud-row-btn edit" onClick={() => handleOpenEdit(item)}><Edit size={14} /></button>
                               <button className="crud-row-btn delete" onClick={() => handleDelete(item.codigo)}><Trash2 size={14} /></button>
@@ -1197,9 +1209,7 @@ export default function CadastrosTab() {
                         <th>Tamanho</th>
                         <th>Cor</th>
                         <th>Estoque</th>
-                        <th>Vlr. Dinheiro</th>
-                        <th>Vlr. Vista</th>
-                        <th>Vlr. Prazo</th>
+                        <th>Preços (Vista / Din. / Prazo)</th>
                         <th>Cód. Barras</th>
                         <th>Ações</th>
                       </tr>
@@ -1215,10 +1225,18 @@ export default function CadastrosTab() {
                             </td>
                             <td>{item.cor ? <span className="sigla-tag">{item.cor}</span> : '-'}</td>
                             <td><strong style={{ color: Number(item.quantidade) > 0 ? '#10b981' : '#ef4444' }}>{item.quantidade}</strong></td>
-                            <td>R$ {(Number(item.valor_dinheiro ?? item.gra_valor_dinheiro ?? item.valor) || 0).toFixed(2)}</td>
-                            <td><strong>R$ {(Number(item.valor) || 0).toFixed(2)}</strong></td>
-                            <td>R$ {(Number(item.valor_prazo ?? item.gra_valor_prazo ?? item.valor) || 0).toFixed(2)}</td>
-                            <td>{item.codbarra || '-'}</td>
+                            <td className="prices-cell">
+                              <div className="price-badge-container">
+                                <div className="price-primary" title="Preço à Vista">
+                                  <span className="price-label">Vista:</span> R$ {(Number(item.valor) || 0).toFixed(2)}
+                                </div>
+                                <div className="price-secondary-row">
+                                  <span className="price-tag" title="Valor Dinheiro">Din: R$ {(Number(item.valor_dinheiro ?? item.gra_valor_dinheiro ?? item.valor) || 0).toFixed(2)}</span>
+                                  <span className="price-tag" title="Preço a Prazo">Prz: R$ {(Number(item.valor_prazo ?? item.gra_valor_prazo ?? item.valor) || 0).toFixed(2)}</span>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="codbarra-cell">{item.codbarra || '-'}</td>
                             <td className="actions-cell">
                               <button 
                                 className="crud-row-btn edit" 

@@ -151,7 +151,7 @@ begin
   try
     id := Req.Params.Items['id'].ToInteger();
     Clientes := TClientes.Create(TDatabase.Connection);
-    Clientes.CarregaDoBanco(id);
+    Clientes.BuscaDadosTabela(id);
     Res.Send<TJSONObject>(TJSONObject.ParseJSONValue(Clientes.ToJson) as TJSONObject);
   finally
     Clientes.DisposeOf;

@@ -358,3 +358,68 @@
   animation: fadeIn 0.2s ease-in-out;
 }
 
+/* OTIMIZAÇÃO DA TABELA DE PRODUTOS & PREÇOS */
+.data-table th {
+  white-space: nowrap;
+}
+
+.product-name-cell {
+  max-width: 320px;
+  min-width: 200px;
+  line-height: 1.35;
+  font-weight: 500;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  word-break: break-word;
+}
+
+.prices-cell {
+  white-space: nowrap;
+}
+
+.price-badge-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.price-primary {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+}
+
+.price-primary .price-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  margin-right: 0.2rem;
+}
+
+.price-secondary-row {
+  display: flex;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+}
+
+.price-tag {
+  background: rgba(0, 0, 0, 0.04);
+  padding: 0.15rem 0.4rem;
+  border-radius: 0.35rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.codbarra-cell {
+  white-space: nowrap;
+  font-family: monospace;
+  font-size: 0.88rem;
+  letter-spacing: 0.3px;
+  color: var(--text-secondary);
+}
+

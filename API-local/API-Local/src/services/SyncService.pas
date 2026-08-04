@@ -634,6 +634,7 @@ var
   LObjItem: TJSONObject;
   LQuery: iQuery;
   Null: Variant;
+  LArrClientes: TJSONArray;
 begin
   LLastSync := FIniFile.ReadString('Sincronia', 'CD_LastSync', '');
   LURL := TConstants.URL_CD + '/v1/sync/pending?last_sync=' + LLastSync;
@@ -887,7 +888,9 @@ begin
           begin
             LObj := TJSONObject(LArrClientes.Items[I]);
             LQuery.Clear;
-            LQuery.Add('UPDATE OR INSERT INTO CLIENTES (CLI_CODIGO, CLI_NOME, CLI_CELULAR, CLI_FONE, CLI_EMAIL, CLI_CIDADE, CLI_UF, CLI_ENDERECO, CLI_BAIRRO, CLI_CEP, CLI_CNPJ_CPF, CLI_RG, CLI_LIMITE) VALUES (:COD, :NOME, :CEL, :TEL, :EMAIL, :CID, :UF, :END, :BAI, :CEP, :CNPJ, :RG, :LIM) MATCHING (CLI_CODIGO)');
+            LQuery.Add('UPDATE OR INSERT INTO CLIENTES (CLI_CODIGO, CLI_NOME, CLI_CELULAR, CLI_FONE, CLI_EMAIL, CLI_CIDADE, ');
+            LQuery.Add('CLI_UF, CLI_ENDERECO, CLI_BAIRRO, CLI_CEP, CLI_CNPJ_CPF, CLI_RG, CLI_LIMITE) VALUES (:COD, :NOME, :CEL, ');
+            LQuery.Add(':TEL, :EMAIL, :CID, :UF, :END, :BAI, :CEP, :CNPJ, :RG, :LIM) MATCHING (CLI_CODIGO)');
             LQuery.AddParam('COD', SafeGetInt(LObj, 'codigo', 0));
             LQuery.AddParam('NOME', SafeGetString(LObj, 'nome'));
             LQuery.AddParam('CEL', SafeGetString(LObj, 'celular'));

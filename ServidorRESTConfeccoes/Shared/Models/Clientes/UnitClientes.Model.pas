@@ -5,8 +5,7 @@ interface
 uses
   System.SysUtils,
   System.Classes,
-  UnitTabela.Model,
-  UnitTabela.Atributos;
+  UnitPortalORM.Model;
 
 type
   [TNomeTabela('CLIENTES', 'CLI_CODIGO')]
