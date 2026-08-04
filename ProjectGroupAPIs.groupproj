@@ -6,7 +6,7 @@
         <Projects Include="API-local\API-Local\api_dashboard.dproj">
             <Dependencies/>
         </Projects>
-        <Projects Include="ServidorRESTConfeccoes\ServidorConsole\api_centro_distribuicao.dproj">
+        <Projects Include="ServidorRESTConfeccoes\ServidorConsole\ServidorConsole.dproj">
             <Dependencies/>
         </Projects>
         <Projects Include="API-auth\API-Central\AUTH.dproj">
@@ -29,14 +29,14 @@
     <Target Name="api_dashboard:Make">
         <MSBuild Projects="API-local\API-Local\api_dashboard.dproj" Targets="Make"/>
     </Target>
-    <Target Name="api_centro_distribuicao">
-        <MSBuild Projects="ServidorRESTConfeccoes\ServidorConsole\api_centro_distribuicao.dproj"/>
+    <Target Name="ServidorConsole">
+        <MSBuild Projects="ServidorRESTConfeccoes\ServidorConsole\ServidorConsole.dproj"/>
     </Target>
-    <Target Name="api_centro_distribuicao:Clean">
-        <MSBuild Projects="ServidorRESTConfeccoes\ServidorConsole\api_centro_distribuicao.dproj" Targets="Clean"/>
+    <Target Name="ServidorConsole:Clean">
+        <MSBuild Projects="ServidorRESTConfeccoes\ServidorConsole\ServidorConsole.dproj" Targets="Clean"/>
     </Target>
-    <Target Name="api_centro_distribuicao:Make">
-        <MSBuild Projects="ServidorRESTConfeccoes\ServidorConsole\api_centro_distribuicao.dproj" Targets="Make"/>
+    <Target Name="ServidorConsole:Make">
+        <MSBuild Projects="ServidorRESTConfeccoes\ServidorConsole\ServidorConsole.dproj" Targets="Make"/>
     </Target>
     <Target Name="AUTH">
         <MSBuild Projects="API-auth\API-Central\AUTH.dproj"/>
@@ -48,13 +48,13 @@
         <MSBuild Projects="API-auth\API-Central\AUTH.dproj" Targets="Make"/>
     </Target>
     <Target Name="Build">
-        <CallTarget Targets="api_dashboard;api_centro_distribuicao;AUTH"/>
+        <CallTarget Targets="api_dashboard;ServidorConsole;AUTH"/>
     </Target>
     <Target Name="Clean">
-        <CallTarget Targets="api_dashboard:Clean;api_centro_distribuicao:Clean;AUTH:Clean"/>
+        <CallTarget Targets="api_dashboard:Clean;ServidorConsole:Clean;AUTH:Clean"/>
     </Target>
     <Target Name="Make">
-        <CallTarget Targets="api_dashboard:Make;api_centro_distribuicao:Make;AUTH:Make"/>
+        <CallTarget Targets="api_dashboard:Make;ServidorConsole:Make;AUTH:Make"/>
     </Target>
     <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
 </Project>

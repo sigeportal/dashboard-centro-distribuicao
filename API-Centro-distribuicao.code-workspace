@@ -11,9 +11,6 @@
 		},
 		{
 			"path": "docs"
-		},
-		{
-			"path": "../CentroDeDistribuicao"
 		}
 	],
 	"settings": {}

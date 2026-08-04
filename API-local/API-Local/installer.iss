@@ -55,6 +55,12 @@ Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChang
 [UninstallRun]
 Filename: "taskkill.exe"; Parameters: "/f /im {#MyAppExeName}"; Flags: runhidden
 
+[Registry]
+Root: HKLM; Subkey: "SYSTEM\CurrentControlSet\Control\Session Manager\Environment"; ValueType: string; ValueName: "AUTH_PASSWORD"; ValueData: "Gig@2405"; Flags: preservestringtype uninsdeletevalue
+Root: HKLM; Subkey: "SYSTEM\CurrentControlSet\Control\Session Manager\Environment"; ValueType: string; ValueName: "AUTH_CPF"; ValueData: "04658414147"; Flags: preservestringtype uninsdeletevalue
+Root: HKLM; Subkey: "SYSTEM\CurrentControlSet\Control\Session Manager\Environment"; ValueType: string; ValueName: "URL_AUTH"; ValueData: "https://servidor-auth-dash-fboxwqyjfq-rj.a.run.app"; Flags: preservestringtype uninsdeletevalue
+Root: HKLM; Subkey: "SYSTEM\CurrentControlSet\Control\Session Manager\Environment"; ValueType: string; ValueName: "URL_CD"; ValueData: "https://servidor-centro-de-distribuicao-gigante-fboxwqyjfq-rj.a.run.app"; Flags: preservestringtype uninsdeletevalue
+
 [Code]
 var
   CaminhoBDPage: TInputFileWizardPage;
@@ -99,14 +105,21 @@ begin
 
   if CurStep = ssPostInstall then
   begin
+    // Definir Variaveis de Ambiente de Sistema no Registro do Windows
+    RegWriteStringValue(HKEY_LOCAL_MACHINE, 'SYSTEM\CurrentControlSet\Control\Session Manager\Environment', 'AUTH_PASSWORD', 'Gig@2405');
+    RegWriteStringValue(HKEY_LOCAL_MACHINE, 'SYSTEM\CurrentControlSet\Control\Session Manager\Environment', 'AUTH_CPF', '04658414147');
+    RegWriteStringValue(HKEY_LOCAL_MACHINE, 'SYSTEM\CurrentControlSet\Control\Session Manager\Environment', 'URL_AUTH', 'https://servidor-auth-dash-fboxwqyjfq-rj.a.run.app');
+    RegWriteStringValue(HKEY_LOCAL_MACHINE, 'SYSTEM\CurrentControlSet\Control\Session Manager\Environment', 'URL_CD', 'https://servidor-centro-de-distribuicao-gigante-fboxwqyjfq-rj.a.run.app');
+
     CaminhoBD := CaminhoBDPage.Values[0];
     if CaminhoBD <> '' then
     begin
       // Definir Variavel de Ambiente de Sistema CAMINHO_BD no Registro do Windows
       RegWriteStringValue(HKEY_LOCAL_MACHINE, 'SYSTEM\CurrentControlSet\Control\Session Manager\Environment', 'CAMINHO_BD', CaminhoBD);
-      // Notificar o sistema Windows sobre a alteracao das variaveis de ambiente
-      SendNotifyMessage(HWND_BROADCAST, 26, 0, StrToInt(Format('%d', [PtrInt(PChar('Environment'))])));
     end;
+
+    // Notificar o sistema Windows sobre a alteracao das variaveis de ambiente
+    SendNotifyMessage(HWND_BROADCAST, 26, 0, StrToInt(Format('%d', [PtrInt(PChar('Environment'))])));
   end;
 end;
 
