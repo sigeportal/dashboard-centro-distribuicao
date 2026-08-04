@@ -1,4 +1,4 @@
-unit UnitTotalizadores.Controller;
+﻿unit UnitTotalizadores.Controller;
 
 interface
 
@@ -64,8 +64,8 @@ begin
 		end;
 		Query.Add('SELECT TOT_CODIGO, TOT_TOTALIZADOR, TOT_ALIQUOTA, TOT_SIT_TRIB, TOT_CST,');
 		Query.Add('TRIM(CASE WHEN TOT_SIT_TRIB = ''I'' THEN ''I - Isento''');
-		Query.Add('WHEN TOT_SIT_TRIB = ''N'' THEN ''N - N�o Tributado''');
-		Query.Add('WHEN TOT_SIT_TRIB = ''F'' THEN ''F - Substitui��o Tribut�ria''');
+		Query.Add('WHEN TOT_SIT_TRIB = ''N'' THEN ''N - Nao Tributado''');
+		Query.Add('WHEN TOT_SIT_TRIB = ''F'' THEN ''F - Substituicaoo Tributaria''');
 		Query.Add('WHEN TOT_SIT_TRIB = ''T'' THEN ''T - Tributado pelo ICMS''');
 		Query.Add('WHEN TOT_SIT_TRIB = ''S'' THEN ''S - Tributado pelo ISSQN'' END) ||'' / ''||TOT_CST||'' / ''||TOT_ALIQUOTA DESCRICAO');
 		Query.Add('');

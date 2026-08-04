@@ -21,6 +21,23 @@ export default function CadastrosTab() {
   const [historyData, setHistoryData] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
 
+  // Modal de Gerenciamento de Grades por Produto
+  const [selectedProductGrades, setSelectedProductGrades] = useState(null);
+  const [productGradesList, setProductGradesList] = useState([]);
+  const [loadingProductGrades, setLoadingProductGrades] = useState(false);
+  const [showProductGradeForm, setShowProductGradeForm] = useState(false);
+  const [editingProductGrade, setEditingProductGrade] = useState(null);
+  const [productGradeForm, setProductGradeForm] = useState({
+    codigo: '',
+    pro: '',
+    tam: '',
+    cor: '',
+    quantidade: '',
+    valor: '',
+    codbarra: ''
+  });
+  const [gradeProductFilter, setGradeProductFilter] = useState('');
+
   // Saldo de Estoque Específico da Unidade Logada
   const [activeUnitStocks, setActiveUnitStocks] = useState({});
   const activeUnitId = Number(localStorage.getItem('selected_company_id')) || 1;
@@ -400,6 +417,123 @@ export default function CadastrosTab() {
     }
   };
 
+  // Funções para Modal de Grades por Produto
+  const fetchProductGrades = async (productCode) => {
+    setLoadingProductGrades(true);
+    try {
+      let res = await api.get(`/v1/grades/produto/${productCode}`);
+      let items = [];
+      if (Array.isArray(res.data)) items = res.data;
+      else if (res.data?.data) items = res.data.data;
+      
+      setProductGradesList(items);
+    } catch (err) {
+      console.warn('Fallback para /v1/grades ao buscar grades do produto:', err);
+      try {
+        let resAll = await api.get('/v1/grades?limit=100');
+        let allGrades = Array.isArray(resAll.data) ? resAll.data : (resAll.data?.data || []);
+        setProductGradesList(allGrades.filter(g => Number(g.pro) === Number(productCode)));
+      } catch (e2) {
+        setProductGradesList([]);
+      }
+    } finally {
+      setLoadingProductGrades(false);
+    }
+  };
+
+  const handleOpenProductGradesModal = async (product) => {
+    setSelectedProductGrades(product);
+    setShowProductGradeForm(false);
+    setEditingProductGrade(null);
+
+    let defaultTam = tamanhos[0]?.codigo || '';
+    if (tamanhos.length === 0) {
+      try {
+        const tRes = await api.get('/v1/tamanhos?limit=100');
+        let loadedTams = [];
+        if (Array.isArray(tRes.data)) loadedTams = tRes.data;
+        else if (tRes.data?.data) loadedTams = tRes.data.data;
+        setTamanhos(loadedTams);
+        if (loadedTams.length > 0) defaultTam = loadedTams[0].codigo;
+      } catch (err) {
+        console.warn('Erro ao carregar tamanhos:', err);
+      }
+    }
+
+    setProductGradeForm({
+      codigo: '',
+      pro: product.codigo,
+      tam: defaultTam,
+      cor: '',
+      quantidade: '',
+      valor: product.valorv || 0,
+      codbarra: product.codbarra || ''
+    });
+
+    await fetchProductGrades(product.codigo);
+  };
+
+  const handleSaveProductGrade = async (e) => {
+    e.preventDefault();
+    if (!productGradeForm.tam) {
+      alert('Selecione um tamanho para a variação.');
+      return;
+    }
+    setLoadingProductGrades(true);
+    try {
+      const payload = {
+        codigo: editingProductGrade ? Number(productGradeForm.codigo) : Math.floor(Math.random() * 90000) + 10000,
+        pro: Number(selectedProductGrades.codigo),
+        tam: Number(productGradeForm.tam),
+        quantidade: Number(productGradeForm.quantidade) || 0,
+        valor: Number(productGradeForm.valor) || 0,
+        codbarra: productGradeForm.codbarra || '',
+        cor: productGradeForm.cor || ''
+      };
+
+      if (editingProductGrade) {
+        await api.put('/v1/grades', payload);
+      } else {
+        await api.post('/v1/grades', payload);
+      }
+
+      alert('Grade salva com sucesso!');
+      setShowProductGradeForm(false);
+      setEditingProductGrade(null);
+      setProductGradeForm({
+        codigo: '',
+        pro: selectedProductGrades.codigo,
+        tam: tamanhos[0]?.codigo || '',
+        cor: '',
+        quantidade: '',
+        valor: selectedProductGrades.valorv || 0,
+        codbarra: selectedProductGrades.codbarra || ''
+      });
+      await fetchProductGrades(selectedProductGrades.codigo);
+      if (activeSubTab === 'grades') fetchData();
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao salvar grade do produto.');
+    } finally {
+      setLoadingProductGrades(false);
+    }
+  };
+
+  const handleDeleteProductGrade = async (gradeId) => {
+    if (!window.confirm('Tem certeza que deseja excluir esta grade?')) return;
+    setLoadingProductGrades(true);
+    try {
+      await api.delete(`/v1/grades/${gradeId}`);
+      alert('Grade excluída com sucesso!');
+      await fetchProductGrades(selectedProductGrades.codigo);
+      if (activeSubTab === 'grades') fetchData();
+    } catch (err) {
+      alert('Erro ao excluir grade.');
+    } finally {
+      setLoadingProductGrades(false);
+    }
+  };
+
   return (
     <div className="crud-container full-width">
       
@@ -637,6 +771,7 @@ export default function CadastrosTab() {
                         <td>R$ {Number(item.valorv).toFixed(2)}</td>
                         <td>{item.codbarra || '-'}</td>
                         <td className="actions-cell">
+                          <button className="crud-row-btn" onClick={() => handleOpenProductGradesModal(item)} title="Gerenciar Grades / Variações" style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b' }}><Grid size={14} /></button>
                           <button className="crud-row-btn" onClick={() => handleOpenHistoryModal(item)} title="Ver Histórico (HIS_PRO)" style={{ background: 'rgba(99, 102, 241, 0.15)', color: '#6366f1' }}><History size={14} /></button>
                           <button className="crud-row-btn edit" onClick={() => handleOpenEdit(item)}><Edit size={14} /></button>
                           <button className="crud-row-btn delete" onClick={() => handleDelete(item.codigo)}><Trash2 size={14} /></button>
@@ -717,25 +852,27 @@ export default function CadastrosTab() {
                     </tr>
                   </thead>
                   <tbody>
-                    {grades.map((item, idx) => {
-                      const prod = produtos.find(p => p.codigo === item.pro);
-                      const tam = tamanhos.find(t => t.codigo === item.tam);
-                      return (
-                        <tr key={item.codigo || idx}>
-                          <td><span className="item-code">#{item.codigo}</span></td>
-                          <td>{prod ? prod.nome : `Produto #${item.pro}`}</td>
-                          <td>{tam ? `${tam.tamanho} (${tam.sigla})` : `Tamanho #${item.tam}`}</td>
-                          <td>{item.quantidade}</td>
-                          <td>R$ {Number(item.valor).toFixed(2)}</td>
-                          <td>{item.cor || '-'}</td>
-                          <td>{item.codbarra || '-'}</td>
-                          <td className="actions-cell">
-                            <button className="crud-row-btn edit" onClick={() => handleOpenEdit(item)}><Edit size={14} /></button>
-                            <button className="crud-row-btn delete" onClick={() => handleDelete(item.codigo)}><Trash2 size={14} /></button>
-                          </td>
-                        </tr>
-                      );
-                    })}
+                    {grades
+                      .filter(g => !gradeProductFilter || Number(g.pro) === Number(gradeProductFilter))
+                      .map((item, idx) => {
+                        const prod = produtos.find(p => p.codigo === item.pro);
+                        const tam = tamanhos.find(t => t.codigo === item.tam);
+                        return (
+                          <tr key={item.codigo || idx}>
+                            <td><span className="item-code">#{item.codigo}</span></td>
+                            <td>{prod ? prod.nome : `Produto #${item.pro}`}</td>
+                            <td>{tam ? `${tam.tamanho} (${tam.sigla})` : `Tamanho #${item.tam}`}</td>
+                            <td>{item.quantidade}</td>
+                            <td>R$ {Number(item.valor).toFixed(2)}</td>
+                            <td>{item.cor || '-'}</td>
+                            <td>{item.codbarra || '-'}</td>
+                            <td className="actions-cell">
+                              <button className="crud-row-btn edit" onClick={() => handleOpenEdit(item)}><Edit size={14} /></button>
+                              <button className="crud-row-btn delete" onClick={() => handleDelete(item.codigo)}><Trash2 size={14} /></button>
+                            </td>
+                          </tr>
+                        );
+                      })}
                   </tbody>
                 </>
               )}
@@ -837,6 +974,223 @@ export default function CadastrosTab() {
             <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
               <button className="btn-secondary" onClick={() => setSelectedHistoryProduct(null)}>Fechar</button>
             </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* MODAL POPUP DE GERENCIAMENTO DE GRADES DO PRODUTO */}
+      {selectedProductGrades && createPortal(
+        <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setSelectedProductGrades(null); }}>
+          <div className="modal-content glass" style={{ maxWidth: '950px', width: '92vw' }}>
+            
+            <div className="modal-header">
+              <h4>
+                <Grid size={22} style={{ color: '#f59e0b' }} />
+                Grades / Variações do Produto: <span style={{ color: 'var(--accent)' }}>#{selectedProductGrades.codigo}</span> - {selectedProductGrades.nome}
+              </h4>
+              <button className="btn-close" onClick={() => setSelectedProductGrades(null)}><X size={18} /></button>
+            </div>
+
+            <div className="modal-body">
+              
+              {/* Header de Resumo & Botão Adicionar */}
+              <div className="product-grades-modal-header">
+                <div className="product-grades-stats">
+                  <div className="product-grade-stat-item">
+                    <span className="stat-label">Total de Variações</span>
+                    <span className="stat-value">{productGradesList.length}</span>
+                  </div>
+                  <div className="product-grade-stat-item">
+                    <span className="stat-label">Estoque Total nas Grades</span>
+                    <span className="stat-value" style={{ color: '#10b981' }}>
+                      {productGradesList.reduce((acc, g) => acc + (Number(g.quantidade) || 0), 0)}
+                    </span>
+                  </div>
+                  <div className="product-grade-stat-item">
+                    <span className="stat-label">Preço Base do Produto</span>
+                    <span className="stat-value">{formatCurrency(selectedProductGrades.valorv || 0)}</span>
+                  </div>
+                </div>
+
+                <button 
+                  className="crud-add-btn" 
+                  onClick={() => {
+                    setEditingProductGrade(null);
+                    setProductGradeForm({
+                      codigo: '',
+                      pro: selectedProductGrades.codigo,
+                      tam: tamanhos[0]?.codigo || '',
+                      cor: '',
+                      quantidade: '',
+                      valor: selectedProductGrades.valorv || 0,
+                      codbarra: selectedProductGrades.codbarra || ''
+                    });
+                    setShowProductGradeForm(!showProductGradeForm);
+                  }}
+                  style={{ background: showProductGradeForm ? 'rgba(0,0,0,0.1)' : 'var(--accent)', color: showProductGradeForm ? 'var(--text-primary)' : '#fff' }}
+                >
+                  {showProductGradeForm ? <X size={16} /> : <Plus size={16} />}
+                  {showProductGradeForm ? 'Cancelar' : 'Nova Grade'}
+                </button>
+              </div>
+
+              {/* FORMULÁRIO DE NOVA / EDIÇÃO DE GRADE DO PRODUTO */}
+              {showProductGradeForm && (
+                <form onSubmit={handleSaveProductGrade} className="inline-grade-form">
+                  <h5 style={{ margin: '0 0 1rem 0', fontWeight: 600, color: 'var(--text-primary)', fontSize: '1rem' }}>
+                    {editingProductGrade ? 'Editar Variação de Grade' : 'Cadastrar Nova Variação para este Produto'}
+                  </h5>
+                  
+                  <div className="grid-form" style={{ marginBottom: '1rem' }}>
+                    <label className="crud-input">
+                      Tamanho / Variação *
+                      <select 
+                        value={productGradeForm.tam} 
+                        onChange={(e) => setProductGradeForm({ ...productGradeForm, tam: e.target.value })}
+                        required
+                      >
+                        <option value="">Selecione o Tamanho...</option>
+                        {tamanhos.map(t => (
+                          <option key={t.codigo} value={t.codigo}>
+                            {t.tamanho} ({t.sigla})
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <label className="crud-input">
+                      Cor / Acabamento
+                      <input 
+                        type="text" 
+                        value={productGradeForm.cor} 
+                        onChange={(e) => setProductGradeForm({ ...productGradeForm, cor: e.target.value })}
+                        placeholder="Ex: Azul, Preto, Estampado" 
+                      />
+                    </label>
+
+                    <label className="crud-input">
+                      Quantidade / Estoque *
+                      <input 
+                        type="number" 
+                        value={productGradeForm.quantidade} 
+                        onChange={(e) => setProductGradeForm({ ...productGradeForm, quantidade: e.target.value })}
+                        placeholder="Ex: 10" 
+                        required
+                      />
+                    </label>
+
+                    <label className="crud-input">
+                      Preço Específico (R$)
+                      <input 
+                        type="number" 
+                        step="0.01" 
+                        value={productGradeForm.valor} 
+                        onChange={(e) => setProductGradeForm({ ...productGradeForm, valor: e.target.value })}
+                        placeholder="Ex: 49.90" 
+                      />
+                    </label>
+
+                    <label className="crud-input">
+                      Código de Barras da Grade
+                      <input 
+                        type="text" 
+                        value={productGradeForm.codbarra} 
+                        onChange={(e) => setProductGradeForm({ ...productGradeForm, codbarra: e.target.value })}
+                        placeholder="EAN / Cod. Barras específico" 
+                      />
+                    </label>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                    <button type="button" className="btn-secondary" onClick={() => setShowProductGradeForm(false)}>
+                      Cancelar
+                    </button>
+                    <button type="submit" className="btn-primary" disabled={loadingProductGrades}>
+                      <Save size={16} /> {editingProductGrade ? 'Atualizar Grade' : 'Salvar Nova Grade'}
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* LISTA DE GRADES DO PRODUTO */}
+              {loadingProductGrades ? (
+                <div style={{ textAlign: 'center', padding: '2rem' }}>Buscando variações de grade do produto...</div>
+              ) : productGradesList.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '2.5rem', background: 'rgba(0,0,0,0.02)', borderRadius: '1rem' }}>
+                  <AlertCircle size={32} style={{ color: 'var(--text-secondary)', marginBottom: '0.5rem' }} />
+                  <p style={{ margin: 0, fontWeight: 500, color: 'var(--text-primary)' }}>Nenhuma grade cadastrada para este produto ainda.</p>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Clique no botão "+ Nova Grade" acima para vincular variações de tamanhos e cores a este produto.</span>
+                </div>
+              ) : (
+                <div className="table-responsive" style={{ maxHeight: '420px', overflowY: 'auto' }}>
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Cód Grade</th>
+                        <th>Tamanho</th>
+                        <th>Cor</th>
+                        <th>Estoque</th>
+                        <th>Preço</th>
+                        <th>Cód. Barras</th>
+                        <th>Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {productGradesList.map((item, idx) => {
+                        const tam = tamanhos.find(t => Number(t.codigo) === Number(item.tam));
+                        return (
+                          <tr key={item.codigo || idx}>
+                            <td><span className="item-code">#{item.codigo}</span></td>
+                            <td>
+                              <strong>{tam ? `${tam.tamanho} (${tam.sigla})` : `Tamanho #${item.tam}`}</strong>
+                            </td>
+                            <td>{item.cor ? <span className="sigla-tag">{item.cor}</span> : '-'}</td>
+                            <td><strong style={{ color: Number(item.quantidade) > 0 ? '#10b981' : '#ef4444' }}>{item.quantidade}</strong></td>
+                            <td>R$ {Number(item.valor).toFixed(2)}</td>
+                            <td>{item.codbarra || '-'}</td>
+                            <td className="actions-cell">
+                              <button 
+                                className="crud-row-btn edit" 
+                                onClick={() => {
+                                  setEditingProductGrade(item);
+                                  setProductGradeForm({
+                                    codigo: item.codigo,
+                                    pro: selectedProductGrades.codigo,
+                                    tam: item.tam,
+                                    cor: item.cor || '',
+                                    quantidade: item.quantidade || 0,
+                                    valor: item.valor || 0,
+                                    codbarra: item.codbarra || ''
+                                  });
+                                  setShowProductGradeForm(true);
+                                }}
+                                title="Editar esta variação"
+                              >
+                                <Edit size={14} />
+                              </button>
+                              <button 
+                                className="crud-row-btn delete" 
+                                onClick={() => handleDeleteProductGrade(item.codigo)}
+                                title="Excluir variação"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+            </div>
+
+            <div className="modal-footer">
+              <button className="btn-secondary" onClick={() => setSelectedProductGrades(null)}>Fechar</button>
+            </div>
+
           </div>
         </div>,
         document.body
