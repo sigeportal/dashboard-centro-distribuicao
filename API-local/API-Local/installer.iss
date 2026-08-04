@@ -62,6 +62,11 @@ Root: HKLM; Subkey: "SYSTEM\CurrentControlSet\Control\Session Manager\Environmen
 Root: HKLM; Subkey: "SYSTEM\CurrentControlSet\Control\Session Manager\Environment"; ValueType: string; ValueName: "URL_CD"; ValueData: "https://servidor-centro-de-distribuicao-gigante-fboxwqyjfq-rj.a.run.app"; Flags: preservestringtype uninsdeletevalue
 
 [Code]
+const
+  WM_SETTINGCHANGE = $001A;
+
+procedure SendNotifyMessage(hWnd: LongInt; Msg: UINT; wParam: LongInt; lParam: String); external 'SendNotifyMessageW@user32.dll stdcall';
+
 var
   CaminhoBDPage: TInputFileWizardPage;
 
@@ -119,7 +124,7 @@ begin
     end;
 
     // Notificar o sistema Windows sobre a alteracao das variaveis de ambiente
-    SendNotifyMessage(HWND_BROADCAST, 26, 0, StrToInt(Format('%d', [PtrInt(PChar('Environment'))])));
+    SendNotifyMessage(HWND_BROADCAST, WM_SETTINGCHANGE, 0, 'Environment');
   end;
 end;
 
