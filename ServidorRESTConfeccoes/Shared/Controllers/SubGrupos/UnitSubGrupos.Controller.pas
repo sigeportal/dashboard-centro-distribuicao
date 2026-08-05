@@ -95,11 +95,20 @@ end;
 class procedure TSubGruposController.Post(Req: THorseRequest; Res: THorseResponse; Next: TProc);
 var
 	SubGrupos: TSubGrupos;
+	LBodyObj: TJSONObject;
 begin
 	try
+		LBodyObj := Req.Body<TJSONObject>;
 		SubGrupos := TSubGrupos.Create(TDatabase.Connection).fromJson<TSubGrupos>(Req.Body);
 		if SubGrupos.Codigo = 0 then
 			SubGrupos.Codigo := SubGrupos.GeraCodigo('GRU_CODIGO');
+		if Assigned(LBodyObj) then
+		begin
+			if LBodyObj.GetValue('g1') <> nil then
+				SubGrupos.G1 := LBodyObj.GetValue<Integer>('g1')
+			else if LBodyObj.GetValue('gru_g1') <> nil then
+				SubGrupos.G1 := LBodyObj.GetValue<Integer>('gru_g1');
+		end;
 		SubGrupos.Cadastrar := 'S';
 		SubGrupos.SalvaNoBanco(0);
 		Res.Send<TJSONObject>(TJSONObject.ParseJSONValue(SubGrupos.ToJson) as TJSONObject).Status(THTTPStatus.Created);
@@ -151,9 +160,19 @@ end;
 class procedure TSubGruposController.Put(Req: THorseRequest; Res: THorseResponse; Next: TProc);
 var
 	SubGrupos: TSubGrupos;
+	LBodyObj: TJSONObject;
 begin
 	try
+		LBodyObj := Req.Body<TJSONObject>;
 		SubGrupos := TSubGrupos.Create(TDatabase.Connection).fromJson<TSubGrupos>(Req.Body);
+		if Assigned(LBodyObj) then
+		begin
+			if LBodyObj.GetValue('g1') <> nil then
+				SubGrupos.G1 := LBodyObj.GetValue<Integer>('g1')
+			else if LBodyObj.GetValue('gru_g1') <> nil then
+				SubGrupos.G1 := LBodyObj.GetValue<Integer>('gru_g1');
+		end;
+		SubGrupos.Cadastrar := 'S';
 		SubGrupos.SalvaNoBanco(1);
 		Res.Send<TJSONObject>(TJSONObject.ParseJSONValue(SubGrupos.ToJson) as TJSONObject);
 	finally

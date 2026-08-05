@@ -242,6 +242,20 @@ begin
 				Produtos.ValorPrazo := LBodyObj.GetValue<Double>('valor_prazo')
 			else if LBodyObj.GetValue('valorprazo') <> nil then
 				Produtos.ValorPrazo := LBodyObj.GetValue<Double>('valorprazo');
+
+			if LBodyObj.GetValue('pro_for') <> nil then
+				Produtos.ForCodigo := LBodyObj.GetValue<Integer>('pro_for')
+			else if LBodyObj.GetValue('forCodigo') <> nil then
+				Produtos.ForCodigo := LBodyObj.GetValue<Integer>('forCodigo')
+			else if LBodyObj.GetValue('fornecedorId') <> nil then
+				Produtos.ForCodigo := LBodyObj.GetValue<Integer>('fornecedorId');
+
+			if LBodyObj.GetValue('pro_gru') <> nil then
+				Produtos.Gru := LBodyObj.GetValue<Integer>('pro_gru')
+			else if LBodyObj.GetValue('gru') <> nil then
+				Produtos.Gru := LBodyObj.GetValue<Integer>('gru')
+			else if LBodyObj.GetValue('subgrupoId') <> nil then
+				Produtos.Gru := LBodyObj.GetValue<Integer>('subgrupoId');
 		end;
 		Produtos.Cadastrar := 'S';
 		Produtos.SalvaNoBanco(0);
@@ -367,6 +381,20 @@ begin
 				Produtos.ValorPrazo := LBodyObj.GetValue<Double>('valor_prazo')
 			else if LBodyObj.GetValue('valorprazo') <> nil then
 				Produtos.ValorPrazo := LBodyObj.GetValue<Double>('valorprazo');
+
+			if LBodyObj.GetValue('pro_for') <> nil then
+				Produtos.ForCodigo := LBodyObj.GetValue<Integer>('pro_for')
+			else if LBodyObj.GetValue('forCodigo') <> nil then
+				Produtos.ForCodigo := LBodyObj.GetValue<Integer>('forCodigo')
+			else if LBodyObj.GetValue('fornecedorId') <> nil then
+				Produtos.ForCodigo := LBodyObj.GetValue<Integer>('fornecedorId');
+
+			if LBodyObj.GetValue('pro_gru') <> nil then
+				Produtos.Gru := LBodyObj.GetValue<Integer>('pro_gru')
+			else if LBodyObj.GetValue('gru') <> nil then
+				Produtos.Gru := LBodyObj.GetValue<Integer>('gru')
+			else if LBodyObj.GetValue('subgrupoId') <> nil then
+				Produtos.Gru := LBodyObj.GetValue<Integer>('subgrupoId');
 		end;
 		Produtos.Cadastrar := 'S';
 		Produtos.SalvaNoBanco(1);

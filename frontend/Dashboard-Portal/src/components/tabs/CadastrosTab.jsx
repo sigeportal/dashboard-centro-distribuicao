@@ -87,6 +87,7 @@ export default function CadastrosTab() {
   const [grades, setGrades] = useState([]);
   const [tamanhos, setTamanhos] = useState([]);
   const [totalizadores, setTotalizadores] = useState([]);
+  const [fornecedores, setFornecedores] = useState([]);
 
   // Estados de Formulário
   const [editingItem, setEditingItem] = useState(null); // Item em edição
@@ -97,6 +98,8 @@ export default function CadastrosTab() {
     codigo: '', 
     nome: '', 
     fabricante: '', 
+    pro_for: 0,
+    pro_gru: 0,
     codbarra: '', 
     quantidade: 0, 
     valorv: 0,
@@ -113,6 +116,30 @@ export default function CadastrosTab() {
   const [subgrupoForm, setSubgrupoForm] = useState({ codigo: '', nome: '', g1: '', tr: '0' });
   const [gradeForm, setGradeForm] = useState({ codigo: '', pro: '', valor: '', valor_dinheiro: '', valor_prazo: '', tam: '', quantidade: '', codbarra: '', cor: '' });
   const [tamanhoForm, setTamanhoForm] = useState({ codigo: '', pro: '', tamanho: '', sigla: '', valor: '' });
+
+  const fetchLookups = async () => {
+    try {
+      const [gRes, sgRes, fRes] = await Promise.all([
+        api.get('/v1/grupos?limit=500').catch(() => ({ data: [] })),
+        api.get('/v1/subgrupos?limit=500').catch(() => ({ data: [] })),
+        api.get('/v1/fornecedores?limit=500').catch(() => ({ data: [] }))
+      ]);
+
+      const gItems = Array.isArray(gRes.data) ? gRes.data : (gRes.data?.data || []);
+      const sgItems = Array.isArray(sgRes.data) ? sgRes.data : (sgRes.data?.data || []);
+      const fItems = Array.isArray(fRes.data) ? fRes.data : (fRes.data?.data || []);
+
+      if (gItems.length > 0) setGrupos(gItems);
+      if (sgItems.length > 0) setSubgrupos(sgItems);
+      if (fItems.length > 0) setFornecedores(fItems);
+    } catch (e) {
+      console.warn('Erro ao carregar dados auxiliares de cadastros:', e);
+    }
+  };
+
+  useEffect(() => {
+    fetchLookups();
+  }, []);
 
   useEffect(() => {
     const loadTotalizadores = async () => {
@@ -216,6 +243,8 @@ export default function CadastrosTab() {
       codigo: '', 
       nome: '', 
       fabricante: '', 
+      pro_for: fornecedores[0]?.codigo || 0,
+      pro_gru: subgrupos[0]?.codigo || 0,
       codbarra: '', 
       quantidade: '', 
       valorv: '', 
@@ -229,7 +258,7 @@ export default function CadastrosTab() {
       distribute: true 
     });
     setGrupoForm({ codigo: '', nome: '' });
-    setSubgrupoForm({ codigo: '', nome: '', g1: '', tr: '0' });
+    setSubgrupoForm({ codigo: '', nome: '', g1: grupos[0]?.codigo || '', tr: '0' });
     setGradeForm({ codigo: '', pro: '', valor: '', valor_dinheiro: '', valor_prazo: '', tam: '', quantidade: '', codbarra: '', cor: '' });
     setTamanhoForm({ codigo: '', pro: '', tamanho: '', sigla: '', valor: '' });
     setShowForm(true);
@@ -240,6 +269,8 @@ export default function CadastrosTab() {
     if (activeSubTab === 'produtos') {
       setProdForm({ 
         ...item,
+        pro_for: item.pro_for || item.forCodigo || item.fornecedorId || 0,
+        pro_gru: item.pro_gru || item.gru || item.subgrupoId || 0,
         pro_valor_dinheiro: item.pro_valor_dinheiro ?? item.valorDinheiro ?? item.valordinheiro ?? item.valor_dinheiro ?? item.valorv ?? 0,
         pro_valorv_prazo: item.pro_valorv_prazo ?? item.valorPrazo ?? item.valorprazo ?? item.valor_prazo ?? item.valorv ?? 0,
         codTotalizador: item.codTotalizador || item.pro_totalizador || 1,
@@ -249,7 +280,10 @@ export default function CadastrosTab() {
     } else if (activeSubTab === 'grupos') {
       setGrupoForm({ ...item });
     } else if (activeSubTab === 'subgrupos') {
-      setSubgrupoForm({ ...item });
+      setSubgrupoForm({ 
+        ...item,
+        g1: item.g1 || item.gru_g1 || ''
+      });
     } else if (activeSubTab === 'grades') {
       setGradeForm({ 
         ...item,
@@ -298,6 +332,12 @@ export default function CadastrosTab() {
           codigo: productCode,
           nome: prodForm.nome,
           fabricante: prodForm.fabricante,
+          pro_for: Number(prodForm.pro_for) || 0,
+          forCodigo: Number(prodForm.pro_for) || 0,
+          fornecedorId: Number(prodForm.pro_for) || 0,
+          pro_gru: Number(prodForm.pro_gru) || 0,
+          gru: Number(prodForm.pro_gru) || 0,
+          subgrupoId: Number(prodForm.pro_gru) || 0,
           codbarra: prodForm.codbarra,
           quantidade: Number(prodForm.quantidade) || 0,
           valorv: Number(prodForm.valorv) || 0,
@@ -370,7 +410,8 @@ export default function CadastrosTab() {
         const payload = {
           codigo: editingItem ? Number(subgrupoForm.codigo) : Math.floor(Math.random() * 9000) + 1000,
           nome: subgrupoForm.nome,
-          g1: Number(subgrupoForm.g1),
+          g1: Number(subgrupoForm.g1) || 0,
+          gru_g1: Number(subgrupoForm.g1) || 0,
           tr: Number(subgrupoForm.tr) || 0
         };
         if (editingItem) {
@@ -610,7 +651,7 @@ export default function CadastrosTab() {
             <button className="crud-close-btn" onClick={() => setShowForm(false)}><X size={18} /></button>
           </div>
 
-          <form onSubmit={handleSave} className="crud-form">
+          <form onSubmit={handleSave}>
             
             {/* FORM: PRODUTOS */}
             {activeSubTab === 'produtos' && (
@@ -622,6 +663,37 @@ export default function CadastrosTab() {
                 <label className="crud-input">
                   Fabricante/Marca
                   <input type="text" value={prodForm.fabricante} onChange={(e) => setProdForm({ ...prodForm, fabricante: e.target.value })} />
+                </label>
+                <label className="crud-input">
+                  Fornecedor (Amarração)
+                  <select 
+                    value={prodForm.pro_for || 0} 
+                    onChange={(e) => setProdForm({ ...prodForm, pro_for: Number(e.target.value) })}
+                  >
+                    <option value="0">-- Nenhum / Selecione Fornecedor --</option>
+                    {fornecedores.map(f => (
+                      <option key={f.codigo} value={f.codigo}>
+                        #{f.codigo} - {f.nome || f.razao_social || f.fantasia}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="crud-input">
+                  Subgrupo / Grupo (Amarração)
+                  <select 
+                    value={prodForm.pro_gru || 0} 
+                    onChange={(e) => setProdForm({ ...prodForm, pro_gru: Number(e.target.value) })}
+                  >
+                    <option value="0">-- Nenhum / Selecione Subgrupo --</option>
+                    {subgrupos.map(sg => {
+                      const grp = grupos.find(g => Number(g.codigo) === Number(sg.g1 || sg.gru_g1));
+                      return (
+                        <option key={sg.codigo} value={sg.codigo}>
+                          #{sg.codigo} - {sg.nome}{grp ? ` [Grupo: ${grp.nome}]` : ''}
+                        </option>
+                      );
+                    })}
+                  </select>
                 </label>
                 <label className="crud-input">
                   Código de Barras (EAN)
@@ -702,8 +774,19 @@ export default function CadastrosTab() {
                   <input type="text" value={subgrupoForm.nome} onChange={(e) => setSubgrupoForm({ ...subgrupoForm, nome: e.target.value })} required />
                 </label>
                 <label className="crud-input">
-                  Associação de Grupo (G1 ID)
-                  <input type="number" value={subgrupoForm.g1} onChange={(e) => setSubgrupoForm({ ...subgrupoForm, g1: e.target.value })} required />
+                  Grupo Principal (G1) *
+                  <select 
+                    value={subgrupoForm.g1 || ''} 
+                    onChange={(e) => setSubgrupoForm({ ...subgrupoForm, g1: e.target.value })} 
+                    required
+                  >
+                    <option value="">-- Selecione o Grupo --</option>
+                    {grupos.map(g => (
+                      <option key={g.codigo} value={g.codigo}>
+                        #{g.codigo} - {g.nome}
+                      </option>
+                    ))}
+                  </select>
                 </label>
                 <label className="crud-input">
                   TR Código (Padrão: 0)
@@ -734,24 +817,24 @@ export default function CadastrosTab() {
                   <input type="number" value={gradeForm.quantidade} onChange={(e) => setGradeForm({ ...gradeForm, quantidade: e.target.value })} />
                 </label>
                 <label className="crud-input">
-                  Valor Dinheiro (R$)
-                  <input type="number" step="0.01" value={gradeForm.valor_dinheiro} onChange={(e) => setGradeForm({ ...gradeForm, valor_dinheiro: e.target.value })} placeholder="Ex: 55.00" />
-                </label>
-                <label className="crud-input">
                   Preço Vista (Débito / PIX) (R$)
                   <input type="number" step="0.01" value={gradeForm.valor} onChange={(e) => setGradeForm({ ...gradeForm, valor: e.target.value })} placeholder="Ex: 59.90" />
+                </label>
+                <label className="crud-input">
+                  Valor Dinheiro (R$)
+                  <input type="number" step="0.01" value={gradeForm.valor_dinheiro} onChange={(e) => setGradeForm({ ...gradeForm, valor_dinheiro: e.target.value })} placeholder="Ex: 55.00" />
                 </label>
                 <label className="crud-input">
                   Preço a Prazo (Cartão Prazo) (R$)
                   <input type="number" step="0.01" value={gradeForm.valor_prazo} onChange={(e) => setGradeForm({ ...gradeForm, valor_prazo: e.target.value })} placeholder="Ex: 65.90" />
                 </label>
                 <label className="crud-input">
-                  Código de Barras específico
-                  <input type="text" value={gradeForm.codbarra} onChange={(e) => setGradeForm({ ...gradeForm, codbarra: e.target.value })} />
+                  Cor
+                  <input type="text" value={gradeForm.cor} onChange={(e) => setGradeForm({ ...gradeForm, cor: e.target.value })} placeholder="Ex: Azul, Preto" />
                 </label>
                 <label className="crud-input">
-                  Cor da variação
-                  <input type="text" value={gradeForm.cor} onChange={(e) => setGradeForm({ ...gradeForm, cor: e.target.value })} />
+                  Código de Barras Específico
+                  <input type="text" value={gradeForm.codbarra} onChange={(e) => setGradeForm({ ...gradeForm, codbarra: e.target.value })} />
                 </label>
               </div>
             )}
@@ -760,72 +843,104 @@ export default function CadastrosTab() {
             {activeSubTab === 'tamanhos' && (
               <div className="grid-form">
                 <label className="crud-input">
-                  Descrição do Tamanho
-                  <input type="text" value={tamanhoForm.tamanho} onChange={(e) => setTamanhoForm({ ...tamanhoForm, tamanho: e.target.value })} placeholder="Ex: Médio" required />
+                  Descrição do Tamanho (ex: P, M, G, 42)
+                  <input type="text" value={tamanhoForm.tamanho} onChange={(e) => setTamanhoForm({ ...tamanhoForm, tamanho: e.target.value })} required />
                 </label>
                 <label className="crud-input">
-                  Sigla
-                  <input type="text" maxLength="2" value={tamanhoForm.sigla} onChange={(e) => setTamanhoForm({ ...tamanhoForm, sigla: e.target.value })} placeholder="Ex: M" required />
-                </label>
-                <label className="crud-input">
-                  Valor / Multiplicador
-                  <input type="number" step="0.0001" value={tamanhoForm.valor} onChange={(e) => setTamanhoForm({ ...tamanhoForm, valor: e.target.value })} />
-                </label>
-                <label className="crud-input">
-                  Código de Referência de Produto (Padrão: 0)
-                  <input type="number" value={tamanhoForm.pro} onChange={(e) => setTamanhoForm({ ...tamanhoForm, pro: e.target.value })} />
+                  Sigla Curta (ex: P, 42)
+                  <input type="text" value={tamanhoForm.sigla} onChange={(e) => setTamanhoForm({ ...tamanhoForm, sigla: e.target.value })} required />
                 </label>
               </div>
             )}
 
-            <button type="submit" className="crud-save-btn" disabled={loading}>
-              <Save size={18} /> Salvar Alterações
-            </button>
+            <div className="crud-form-actions">
+              <button type="button" className="btn-secondary" onClick={() => setShowForm(false)}>Cancelar</button>
+              <button type="submit" className="btn-primary"><Save size={16} /> Salvar Registro</button>
+            </div>
           </form>
         </div>
       )}
 
-      {/* TELA DE TABELA / LISTA */}
-      {!showForm && (
-        <div className="list-card glass">
-          <div className="crud-title-row">
-            <h3>Gerenciamento de {activeSubTab.toUpperCase()}</h3>
-            <div style={{ display: 'flex', gap: '0.75rem' }}>
-              <button className="refresh-btn" onClick={fetchData} disabled={loading}><RefreshCw size={18} /> Atualizar</button>
-              <button className="crud-add-btn" onClick={handleOpenCreate}><Plus size={18} /> Adicionar Novo</button>
+      {/* TABELAS DE DADOS */}
+      <div className="list-card glass">
+        <div className="crud-table-header">
+          <h3>
+            {activeSubTab === 'produtos' && 'Cadastro Geral de Produtos'}
+            {activeSubTab === 'grupos' && 'Grupos de Produtos'}
+            {activeSubTab === 'subgrupos' && 'Subgrupos de Produtos'}
+            {activeSubTab === 'grades' && 'Grades e Variações por Tamanho/Cor'}
+            {activeSubTab === 'tamanhos' && 'Tamanhos de Produtos'}
+          </h3>
+
+          <div className="crud-controls">
+            <div className="search-box">
+              <Search size={16} />
+              <input 
+                type="text" 
+                placeholder="Pesquisar registros..." 
+                value={searchTerm} 
+                onChange={(e) => handleSearch(e.target.value)} 
+              />
             </div>
+            <button className="btn-primary" onClick={handleOpenCreate}>
+              <Plus size={16} /> Novo Registro
+            </button>
           </div>
+        </div>
 
-          {loading && <div className="loading-bar">Buscando do Banco Online...</div>}
+        {loading && <div className="loading-bar">Buscando do Banco Online...</div>}
 
-          <div className="table-responsive">
-            <table className="data-table">
-              
-              {/* LIST: PRODUTOS */}
-              {activeSubTab === 'produtos' && (
-                <>
-                  <thead>
-                    <tr>
-                      <th>Código</th>
-                      <th>Nome do Produto</th>
-                      <th>Marca</th>
-                      <th>NCM</th>
-                      <th>UM</th>
-                      <th title="Totalizador Fiscal">Tot.</th>
-                      <th title={`Estoque na unidade ${activeUnitName}`}>Estoque</th>
-                      <th title="Preços de Venda: à Vista / Dinheiro / a Prazo">Preços (Vista / Din / Prazo)</th>
-                      <th>Cód. Barras</th>
-                      <th>Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {produtos.map((item, idx) => (
+        <div className="table-responsive">
+          <table className="data-table">
+            
+            {/* LIST: PRODUTOS */}
+            {activeSubTab === 'produtos' && (
+              <>
+                <thead>
+                  <tr>
+                    <th>Código</th>
+                    <th>Nome do Produto</th>
+                    <th>Fornecedor</th>
+                    <th>Subgrupo / Grupo</th>
+                    <th>NCM</th>
+                    <th>UM</th>
+                    <th title="Totalizador Fiscal">Tot.</th>
+                    <th title={`Estoque na unidade ${activeUnitName}`}>Estoque</th>
+                    <th title="Preços de Venda: à Vista / Dinheiro / a Prazo">Preços (Vista / Din / Prazo)</th>
+                    <th>Cód. Barras</th>
+                    <th>Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {produtos.map((item, idx) => {
+                    const fornId = Number(item.pro_for || item.forCodigo || item.fornecedorId);
+                    const forn = fornecedores.find(f => Number(f.codigo) === fornId);
+                    const subgId = Number(item.pro_gru || item.gru || item.subgrupoId);
+                    const subg = subgrupos.find(s => Number(s.codigo) === subgId);
+                    const parentGrp = subg ? grupos.find(g => Number(g.codigo) === Number(subg.g1 || subg.gru_g1)) : null;
+
+                    return (
                       <tr key={item.codigo || idx}>
                         <td><span className="item-code">#{item.codigo}</span></td>
                         <td className="product-name-cell">
                           <div className="product-name-text" title={item.nome}>{item.nome}</div>
                         </td>
-                        <td>{item.fabricante || '-'}</td>
+                        <td>
+                          {forn ? (
+                            <span className="sigla-tag" title={`Cód: #${forn.codigo}`}>{forn.nome || forn.razao_social || forn.fantasia}</span>
+                          ) : (
+                            item.fabricante ? <span>{item.fabricante}</span> : <span style={{ opacity: 0.4 }}>-</span>
+                          )}
+                        </td>
+                        <td>
+                          {subg ? (
+                            <span className="badge badge-info" title={parentGrp ? `Grupo #${parentGrp.codigo}: ${parentGrp.nome}` : ''}>
+                              {subg.nome}{parentGrp ? ` (${parentGrp.nome})` : ''}
+                            </span>
+                          ) : (
+                            <span style={{ opacity: 0.4 }}>-</span>
+                          )}
+                        </td>
                         <td><span className="badge badge-info">{item.ncm || item.pro_ncm || '6109.10.00'}</span></td>
                         <td><strong>{item.um || item.embalagem || item.pro_um || 'UN'}</strong></td>
                         <td><span className="badge badge-success">#{item.codTotalizador || item.pro_totalizador || 1}</span></td>
@@ -849,66 +964,78 @@ export default function CadastrosTab() {
                           <button className="crud-row-btn delete" onClick={() => handleDelete(item.codigo)}><Trash2 size={14} /></button>
                         </td>
                       </tr>
-                    ))}
-                  </tbody>
-                </>
-              )}
+                    );
+                  })}
+                </tbody>
+              </>
+            )}
 
-              {/* LIST: GRUPOS */}
-              {activeSubTab === 'grupos' && (
-                <>
-                  <thead>
-                    <tr>
-                      <th>Código Grupo</th>
-                      <th>Nome</th>
-                      <th>Ações</th>
+            {/* LIST: GRUPOS */}
+            {activeSubTab === 'grupos' && (
+              <>
+                <thead>
+                  <tr>
+                    <th>Código Grupo</th>
+                    <th>Nome</th>
+                    <th>Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {grupos.map((item, idx) => (
+                    <tr key={item.codigo || idx}>
+                      <td><span className="item-code">#{item.codigo}</span></td>
+                      <td>{item.nome}</td>
+                      <td className="actions-cell">
+                        <button className="crud-row-btn edit" onClick={() => handleOpenEdit(item)}><Edit size={14} /></button>
+                        <button className="crud-row-btn delete" onClick={() => handleDelete(item.codigo)}><Trash2 size={14} /></button>
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {grupos.map((item, idx) => (
+                  ))}
+                </tbody>
+              </>
+            )}
+
+            {/* LIST: SUBGRUPOS */}
+            {activeSubTab === 'subgrupos' && (
+              <>
+                <thead>
+                  <tr>
+                    <th>Código Subgrupo</th>
+                    <th>Nome Subgrupo</th>
+                    <th>Grupo Principal (G1)</th>
+                    <th>TR</th>
+                    <th>Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {subgrupos.map((item, idx) => {
+                    const grpId = Number(item.g1 || item.gru_g1);
+                    const grp = grupos.find(g => Number(g.codigo) === grpId);
+
+                    return (
                       <tr key={item.codigo || idx}>
                         <td><span className="item-code">#{item.codigo}</span></td>
                         <td>{item.nome}</td>
-                        <td className="actions-cell">
-                          <button className="crud-row-btn edit" onClick={() => handleOpenEdit(item)}><Edit size={14} /></button>
-                          <button className="crud-row-btn delete" onClick={() => handleDelete(item.codigo)}><Trash2 size={14} /></button>
+                        <td>
+                          {grp ? (
+                            <span className="badge badge-info">#{grp.codigo} - {grp.nome}</span>
+                          ) : (
+                            <span className="sigla-tag">#{item.g1 || '-'}</span>
+                          )}
                         </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </>
-              )}
-
-              {/* LIST: SUBGRUPOS */}
-              {activeSubTab === 'subgrupos' && (
-                <>
-                  <thead>
-                    <tr>
-                      <th>Código Subgrupo</th>
-                      <th>Nome</th>
-                      <th>ID Grupo Relacionado (G1)</th>
-                      <th>TR</th>
-                      <th>Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {subgrupos.map((item, idx) => (
-                      <tr key={item.codigo || idx}>
-                        <td><span className="item-code">#{item.codigo}</span></td>
-                        <td>{item.nome}</td>
-                        <td>#{item.g1}</td>
                         <td>{item.tr}</td>
                         <td className="actions-cell">
                           <button className="crud-row-btn edit" onClick={() => handleOpenEdit(item)}><Edit size={14} /></button>
                           <button className="crud-row-btn delete" onClick={() => handleDelete(item.codigo)}><Trash2 size={14} /></button>
                         </td>
                       </tr>
-                    ))}
-                  </tbody>
-                </>
-              )}
+                    );
+                  })}
+                </tbody>
+              </>
+            )}
 
-              {/* LIST: GRADES */}
+            {/* LIST: GRADES */}
               {activeSubTab === 'grades' && (
                 <>
                   <thead>
@@ -999,7 +1126,6 @@ export default function CadastrosTab() {
             onPageChange={(p) => fetchData(p, searchTerm)}
           />
         </div>
-      )}
 
       {/* MODAL POPUP DE HISTÓRICO DE MOVIMENTAÇÃO (HIS_PRO) */}
       {selectedHistoryProduct && createPortal(

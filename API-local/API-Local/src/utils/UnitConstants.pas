@@ -47,8 +47,8 @@ end;
 
 class function TConstants.BancoDados: string;
 begin
-  //Result := GetEnvironmentVariable('CAMINHO_BD');
-  Result := 'PRINCIPAL.FDB';
+  Result := GetEnvironmentVariable('CAMINHO_BD');
+//  Result := 'PRINCIPAL.FDB';
 end;
 
 end.
