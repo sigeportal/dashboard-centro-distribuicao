@@ -1,4 +1,4 @@
-﻿unit UnitHisPro.Controller;
+unit UnitHisPro.Controller;
 
 interface
 
@@ -98,8 +98,9 @@ class procedure THisProController.GetHistorico(Req: THorseRequest; Res: THorseRe
 var
   LResponseObj, LMetaObj, LObj: TJSONObject;
   LDataArr: TJSONArray;
-  QueryCount, QueryData: iQuery;
-  LPage, LLimit, LOffset, LTotalRecords, LTotalPages, LProCodigo: Integer;
+  QueryCount, QueryData, QueryTransf: iQuery;
+  LPage, LLimit, LOffset, LTotalRecords, LTotalPages, LProCodigo, LTrId: Integer;
+  LDoc, LOrigemStr, LTipoStr, LNomeOri, LNomeDest: string;
 begin
   EnsureHisProTable;
   LDataArr := TJSONArray.Create;
@@ -137,18 +138,53 @@ begin
     while not QueryData.Dataset.Eof do
     begin
       LObj := TJSONObject.Create;
+      LDoc := QueryData.Dataset.FieldByName('HP_DOC').AsString;
+      LOrigemStr := QueryData.Dataset.FieldByName('HP_ORIGEM').AsString;
+      LTipoStr := QueryData.Dataset.FieldByName('HP_TIPO').AsString;
+
+      LTrId := StrToIntDef(LDoc, 0);
+      if (LTrId > 0) and ((SameText(LTipoStr, 'T')) or (LOrigemStr.Contains('TRANSFERENCIA')) or (LOrigemStr.Contains('TRANSF'))) then
+      begin
+        try
+          QueryTransf := TDatabase.Query;
+          QueryTransf.Open(Format(
+            'SELECT T.TR_ORIGEM, T.TR_DESTINO, ' +
+            '       E_ORI.EMP_FANTASIA AS ORI_FANTASIA, E_ORI.EMP_RAZAO_SOCIAL AS ORI_RAZAO, ' +
+            '       E_DEST.EMP_FANTASIA AS DEST_FANTASIA, E_DEST.EMP_RAZAO_SOCIAL AS DEST_RAZAO ' +
+            'FROM TRANSFERENCIA T ' +
+            'LEFT JOIN EMPRESA E_ORI ON (T.TR_ORIGEM = E_ORI.EMP_CODIGO) ' +
+            'LEFT JOIN EMPRESA E_DEST ON (T.TR_DESTINO = E_DEST.EMP_CODIGO) ' +
+            'WHERE T.TR_ID = %d', [LTrId]));
+          if not QueryTransf.DataSet.Eof then
+          begin
+            LNomeOri := QueryTransf.DataSet.FieldByName('ORI_FANTASIA').AsString;
+            if LNomeOri.IsEmpty then LNomeOri := QueryTransf.DataSet.FieldByName('ORI_RAZAO').AsString;
+            if LNomeOri.IsEmpty then LNomeOri := 'UNIDADE #' + IntToStr(QueryTransf.DataSet.FieldByName('TR_ORIGEM').AsInteger);
+
+            LNomeDest := QueryTransf.DataSet.FieldByName('DEST_FANTASIA').AsString;
+            if LNomeDest.IsEmpty then LNomeDest := QueryTransf.DataSet.FieldByName('DEST_RAZAO').AsString;
+            if LNomeDest.IsEmpty then LNomeDest := 'UNIDADE #' + IntToStr(QueryTransf.DataSet.FieldByName('TR_DESTINO').AsInteger);
+
+            LOrigemStr := 'TRANSF: ' + LNomeOri + ' -> ' + LNomeDest;
+            LObj.AddPair('unidade_origem', LNomeOri);
+            LObj.AddPair('unidade_destino', LNomeDest);
+          end;
+        except
+        end;
+      end;
+
       LObj.AddPair('hp_codigo', TJSONNumber.Create(QueryData.Dataset.FieldByName('HP_CODIGO').AsInteger));
       LObj.AddPair('hp_data', FormatDateTime('yyyy-mm-dd', QueryData.Dataset.FieldByName('HP_DATA').AsDateTime));
       LObj.AddPair('hp_pro', TJSONNumber.Create(QueryData.Dataset.FieldByName('HP_PRO').AsInteger));
-      LObj.AddPair('hp_origem', QueryData.Dataset.FieldByName('HP_ORIGEM').AsString);
-      LObj.AddPair('hp_doc', QueryData.Dataset.FieldByName('HP_DOC').AsString);
+      LObj.AddPair('hp_origem', LOrigemStr);
+      LObj.AddPair('hp_doc', LDoc);
       LObj.AddPair('hp_quantidade', TJSONNumber.Create(QueryData.Dataset.FieldByName('HP_QUANTIDADE').AsFloat));
       LObj.AddPair('hp_valorc', TJSONNumber.Create(QueryData.Dataset.FieldByName('HP_VALORC').AsFloat));
       LObj.AddPair('hp_valorv', TJSONNumber.Create(QueryData.Dataset.FieldByName('HP_VALORV').AsFloat));
       LObj.AddPair('hp_valorcm', TJSONNumber.Create(QueryData.Dataset.FieldByName('HP_VALORCM').AsFloat));
       LObj.AddPair('hp_valorop', TJSONNumber.Create(QueryData.Dataset.FieldByName('HP_VALOROP').AsFloat));
       LObj.AddPair('hp_valorm', TJSONNumber.Create(QueryData.Dataset.FieldByName('HP_VALORM').AsFloat));
-      LObj.AddPair('hp_tipo', QueryData.Dataset.FieldByName('HP_TIPO').AsString);
+      LObj.AddPair('hp_tipo', LTipoStr);
       LObj.AddPair('hp_tipo2', TJSONNumber.Create(QueryData.Dataset.FieldByName('HP_TIPO2').AsInteger));
       LObj.AddPair('hp_quantidadea', TJSONNumber.Create(QueryData.Dataset.FieldByName('HP_QUANTIDADEA').AsFloat));
 

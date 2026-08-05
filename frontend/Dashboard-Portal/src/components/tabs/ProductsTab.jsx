@@ -391,7 +391,19 @@ export default function ProductsTab({ data, pages, searchTerms, setSearchTerms, 
                       {historyData.map((h, idx) => (
                         <tr key={h.hp_codigo || idx}>
                           <td>{h.hp_data}</td>
-                          <td><strong>{h.hp_origem || '-'}</strong></td>
+                          <td>
+                            {h.unidade_origem || h.unidade_destino ? (
+                              <span className="badge badge-info" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 8px', fontWeight: 600 }}>
+                                🏢 {h.hp_origem}
+                              </span>
+                            ) : h.hp_origem && h.hp_origem.toUpperCase().includes('TRANSF') ? (
+                              <span className="badge badge-info" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 8px', fontWeight: 600 }}>
+                                🔄 {h.hp_origem}
+                              </span>
+                            ) : (
+                              <strong>{h.hp_origem || '-'}</strong>
+                            )}
+                          </td>
                           <td>{h.hp_doc || '-'}</td>
                           <td>
                             <span className={`badge ${h.hp_tipo === 'E' ? 'badge-success' : h.hp_tipo === 'S' ? 'badge-danger' : 'badge-info'}`}>
