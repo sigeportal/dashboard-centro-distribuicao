@@ -35,7 +35,7 @@ type
     [TCampo('TR_DATA', 'DATE NOT NULL')]
     property Data: TDateTime read FData write FData;
 
-    [TCampo('TR_STATUS', 'VARCHAR(20) NOT NULL')]
+    [TCampo('TR_STATUS', 'VARCHAR(50) NOT NULL')]
     property Status: string read FStatus write FStatus;
 
     [TCampo('TR_OBS', 'VARCHAR(250)')]

@@ -274,8 +274,8 @@ begin
     LQuery  := TDatabase.Query;
     FDQuery := TFDQuery(LQuery.Query);
     FDQuery.Close;
-    FDQuery.SQL.Add('UPDATE OR INSERT INTO TRANSFERENCIA_ITEM (TRI_ID, TRI_TRANSFERENCIA_ID, TRI_PRODUTO_ID, TRI_QUANTIDADE, TRI_VALOR, TRI_QTD_CONFERIDA)');
-    FDQuery.SQL.Add('VALUES (:TRI_ID, :TRI_TRANSFERENCIA_ID, :TRI_PRODUTO_ID, :TRI_QUANTIDADE, :TRI_VALOR, :TRI_QTD_CONFERIDA)');
+    FDQuery.SQL.Add('UPDATE OR INSERT INTO TRANSFERENCIA_ITEM (TRI_ID, TRI_TRANSFERENCIA_ID, TRI_PRODUTO_ID, TRI_QUANTIDADE, TRI_VALOR, TRI_QTD_CONFERIDA, TRI_JUSTIFICATIVA)');
+    FDQuery.SQL.Add('VALUES (:TRI_ID, :TRI_TRANSFERENCIA_ID, :TRI_PRODUTO_ID, :TRI_QUANTIDADE, :TRI_VALOR, :TRI_QTD_CONFERIDA, :TRI_JUSTIFICATIVA)');
     FDQuery.SQL.Add('MATCHING (TRI_ID)');  
     // preparando para usar inserções via ArrayDML
     FDQuery.Params.ArraySize := aJson.Count;
@@ -290,6 +290,7 @@ begin
         FDQuery.ParamByName('TRI_QUANTIDADE').AsFloats[i] := Itens.Quantidade;
         FDQuery.ParamByName('TRI_VALOR').AsFloats[i] := Itens.Valor;
         FDQuery.ParamByName('TRI_QTD_CONFERIDA').AsFloats[i] := Itens.QuantidadeConferida;
+        FDQuery.ParamByName('TRI_JUSTIFICATIVA').AsStrings[i] := Itens.Justificativa;
 
         // Movimentação de estoque e histórico
         try

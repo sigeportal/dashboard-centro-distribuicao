@@ -128,8 +128,9 @@ export default function TransferTab() {
 
   // Conferência de Recebimento
   const [receptionTransfer, setReceptionTransfer] = useState(null);
-  const [receptionItems, setReceptionItems] = useState([]); // { item, checked_qty }
+  const [receptionItems, setReceptionItems] = useState([]); // { item, checked_qty, justificativa }
   const [checkerName, setCheckerName] = useState('');
+  const [receptionObs, setReceptionObs] = useState('');
 
   // Notificações
   const [notifications, setNotifications] = useState([]);
@@ -445,8 +446,10 @@ export default function TransferTab() {
         setReceptionTransfer(transfer);
         setReceptionItems(response.data.map(item => ({
           ...item,
-          quantidadeConferida: item.quantidade // Preenche inicialmente com a enviada
+          quantidadeConferida: item.quantidadeConferida ?? item.quantidade,
+          justificativa: item.justificativa || ''
         })));
+        setReceptionObs('');
         setActiveSubTab('reception');
       }
     } catch (err) {
@@ -462,6 +465,12 @@ export default function TransferTab() {
     setReceptionItems(next);
   };
 
+  const handleJustificativaChange = (idx, value) => {
+    const next = [...receptionItems];
+    next[idx].justificativa = value;
+    setReceptionItems(next);
+  };
+
   const handleApproveReception = async (status) => {
     if (!checkerName.trim()) {
       alert('Por favor, informe o nome do conferente/responsável.');
@@ -470,28 +479,38 @@ export default function TransferTab() {
 
     setLoading(true);
     try {
-      // 1. Atualiza cabeçalho de transferência com Status, conferente e data
+      // 1. Atualiza cabeçalho de transferência com Status, conferente, data e observações da recepção se houver
+      const finalObs = receptionObs.trim() 
+        ? `${receptionTransfer.obs ? receptionTransfer.obs + ' | ' : ''}Recepção: ${receptionObs.trim()}`
+        : receptionTransfer.obs;
+
       const updatedHeader = {
         ...receptionTransfer,
-        status: status, // 'Conferido/Aprovado' ou 'Rejeitado'
+        status: status, // 'Conferido/Aprovado', 'Aceito Parcialmente' ou 'Rejeitado'
         usuarioRecebimento: checkerName,
-        dataRecebimento: new Date().toISOString().split('T')[0]
+        dataRecebimento: new Date().toISOString().split('T')[0],
+        obs: finalObs
       };
       await api.put('/v1/transferencias', updatedHeader);
 
-      // 2. Atualiza os itens com a quantidade fisicamente conferida
+      // 2. Atualiza os itens com a quantidade fisicamente conferida e a justificativa por item
       const formattedReceptionItems = receptionItems.map(it => ({
         ...it,
-        quantidadeConferida: Number(it.quantidadeConferida ?? it.quantidade) || 0
+        quantidadeConferida: Number(it.quantidadeConferida ?? it.quantidade) || 0,
+        justificativa: it.justificativa || ''
       }));
       await api.post('/v1/transferenciaItens/emLote', { itens: formattedReceptionItems });
 
-      alert(status === 'Conferido/Aprovado' ? 'Recepção concluída e estoque atualizado com sucesso!' : 'Transferência Recusada!');
+      let msg = 'Recepção concluída e estoque atualizado com sucesso!';
+      if (status === 'Aceito Parcialmente') msg = 'Transferência Aceita Parcialmente com divergências registradas!';
+      if (status === 'Rejeitado') msg = 'Transferência Recusada / Devolvida!';
+      alert(msg);
       
       // Reset
       setReceptionTransfer(null);
       setReceptionItems([]);
       setCheckerName('');
+      setReceptionObs('');
       setActiveSubTab('list');
       fetchTransfers();
     } catch (err) {
@@ -515,6 +534,8 @@ export default function TransferTab() {
         return <span className="badge badge-info">Em Trânsito</span>;
       case 'Conferido/Aprovado':
         return <span className="badge badge-success">Conferido & Aprovado</span>;
+      case 'Aceito Parcialmente':
+        return <span className="badge badge-warning" style={{ backgroundColor: '#f59e0b', color: '#ffffff' }}>Aceito em Partes</span>;
       case 'Rejeitado':
         return <span className="badge badge-danger">Recusado</span>;
       default:
@@ -697,19 +718,37 @@ export default function TransferTab() {
                   <th>Produto</th>
                   <th>Qtd Enviada</th>
                   <th>Qtd Conferida (Recepção)</th>
+                  <th>Status / Justificativa</th>
                   <th>Valor Unitário</th>
                 </tr>
               </thead>
               <tbody>
                 {selectedTransferItems.map((item, idx) => {
                   const prod = products.find(p => p.codigo === item.produtoId);
+                  const isConferido = selectedTransfer.status === 'Conferido/Aprovado' || selectedTransfer.status === 'Aceito Parcialmente' || selectedTransfer.status === 'Rejeitado';
+                  const qtdConferidaVal = item.quantidadeConferida ?? item.quantidade;
+                  const isMatch = Number(qtdConferidaVal) === Number(item.quantidade);
+
                   return (
                     <tr key={item.id || idx}>
                       <td>#{item.id}</td>
                       <td>{prod ? prod.nome : `Produto ID ${item.produtoId}`}</td>
                       <td>{item.quantidade}</td>
-                      <td>{selectedTransfer.status === 'Conferido/Aprovado' ? item.quantidadeConferida : '-'}</td>
-                      <td>R$ {item.valor.toFixed(2)}</td>
+                      <td>{isConferido ? (item.quantidadeConferida ?? item.quantidade) : '-'}</td>
+                      <td>
+                        {!isConferido ? (
+                          <span className="badge badge-warning">Aguardando Conferência</span>
+                        ) : isMatch ? (
+                          <span style={{ color: '#10b981', display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}>
+                            <CheckCircle size={16} /> OK
+                          </span>
+                        ) : (
+                          <span style={{ color: '#eab308', display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 600 }} title={item.justificativa || 'Divergência de quantidade'}>
+                            <AlertCircle size={16} /> {item.justificativa ? item.justificativa : `Divergência (${item.quantidadeConferida ?? 0}/${item.quantidade})`}
+                          </span>
+                        )}
+                      </td>
+                      <td>R$ {Number(item.valor).toFixed(2)}</td>
                     </tr>
                   );
                 })}
@@ -990,22 +1029,45 @@ export default function TransferTab() {
                     <th>Produto</th>
                     <th>Qtd Enviada</th>
                     <th>Qtd Conferida (Fisicamente Recebida)</th>
+                    <th>Status / Justificativa (Divergência)</th>
                   </tr>
                 </thead>
                 <tbody>
                   {receptionItems.map((item, idx) => {
                     const prod = products.find(p => p.codigo === item.produtoId);
+                    const isMatch = Number(item.quantidadeConferida) === Number(item.quantidade);
+
                     return (
                       <tr key={item.id || idx}>
                         <td>{prod ? prod.nome : `Produto ID ${item.produtoId}`}</td>
-                        <td>{item.quantidade}</td>
+                        <td><strong>{item.quantidade}</strong></td>
                         <td>
                           <input 
                             type="number" 
                             value={item.quantidadeConferida} 
                             onChange={(e) => handleQtyConferidaChange(idx, e.target.value)}
                             className="cd-inline-input"
+                            style={{ width: '90px' }}
                           />
+                        </td>
+                        <td>
+                          {isMatch ? (
+                            <span style={{ color: '#10b981', display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}>
+                              <CheckCircle size={16} /> OK (Quantidade Correta)
+                            </span>
+                          ) : (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <AlertCircle size={16} style={{ color: '#eab308', flexShrink: 0 }} />
+                              <input 
+                                type="text" 
+                                value={item.justificativa || ''} 
+                                onChange={(e) => handleJustificativaChange(idx, e.target.value)}
+                                placeholder="Motivo/Justificativa da divergência..."
+                                className="cd-text-input"
+                                style={{ padding: '4px 8px', fontSize: '0.82rem' }}
+                              />
+                            </div>
+                          )}
                         </td>
                       </tr>
                     );
@@ -1014,20 +1076,44 @@ export default function TransferTab() {
               </table>
             </div>
 
-            <div className="cd-action-row" style={{ marginTop: '2rem', display: 'flex', gap: '1rem' }}>
+            <label className="cd-input-container" style={{ marginTop: '1.25rem' }}>
+              Observações Gerais sobre a Recepção (Caso haja divergência ou rejeição)
+              <input 
+                type="text" 
+                value={receptionObs} 
+                onChange={(e) => setReceptionObs(e.target.value)} 
+                placeholder="Ex: 2 itens vieram com defeito na embalagem..." 
+                className="cd-text-input" 
+              />
+            </label>
+
+            <div className="cd-action-row" style={{ marginTop: '2rem', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
               <button 
                 type="button" 
                 className="submit-transfer-btn" 
                 onClick={() => handleApproveReception('Conferido/Aprovado')}
                 disabled={loading}
+                style={{ background: 'linear-gradient(135deg, #10b981, #059669)', flex: 1 }}
               >
-                <CheckCircle size={18} /> Confirmar Recebimento & Incrementar Estoque
+                <CheckCircle size={18} /> Aceitar Total (Estoque 100% OK)
               </button>
+
+              <button 
+                type="button" 
+                className="submit-transfer-btn" 
+                onClick={() => handleApproveReception('Aceito Parcialmente')}
+                disabled={loading}
+                style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', flex: 1 }}
+              >
+                <AlertCircle size={18} /> Aceitar em Partes (Com Divergências)
+              </button>
+
               <button 
                 type="button" 
                 className="submit-transfer-btn reject" 
                 onClick={() => handleApproveReception('Rejeitado')}
                 disabled={loading}
+                style={{ flex: 1 }}
               >
                 <XCircle size={18} /> Rejeitar Carga / Devolver
               </button>

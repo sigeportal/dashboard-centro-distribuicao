@@ -16,6 +16,7 @@ type
     FQuantidade: double;
     FValor: double;
     FQuantidadeConferida: double;
+    FJustificativa: string;
   public
     [TCampo('TRI_ID', 'INTEGER NOT NULL PRIMARY KEY')]
     property Id: Integer read FId write FId;
@@ -34,6 +35,9 @@ type
 
     [TCampo('TRI_QTD_CONFERIDA', 'NUMERIC(9,2)')]
     property QuantidadeConferida: double read FQuantidadeConferida write FQuantidadeConferida;
+
+    [TCampo('TRI_JUSTIFICATIVA', 'VARCHAR(150)')]
+    property Justificativa: string read FJustificativa write FJustificativa;
   end;
 
 implementation
