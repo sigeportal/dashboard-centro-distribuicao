@@ -1,4 +1,4 @@
-﻿unit UnitTransferencias.Controller;
+unit UnitTransferencias.Controller;
 
 interface
 
@@ -257,8 +257,10 @@ var
   FDQuery   : TFDQuery;
   i         : Integer;
   TransferenciaItem: TTransferenciaItem;
-  LQueryEst, LQueryCheck, LQueryUpsert: iQuery;
-  LDestinoId: Integer;
+  LQueryEst, LQueryCheck, LQueryUpsert, LQueryEmp: iQuery;
+  LOrigemId, LDestinoId: Integer;
+  LNomeOrigem, LNomeDestino: string;
+  LQtdFinal: Double;
 begin
   TransferenciaItem := TTransferenciaItem.Create(TDatabase.Connection);
   try
@@ -289,49 +291,135 @@ begin
         FDQuery.ParamByName('TRI_VALOR').AsFloats[i] := Itens.Valor;
         FDQuery.ParamByName('TRI_QTD_CONFERIDA').AsFloats[i] := Itens.QuantidadeConferida;
 
-        THisProController.RegistrarMovimentacao(
-          Itens.ProdutoId,
-          Date,
-          'TRANSFERENCIA DE ESTOQUE',
-          IntToStr(Itens.TransferenciaId),
-          Itens.Quantidade,
-          Itens.Valor,
-          Itens.Valor,
-          Itens.Valor,
-          0,
-          Itens.Valor,
-          'T',
-          2,
-          0
-        );
-
-        // Grava fisicamente na tabela ESTOQUE_EMPRESA com a chave EE_ID
+        // Movimentação de estoque e histórico
         try
           LQueryEst := TDatabase.Query;
-          LQueryEst.Open(Format('SELECT TR_DESTINO FROM TRANSFERENCIA WHERE TR_ID = %d', [Itens.TransferenciaId]));
+          LQueryEst.Open(Format('SELECT TR_ORIGEM, TR_DESTINO FROM TRANSFERENCIA WHERE TR_ID = %d', [Itens.TransferenciaId]));
           if not LQueryEst.DataSet.Eof then
           begin
+            LOrigemId  := LQueryEst.DataSet.FieldByName('TR_ORIGEM').AsInteger;
             LDestinoId := LQueryEst.DataSet.FieldByName('TR_DESTINO').AsInteger;
-            LQueryCheck := TDatabase.Query;
-            LQueryCheck.Open(Format('SELECT EE_ID FROM ESTOQUE_EMPRESA WHERE EE_EMPRESA_ID = %d AND EE_PRO_CODIGO = %d', [LDestinoId, Itens.ProdutoId]));
-            LQueryUpsert := TDatabase.Query;
-            if not LQueryCheck.DataSet.Eof then
-            begin
-              LQueryUpsert.Add(Format(
-                'UPDATE ESTOQUE_EMPRESA SET EE_QUANTIDADE = EE_QUANTIDADE + %s, EE_DATA_ATUALIZACAO = CURRENT_TIMESTAMP WHERE EE_EMPRESA_ID = %d AND EE_PRO_CODIGO = %d',
-                [FloatToStr(Itens.Quantidade).Replace(',', '.'), LDestinoId, Itens.ProdutoId]
-              ));
-              LQueryUpsert.ExecSQL;           
-            end
-            else
-            begin
-              LQueryUpsert.Add(Format(
-                'INSERT INTO ESTOQUE_EMPRESA (EE_ID, EE_EMPRESA_ID, EE_PRO_CODIGO, EE_QUANTIDADE, EE_DATA_ATUALIZACAO) ' +
-                'VALUES (%d, %d, %d, %s, CURRENT_TIMESTAMP)',
-                [GeraCodigo('ESTOQUE_EMPRESA', 'EE_ID'), LDestinoId, Itens.ProdutoId, FloatToStr(Itens.Quantidade).Replace(',', '.')]
-              ));
-              LQueryUpsert.ExecSQL;            
+
+            LNomeOrigem  := 'UNIDADE #' + IntToStr(LOrigemId);
+            LNomeDestino := 'UNIDADE #' + IntToStr(LDestinoId);
+
+            try
+              LQueryEmp := TDatabase.Query;
+              LQueryEmp.Open(Format('SELECT EMP_CODIGO, EMP_FANTASIA, EMP_RAZAO_SOCIAL FROM EMPRESA WHERE EMP_CODIGO IN (%d, %d)', [LOrigemId, LDestinoId]));
+              while not LQueryEmp.DataSet.Eof do
+              begin
+                if LQueryEmp.DataSet.FieldByName('EMP_CODIGO').AsInteger = LOrigemId then
+                begin
+                  LNomeOrigem := LQueryEmp.DataSet.FieldByName('EMP_FANTASIA').AsString;
+                  if LNomeOrigem.IsEmpty then
+                    LNomeOrigem := LQueryEmp.DataSet.FieldByName('EMP_RAZAO_SOCIAL').AsString;
+                end
+                else if LQueryEmp.DataSet.FieldByName('EMP_CODIGO').AsInteger = LDestinoId then
+                begin
+                  LNomeDestino := LQueryEmp.DataSet.FieldByName('EMP_FANTASIA').AsString;
+                  if LNomeDestino.IsEmpty then
+                    LNomeDestino := LQueryEmp.DataSet.FieldByName('EMP_RAZAO_SOCIAL').AsString;
+                end;
+                LQueryEmp.DataSet.Next;
+              end;
+            except
             end;
+
+            // Usar SOMENTE a quantidade efetivamente conferida (ou se for 0, usa a solicitada)
+            if Itens.QuantidadeConferida > 0 then
+              LQtdFinal := Itens.QuantidadeConferida
+            else
+              LQtdFinal := Itens.Quantidade;
+
+            // 1. Gravar Histórico de Estoque com o Nome da Unidade Origem e Destino
+            THisProController.RegistrarMovimentacao(
+              Itens.ProdutoId,
+              Date,
+              Copy('TRANSF: ' + LNomeOrigem + ' -> ' + LNomeDestino, 1, 30),
+              IntToStr(Itens.TransferenciaId),
+              LQtdFinal,
+              Itens.Valor,
+              Itens.Valor,
+              Itens.Valor,
+              0,
+              Itens.Valor,
+              'T',
+              2,
+              0
+            );
+
+            // 2. DAR BAIXA NA UNIDADE ORIGEM (ESTOQUE_EMPRESA)
+            if LOrigemId > 0 then
+            begin
+              LQueryCheck := TDatabase.Query;
+              LQueryCheck.Open(Format('SELECT EE_ID FROM ESTOQUE_EMPRESA WHERE EE_EMPRESA_ID = %d AND EE_PRO_CODIGO = %d', [LOrigemId, Itens.ProdutoId]));
+              LQueryUpsert := TDatabase.Query;
+              if not LQueryCheck.DataSet.Eof then
+              begin
+                LQueryUpsert.Add(Format(
+                  'UPDATE ESTOQUE_EMPRESA SET EE_QUANTIDADE = EE_QUANTIDADE - %s, EE_DATA_ATUALIZACAO = CURRENT_TIMESTAMP WHERE EE_EMPRESA_ID = %d AND EE_PRO_CODIGO = %d',
+                  [FloatToStr(LQtdFinal).Replace(',', '.'), LOrigemId, Itens.ProdutoId]
+                ));
+                LQueryUpsert.ExecSQL;
+              end
+              else
+              begin
+                LQueryUpsert.Add(Format(
+                  'INSERT INTO ESTOQUE_EMPRESA (EE_ID, EE_EMPRESA_ID, EE_PRO_CODIGO, EE_QUANTIDADE, EE_DATA_ATUALIZACAO) ' +
+                  'VALUES (%d, %d, %d, -%s, CURRENT_TIMESTAMP)',
+                  [GeraCodigo('ESTOQUE_EMPRESA', 'EE_ID'), LOrigemId, Itens.ProdutoId, FloatToStr(LQtdFinal).Replace(',', '.')]
+                ));
+                LQueryUpsert.ExecSQL;
+              end;
+
+              // Se a origem for a Matriz (PRODUTOS principal), também atualiza PRODUTOS
+              if LOrigemId = 1 then
+              begin
+                LQueryUpsert.Clear;
+                LQueryUpsert.Add(Format(
+                  'UPDATE PRODUTOS SET PRO_QUANTIDADE = PRO_QUANTIDADE - %s, PRO_CADASTRAR = ''S'' WHERE PRO_CODIGO = %d',
+                  [FloatToStr(LQtdFinal).Replace(',', '.'), Itens.ProdutoId]
+                ));
+                LQueryUpsert.ExecSQL;
+              end;
+            end;
+
+            // 3. INCREMENTAR NA UNIDADE DESTINO (ESTOQUE_EMPRESA)
+            if LDestinoId > 0 then
+            begin
+              LQueryCheck := TDatabase.Query;
+              LQueryCheck.Open(Format('SELECT EE_ID FROM ESTOQUE_EMPRESA WHERE EE_EMPRESA_ID = %d AND EE_PRO_CODIGO = %d', [LDestinoId, Itens.ProdutoId]));
+              LQueryUpsert := TDatabase.Query;
+              if not LQueryCheck.DataSet.Eof then
+              begin
+                LQueryUpsert.Add(Format(
+                  'UPDATE ESTOQUE_EMPRESA SET EE_QUANTIDADE = EE_QUANTIDADE + %s, EE_DATA_ATUALIZACAO = CURRENT_TIMESTAMP WHERE EE_EMPRESA_ID = %d AND EE_PRO_CODIGO = %d',
+                  [FloatToStr(LQtdFinal).Replace(',', '.'), LDestinoId, Itens.ProdutoId]
+                ));
+                LQueryUpsert.ExecSQL;
+              end
+              else
+              begin
+                LQueryUpsert.Add(Format(
+                  'INSERT INTO ESTOQUE_EMPRESA (EE_ID, EE_EMPRESA_ID, EE_PRO_CODIGO, EE_QUANTIDADE, EE_DATA_ATUALIZACAO) ' +
+                  'VALUES (%d, %d, %d, %s, CURRENT_TIMESTAMP)',
+                  [GeraCodigo('ESTOQUE_EMPRESA', 'EE_ID'), LDestinoId, Itens.ProdutoId, FloatToStr(LQtdFinal).Replace(',', '.')]
+                ));
+                LQueryUpsert.ExecSQL;
+              end;
+
+              // Se o destino for a Matriz (1), também incrementa em PRODUTOS
+              if LDestinoId = 1 then
+              begin
+                LQueryUpsert.Clear;
+                LQueryUpsert.Add(Format(
+                  'UPDATE PRODUTOS SET PRO_QUANTIDADE = PRO_QUANTIDADE + %s, PRO_CADASTRAR = ''S'' WHERE PRO_CODIGO = %d',
+                  [FloatToStr(LQtdFinal).Replace(',', '.'), Itens.ProdutoId]
+                ));
+                LQueryUpsert.ExecSQL;
+              end;
+            end;
+
           end;
         except
           on E: Exception do

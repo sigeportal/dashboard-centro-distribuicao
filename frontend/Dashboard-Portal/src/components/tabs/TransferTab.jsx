@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { ArrowRightLeft, Plus, CheckCircle, AlertCircle, Eye, RefreshCw, Send, ShieldCheck, XCircle, Search, Package, X } from 'lucide-react';
 import { createApi } from '../../services/api';
 import SearchBar from '../SearchBar';
+import Pagination from '../Pagination';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import './TransferTab.css';
 
@@ -13,6 +14,12 @@ export default function TransferTab() {
   const [transfers, setTransfers] = useState([]);
   const [products, setProducts] = useState([]);
   const [units, setUnits] = useState([]);
+  
+  // Modal de Busca de Produtos Paginada e Debounced
+  const [modalProducts, setModalProducts] = useState([]);
+  const [modalSearchPage, setModalSearchPage] = useState(1);
+  const [modalSearchMeta, setModalSearchMeta] = useState({ page: 1, limit: 10, total: 0, pages: 1 });
+  const [modalSearchLoading, setModalSearchLoading] = useState(false);
   
   // Detalhes da Transferência Selecionada
   const [selectedTransfer, setSelectedTransfer] = useState(null);
@@ -263,22 +270,47 @@ export default function TransferTab() {
     }
   };
 
-  // Filtro de Produtos no Modal Popup
-  const getFilteredModalProducts = () => {
-    return products.filter(p => {
-      const matchesSearch = !modalSearchTerm || (
-        (p.nome && p.nome.toLowerCase().includes(modalSearchTerm.toLowerCase())) ||
-        (p.fabricante && p.fabricante.toLowerCase().includes(modalSearchTerm.toLowerCase())) ||
-        (p.codbarra && p.codbarra.toLowerCase().includes(modalSearchTerm.toLowerCase())) ||
-        (p.codigo && String(p.codigo).includes(modalSearchTerm))
-      );
+  // Busca de Produtos Paginada e Servidor para o Modal (Desempenho Extremo)
+  const fetchModalProducts = async (search = modalSearchTerm, targetPage = 1, stockFilter = modalStockFilter) => {
+    setModalSearchLoading(true);
+    try {
+      const searchParam = search ? `&search=${encodeURIComponent(search)}` : '';
+      const stockParam = stockFilter !== 'todos' ? `&stockStatus=${stockFilter}` : '';
+      const url = `/v1/produtos?page=${targetPage}&limit=10${searchParam}${stockParam}`;
+      const res = await api.get(url);
 
-      const matchesStock = modalStockFilter === 'todos' ? true :
-        modalStockFilter === 'low' ? (p.quantidade > 0 && p.quantidade <= 5) :
-        (p.quantidade <= 0);
+      let items = [];
+      let metaData = { page: targetPage, limit: 10, total: 0, pages: 1 };
 
-      return matchesSearch && matchesStock;
-    });
+      if (Array.isArray(res.data)) {
+        items = res.data;
+        metaData = { page: 1, limit: items.length || 10, total: items.length, pages: 1 };
+      } else if (res.data && Array.isArray(res.data.data)) {
+        items = res.data.data;
+        metaData = res.data.meta || metaData;
+      }
+
+      setModalProducts(items);
+      setModalSearchMeta(metaData);
+      setModalSearchPage(metaData.page || targetPage);
+    } catch (err) {
+      console.error('Erro ao buscar produtos no modal de transferência:', err);
+    } finally {
+      setModalSearchLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (showProductSearchModal) {
+      const timer = setTimeout(() => {
+        fetchModalProducts(modalSearchTerm, 1, modalStockFilter);
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [showProductSearchModal, modalSearchTerm, modalStockFilter]);
+
+  const handleModalPageChange = (newPage) => {
+    fetchModalProducts(modalSearchTerm, newPage, modalStockFilter);
   };
 
   const handleSelectProductFromModal = (prod) => {
@@ -448,7 +480,11 @@ export default function TransferTab() {
       await api.put('/v1/transferencias', updatedHeader);
 
       // 2. Atualiza os itens com a quantidade fisicamente conferida
-      await api.post('/v1/transferenciaItens/emLote', { itens: receptionItems });
+      const formattedReceptionItems = receptionItems.map(it => ({
+        ...it,
+        quantidadeConferida: Number(it.quantidadeConferida ?? it.quantidade) || 0
+      }));
+      await api.post('/v1/transferenciaItens/emLote', { itens: formattedReceptionItems });
 
       alert(status === 'Conferido/Aprovado' ? 'Recepção concluída e estoque atualizado com sucesso!' : 'Transferência Recusada!');
       
@@ -1038,14 +1074,20 @@ export default function TransferTab() {
                     </tr>
                   </thead>
                   <tbody>
-                    {getFilteredModalProducts().length === 0 ? (
+                    {modalSearchLoading ? (
+                      <tr>
+                        <td colSpan="7" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+                          ⌛ Buscando produtos no servidor central...
+                        </td>
+                      </tr>
+                    ) : modalProducts.length === 0 ? (
                       <tr>
                         <td colSpan="7" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
                           Nenhum produto encontrado.
                         </td>
                       </tr>
                     ) : (
-                      getFilteredModalProducts().map(p => (
+                      modalProducts.map(p => (
                         <tr key={p.codigo} style={{ cursor: 'pointer' }} onClick={() => handleSelectProductFromModal(p)}>
                           <td><span className="item-code">#{p.codigo}</span></td>
                           <td><strong>{p.nome}</strong></td>
@@ -1068,6 +1110,12 @@ export default function TransferTab() {
                   </tbody>
                 </table>
               </div>
+
+              <Pagination
+                currentPage={modalSearchMeta.page || modalSearchPage}
+                totalPages={modalSearchMeta.pages || 1}
+                onPageChange={handleModalPageChange}
+              />
             </div>
 
             <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
