@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Package, Eye, X, Building2, History } from 'lucide-react';
+import { Package, Eye, X, Building2, History, Edit, Plus } from 'lucide-react';
 import SearchBar from '../SearchBar';
 import Pagination from '../Pagination';
+import ProductFormModal from '../ProductFormModal';
 import { formatCurrency } from '../../utils/formatters';
 import { createApi } from '../../services/api';
 
@@ -15,6 +16,10 @@ export default function ProductsTab({ data, pages, searchTerms, setSearchTerms, 
   const [selectedHistoryProduct, setSelectedHistoryProduct] = useState(null);
   const [historyData, setHistoryData] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
+
+  // Modal de Cadastro/Edição de Produto Legado (Pop-up)
+  const [showProductModal, setShowProductModal] = useState(false);
+  const [productToEditModal, setProductToEditModal] = useState(null);
 
   // Saldo de Estoque Específico da Unidade Logada
   const [activeUnitStocks, setActiveUnitStocks] = useState({});
@@ -152,7 +157,17 @@ export default function ProductsTab({ data, pages, searchTerms, setSearchTerms, 
 
   return (
     <div className="list-card glass full-width">
-      <h3><Package size={20} /> Tabela de Produtos</h3>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+        <h3 style={{ margin: 0 }}><Package size={20} /> Tabela de Produtos</h3>
+        <button 
+          className="btn-primary" 
+          onClick={() => { setProductToEditModal(null); setShowProductModal(true); }}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '0.55rem 1.1rem', fontWeight: 600 }}
+        >
+          <Plus size={16} /> Novo Produto (Pop-up)
+        </button>
+      </div>
+
       <SearchBar
         value={searchTerms.produtos}
         onChange={(val) => setSearchTerms(prev => ({ ...prev, produtos: val }))}
@@ -171,13 +186,13 @@ export default function ProductsTab({ data, pages, searchTerms, setSearchTerms, 
         <table className="data-table">
           <thead>
             <tr>
-              <th scope="col">Código</th>
+              <th scope="col" style={{ width: '80px' }}>Código</th>
               <th scope="col">Nome</th>
-              <th scope="col">Fabricante</th>
-              <th scope="col">Cód. Barras</th>
-              <th scope="col">Estoque ({activeUnitName})</th>
-              <th scope="col">Valor (Venda)</th>
-              <th scope="col">Ações & Histórico</th>
+              <th scope="col" style={{ width: '130px' }}>Fabricante</th>
+              <th scope="col" style={{ width: '130px' }}>Cód. Barras</th>
+              <th scope="col" style={{ width: '90px', textAlign: 'center' }} title={`Estoque na unidade ${activeUnitName}`}>Estoque</th>
+              <th scope="col" style={{ width: '100px', textAlign: 'right' }}>Valor</th>
+              <th scope="col" style={{ width: '220px', textAlign: 'center' }}>Ações</th>
             </tr>
           </thead>
           <tbody>
@@ -187,32 +202,54 @@ export default function ProductsTab({ data, pages, searchTerms, setSearchTerms, 
                 <td data-label="Nome">{item.nome}</td>
                 <td data-label="Fabricante">{item.fabricante}</td>
                 <td data-label="Cód. Barras">{item.codbarra}</td>
-                <td data-label={`Estoque (${activeUnitName})`}>
+                <td data-label="Estoque" style={{ textAlign: 'center' }}>
                   <strong style={{ color: getProductStockForActiveUnit(item) > 0 ? '#10b981' : '#ef4444' }}>
                     {getProductStockForActiveUnit(item)}
                   </strong>
                 </td>
-                <td data-label="Valor (Venda)">{formatCurrency(item.valorv)}</td>
-                <td data-label="Ações & Histórico">
-                  <div style={{ display: 'inline-flex', gap: '6px', flexWrap: 'wrap' }}>
+                <td data-label="Valor" style={{ textAlign: 'right' }}>{formatCurrency(item.valorv)}</td>
+                <td data-label="Ações" style={{ textAlign: 'center' }}>
+                  <div style={{ display: 'inline-flex', gap: '4px', justifyContent: 'center' }}>
                     <button 
                       className="action-btn action-view" 
                       onClick={() => handleOpenStockModal(item)}
                       title="Ver posição por Filial"
-                      style={{ padding: '6px 10px', fontSize: '0.82rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                      style={{ padding: '4px 8px', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
                     >
-                      <Building2 size={14} /> Filiais
+                      <Building2 size={13} /> Filiais
                     </button>
+
+                    <button 
+                      className="action-btn" 
+                      onClick={() => { setProductToEditModal(item); setShowProductModal(true); }}
+                      title="Editar Produto (Pop-up)"
+                      style={{
+                        padding: '4px 8px',
+                        fontSize: '0.78rem',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '3px',
+                        background: 'rgba(37, 99, 235, 0.12)',
+                        color: '#2563eb',
+                        border: '1px solid rgba(37, 99, 235, 0.3)',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontWeight: 600
+                      }}
+                    >
+                      <Edit size={13} /> Editar
+                    </button>
+
                     <button 
                       className="action-btn" 
                       onClick={() => handleOpenHistoryModal(item)}
-                      title="Ver Histórico de Movimentações (HIS_PRO)"
+                      title="Ver Histórico (HIS_PRO)"
                       style={{
-                        padding: '6px 10px',
-                        fontSize: '0.82rem',
+                        padding: '4px 8px',
+                        fontSize: '0.78rem',
                         display: 'inline-flex',
                         alignItems: 'center',
-                        gap: '4px',
+                        gap: '3px',
                         background: 'rgba(99, 102, 241, 0.12)',
                         color: '#6366f1',
                         border: '1px solid rgba(99, 102, 241, 0.3)',
@@ -221,7 +258,7 @@ export default function ProductsTab({ data, pages, searchTerms, setSearchTerms, 
                         fontWeight: 600
                       }}
                     >
-                      <History size={14} /> Histórico
+                      <History size={13} /> Histórico
                     </button>
                   </div>
                 </td>
@@ -429,6 +466,19 @@ export default function ProductsTab({ data, pages, searchTerms, setSearchTerms, 
         </div>,
         document.body
       )}
+      {/* Modal de Cadastro/Edição em Pop-up */}
+      {showProductModal && (
+        <ProductFormModal
+          isOpen={showProductModal}
+          onClose={() => setShowProductModal(false)}
+          productToEdit={productToEditModal}
+          onSaveSuccess={() => {
+            setShowProductModal(false);
+            fetchPage('produtos', pages.produtos || 1);
+          }}
+        />
+      )}
+
     </div>
   );
 }

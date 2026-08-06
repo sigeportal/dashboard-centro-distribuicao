@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowRightLeft, Plus, CheckCircle, AlertCircle, Eye, RefreshCw, Send, ShieldCheck, XCircle, Search, Package, X } from 'lucide-react';
+import { ArrowRightLeft, Plus, CheckCircle, AlertCircle, Eye, RefreshCw, Send, ShieldCheck, XCircle, Search, Package, X, Printer } from 'lucide-react';
 import { createApi } from '../../services/api';
 import SearchBar from '../SearchBar';
 import Pagination from '../Pagination';
+import RomaneioModal from '../RomaneioModal';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import './TransferTab.css';
 
@@ -25,6 +26,11 @@ export default function TransferTab() {
   const [selectedTransfer, setSelectedTransfer] = useState(null);
   const [selectedTransferItems, setSelectedTransferItems] = useState([]);
   const [isViewingDetails, setIsViewingDetails] = useState(false);
+
+  // Modal de Romaneio de Transferência (Impressão / Guia A4)
+  const [showRomaneioModal, setShowRomaneioModal] = useState(false);
+  const [romaneioTransfer, setRomaneioTransfer] = useState(null);
+  const [romaneioItems, setRomaneioItems] = useState([]);
 
   // Nova Transferência
   const [origin, setOrigin] = useState('');
@@ -336,6 +342,26 @@ export default function TransferTab() {
     }
   };
 
+  const handleOpenRomaneio = async (transfer) => {
+    setRomaneioTransfer(transfer);
+    setLoading(true);
+    try {
+      let items = selectedTransfer && selectedTransfer.id === transfer.id ? selectedTransferItems : [];
+      if (items.length === 0) {
+        const response = await api.get(`/v1/transferenciaItens?transferencia_id=${transfer.id}`);
+        if (Array.isArray(response.data)) {
+          items = response.data;
+        }
+      }
+      setRomaneioItems(items);
+      setShowRomaneioModal(true);
+    } catch (err) {
+      alert('Erro ao carregar os itens para geração do romaneio.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleAddItemToTransfer = () => {
     if (!selectedProduct || !quantity || Number(quantity) <= 0) {
       alert('Selecione o produto e informe uma quantidade válida.');
@@ -627,14 +653,14 @@ export default function TransferTab() {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>Cod. Lote</th>
-                  <th>Tipo</th>
-                  <th>Origem</th>
-                  <th>Destino</th>
-                  <th>Data Envio</th>
-                  <th>Status</th>
+                  <th style={{ width: '85px' }}>Cod. Lote</th>
+                  <th style={{ width: '100px' }}>Tipo</th>
+                  <th style={{ width: '130px' }}>Origem</th>
+                  <th style={{ width: '130px' }}>Destino</th>
+                  <th style={{ width: '100px' }}>Data Envio</th>
+                  <th style={{ width: '110px', textAlign: 'center' }}>Status</th>
                   <th>Observação</th>
-                  <th>Ações</th>
+                  <th style={{ width: '210px', textAlign: 'center' }}>Ações</th>
                 </tr>
               </thead>
               <tbody>
@@ -653,32 +679,45 @@ export default function TransferTab() {
                     <td>{getUnitName(item.origem)}</td>
                     <td>{getUnitName(item.destino)}</td>
                     <td>{formatDate(item.data)}</td>
-                    <td>{getStatusBadge(item.status)}</td>
+                    <td style={{ textAlign: 'center' }}>{getStatusBadge(item.status)}</td>
                     <td>{item.obs || '-'}</td>
-                    <td className="actions-cell">
-                      <button 
-                        className="cd-action-btn view" 
-                        onClick={() => handleViewDetails(item)} 
-                        title="Ver Itens"
-                      >
-                        <Eye size={16} /> Ver Itens
-                      </button>
-                      
-                      {item.status === 'Em Trânsito' && (
+                    <td style={{ textAlign: 'center' }}>
+                      <div style={{ display: 'inline-flex', gap: '4px', justifyContent: 'center' }}>
                         <button 
-                          className="cd-action-btn check" 
-                          onClick={() => handleOpenConference(item)}
-                          title="Conferir e Receber"
+                          className="cd-action-btn view" 
+                          onClick={() => handleViewDetails(item)} 
+                          title="Ver Itens do Lote"
+                          style={{ padding: '4px 8px', fontSize: '0.78rem', gap: '3px' }}
                         >
-                          <ShieldCheck size={16} /> Receber
+                          <Eye size={13} /> Itens
                         </button>
-                      )}
+
+                        <button 
+                          className="cd-action-btn view" 
+                          onClick={() => handleOpenRomaneio(item)} 
+                          title="Imprimir Romaneio de Transferência"
+                          style={{ background: 'linear-gradient(135deg, #2563eb, #3b82f6)', color: '#ffffff', padding: '4px 8px', fontSize: '0.78rem', gap: '3px' }}
+                        >
+                          <Printer size={13} /> Romaneio
+                        </button>
+                        
+                        {item.status === 'Em Trânsito' && (
+                          <button 
+                            className="cd-action-btn check" 
+                            onClick={() => handleOpenConference(item)}
+                            title="Conferir e Receber Carga"
+                            style={{ padding: '4px 8px', fontSize: '0.78rem', gap: '3px', marginLeft: 0 }}
+                          >
+                            <ShieldCheck size={13} /> Receber
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
                 {transfers.length === 0 && (
                   <tr>
-                    <td colSpan="7" style={{ textAlign: 'center', padding: '2rem' }}>
+                    <td colSpan="8" style={{ textAlign: 'center', padding: '2rem' }}>
                       Nenhuma transferência registrada.
                     </td>
                   </tr>
@@ -694,7 +733,16 @@ export default function TransferTab() {
         <div className="list-card glass">
           <div className="cd-title-row">
             <h3>Itens do Lote #{selectedTransfer.id}</h3>
-            <button className="refresh-btn" onClick={() => setIsViewingDetails(false)}>Voltar para Lista</button>
+            <div style={{ display: 'flex', gap: '0.6rem' }}>
+              <button 
+                className="refresh-btn" 
+                onClick={() => handleOpenRomaneio(selectedTransfer)}
+                style={{ background: 'linear-gradient(135deg, #2563eb, #3b82f6)', color: '#ffffff', border: 'none' }}
+              >
+                <Printer size={18} /> Imprimir Romaneio
+              </button>
+              <button className="refresh-btn" onClick={() => setIsViewingDetails(false)}>Voltar para Lista</button>
+            </div>
           </div>
 
           <div className="cd-details-meta grid-2">
@@ -1125,7 +1173,7 @@ export default function TransferTab() {
       {/* MODAL POPUP DE BUSCA DE PRODUTOS PARA TRANSFERÊNCIA (IGUAL À TELA PRODUTOS) */}
       {showProductSearchModal && createPortal(
         <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowProductSearchModal(false); }}>
-          <div className="modal-content glass" style={{ maxWidth: '900px', width: '92vw' }}>
+          <div className="modal-content glass" style={{ maxWidth: '1020px', width: '94vw', padding: '1.25rem 1.5rem' }}>
             <div className="modal-header">
               <h4><Package size={20} style={{ color: 'var(--accent-primary)' }} /> Selecionar Produto do Estoque</h4>
               <button className="btn-close" onClick={() => setShowProductSearchModal(false)}><X size={18} /></button>
@@ -1150,13 +1198,13 @@ export default function TransferTab() {
                 <table className="data-table">
                   <thead>
                     <tr>
-                      <th>Código</th>
+                      <th style={{ width: '80px' }}>Código</th>
                       <th>Nome</th>
-                      <th>Fabricante</th>
-                      <th>Cód. Barras</th>
-                      <th>Estoque Geral</th>
-                      <th>Valor (Venda)</th>
-                      <th>Ações</th>
+                      <th style={{ width: '120px' }}>Fabricante</th>
+                      <th style={{ width: '130px' }}>Cód. Barras</th>
+                      <th style={{ width: '90px', textAlign: 'center' }}>Estoque</th>
+                      <th style={{ width: '100px', textAlign: 'right' }}>Valor</th>
+                      <th style={{ width: '110px', textAlign: 'center' }}>Ações</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1179,14 +1227,14 @@ export default function TransferTab() {
                           <td><strong>{p.nome}</strong></td>
                           <td>{p.fabricante || '-'}</td>
                           <td>{p.codbarra || '-'}</td>
-                          <td>
+                          <td style={{ textAlign: 'center' }}>
                             <span className={`badge ${p.quantidade > 5 ? 'badge-success' : p.quantidade > 0 ? 'badge-warning' : 'badge-danger'}`}>
                               {p.quantidade || 0}
                             </span>
                           </td>
-                          <td><strong style={{ color: 'var(--accent-primary)' }}>{formatCurrency(p.valorv || 0)}</strong></td>
-                          <td>
-                            <button type="button" className="btn-primary" style={{ padding: '4px 10px', fontSize: '0.8rem' }}>
+                          <td style={{ textAlign: 'right' }}><strong style={{ color: 'var(--accent-primary)' }}>{formatCurrency(p.valorv || 0)}</strong></td>
+                          <td style={{ textAlign: 'center' }}>
+                            <button type="button" className="btn-primary" style={{ padding: '4px 10px', fontSize: '0.78rem', whiteSpace: 'nowrap' }}>
                               + Selecionar
                             </button>
                           </td>
@@ -1210,6 +1258,17 @@ export default function TransferTab() {
           </div>
         </div>,
         document.body
+      )}
+
+      {/* MODAL DE IMPRESSÃO DO ROMANEIO DE TRANSFERÊNCIA */}
+      {showRomaneioModal && romaneioTransfer && (
+        <RomaneioModal
+          transfer={romaneioTransfer}
+          items={romaneioItems}
+          products={products}
+          units={units}
+          onClose={() => setShowRomaneioModal(false)}
+        />
       )}
 
     </div>

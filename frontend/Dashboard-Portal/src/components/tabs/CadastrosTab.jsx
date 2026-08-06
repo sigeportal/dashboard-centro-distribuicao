@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Package, Folder, Layers, Ruler, Plus, Edit, Trash2, Save, X, RefreshCw, Grid, AlertCircle, History } from 'lucide-react';
+import { Package, Folder, Layers, Ruler, Plus, Edit, Trash2, Save, X, RefreshCw, Grid, AlertCircle, History, Search } from 'lucide-react';
 import { createApi } from '../../services/api';
 import { formatCurrency, formatDatehora } from '../../utils/formatters';
 import Pagination from '../Pagination';
 import SearchBar from '../SearchBar';
+import ProductFormModal from '../ProductFormModal';
+import GruposSubgruposModal from '../GruposSubgruposModal';
+import GradesModal from '../GradesModal';
 import './CadastrosTab.css';
 
 export default function CadastrosTab() {
@@ -15,6 +18,7 @@ export default function CadastrosTab() {
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState({ page: 1, limit: 10, total: 0, pages: 1 });
   const [searchTerm, setSearchTerm] = useState('');
+  const [gradeProductFilter, setGradeProductFilter] = useState('');
 
   // Histórico de Movimentações (HIS_PRO)
   const [selectedHistoryProduct, setSelectedHistoryProduct] = useState(null);
@@ -38,7 +42,12 @@ export default function CadastrosTab() {
     valor_prazo: '',
     codbarra: ''
   });
-  const [gradeProductFilter, setGradeProductFilter] = useState('');
+  // Novos Modais de Cadastro Legados (Pop-ups)
+  const [showProductModal, setShowProductModal] = useState(false);
+  const [productToEditModal, setProductToEditModal] = useState(null);
+  const [showGruposSubgruposModal, setShowGruposSubgruposModal] = useState(false);
+  const [showGradesModal, setShowGradesModal] = useState(false);
+  const [productForGrades, setProductForGrades] = useState(null);
 
   // Saldo de Estoque Específico da Unidade Logada
   const [activeUnitStocks, setActiveUnitStocks] = useState({});
@@ -237,62 +246,41 @@ export default function CadastrosTab() {
   };
 
   const handleOpenCreate = () => {
+    if (activeSubTab === 'produtos') {
+      setProductToEditModal(null);
+      setShowProductModal(true);
+      return;
+    }
+    if (activeSubTab === 'grupos' || activeSubTab === 'subgrupos') {
+      setShowGruposSubgruposModal(true);
+      return;
+    }
+    if (activeSubTab === 'grades') {
+      setProductForGrades(produtos[0] || null);
+      setShowGradesModal(true);
+      return;
+    }
     setEditingItem(null);
-    // Reset formulários (Novo produto vem marcado para distribuição por padrão)
-    setProdForm({ 
-      codigo: '', 
-      nome: '', 
-      fabricante: '', 
-      pro_for: fornecedores[0]?.codigo || 0,
-      pro_gru: subgrupos[0]?.codigo || 0,
-      codbarra: '', 
-      quantidade: '', 
-      valorv: '', 
-      pro_valor_dinheiro: '',
-      pro_valorv_prazo: '',
-      codTotalizador: 1, 
-      ncm: '6109.10.00', 
-      um: 'UN', 
-      cadastrar: 'S', 
-      url_Imagem: '', 
-      distribute: true 
-    });
-    setGrupoForm({ codigo: '', nome: '' });
-    setSubgrupoForm({ codigo: '', nome: '', g1: grupos[0]?.codigo || '', tr: '0' });
-    setGradeForm({ codigo: '', pro: '', valor: '', valor_dinheiro: '', valor_prazo: '', tam: '', quantidade: '', codbarra: '', cor: '' });
-    setTamanhoForm({ codigo: '', pro: '', tamanho: '', sigla: '', valor: '' });
     setShowForm(true);
   };
 
   const handleOpenEdit = (item) => {
-    setEditingItem(item);
     if (activeSubTab === 'produtos') {
-      setProdForm({ 
-        ...item,
-        pro_for: item.pro_for || item.forCodigo || item.fornecedorId || 0,
-        pro_gru: item.pro_gru || item.gru || item.subgrupoId || 0,
-        pro_valor_dinheiro: item.pro_valor_dinheiro ?? item.valorDinheiro ?? item.valordinheiro ?? item.valor_dinheiro ?? item.valorv ?? 0,
-        pro_valorv_prazo: item.pro_valorv_prazo ?? item.valorPrazo ?? item.valorprazo ?? item.valor_prazo ?? item.valorv ?? 0,
-        codTotalizador: item.codTotalizador || item.pro_totalizador || 1,
-        ncm: item.ncm || item.pro_ncm || '6109.10.00',
-        um: item.um || item.embalagem || item.pro_um || 'UN'
-      });
-    } else if (activeSubTab === 'grupos') {
-      setGrupoForm({ ...item });
-    } else if (activeSubTab === 'subgrupos') {
-      setSubgrupoForm({ 
-        ...item,
-        g1: item.g1 || item.gru_g1 || ''
-      });
-    } else if (activeSubTab === 'grades') {
-      setGradeForm({ 
-        ...item,
-        valor_dinheiro: item.valor_dinheiro ?? item.valordinheiro ?? item.valorDinheiro ?? item.gra_valor_dinheiro ?? item.valor ?? 0,
-        valor_prazo: item.valor_prazo ?? item.valorprazo ?? item.valorPrazo ?? item.gra_valor_prazo ?? item.valor ?? 0
-      });
-    } else if (activeSubTab === 'tamanhos') {
-      setTamanhoForm({ ...item });
+      setProductToEditModal(item);
+      setShowProductModal(true);
+      return;
     }
+    if (activeSubTab === 'grupos' || activeSubTab === 'subgrupos') {
+      setShowGruposSubgruposModal(true);
+      return;
+    }
+    if (activeSubTab === 'grades') {
+      const prod = produtos.find(p => Number(p.codigo) === Number(item.pro));
+      setProductForGrades(prod || { codigo: item.pro, nome: `Produto #${item.pro}` });
+      setShowGradesModal(true);
+      return;
+    }
+    setEditingItem(item);
     setShowForm(true);
   };
 
@@ -873,15 +861,16 @@ export default function CadastrosTab() {
           </h3>
 
           <div className="crud-controls">
-            <div className="search-box">
-              <Search size={16} />
-              <input 
-                type="text" 
-                placeholder="Pesquisar registros..." 
-                value={searchTerm} 
-                onChange={(e) => handleSearch(e.target.value)} 
-              />
-            </div>
+            <SearchBar
+              value={searchTerm}
+              onChange={(val) => setSearchTerm(val)}
+              onSearch={() => fetchData('last', searchTerm)}
+              onClear={() => {
+                setSearchTerm('');
+                fetchData('last', '');
+              }}
+              placeholder="Pesquisar registros..."
+            />
             <button className="btn-primary" onClick={handleOpenCreate}>
               <Plus size={16} /> Novo Registro
             </button>
@@ -898,26 +887,18 @@ export default function CadastrosTab() {
               <>
                 <thead>
                   <tr>
-                    <th>Código</th>
+                    <th style={{ width: '90px' }}>Código</th>
                     <th>Nome do Produto</th>
                     <th>Fornecedor</th>
-                    <th>Subgrupo / Grupo</th>
-                    <th>NCM</th>
-                    <th>UM</th>
-                    <th title="Totalizador Fiscal">Tot.</th>
-                    <th title={`Estoque na unidade ${activeUnitName}`}>Estoque</th>
+                    <th style={{ textAlign: 'center' }} title={`Estoque na unidade ${activeUnitName}`}>Estoque</th>
                     <th title="Preços de Venda: à Vista / Dinheiro / a Prazo">Preços (Vista / Din / Prazo)</th>
-                    <th>Cód. Barras</th>
-                    <th>Ações</th>
+                    <th style={{ textAlign: 'center', width: '160px' }}>Ações</th>
                   </tr>
                 </thead>
                 <tbody>
                   {produtos.map((item, idx) => {
                     const fornId = Number(item.pro_for || item.forCodigo || item.fornecedorId);
                     const forn = fornecedores.find(f => Number(f.codigo) === fornId);
-                    const subgId = Number(item.pro_gru || item.gru || item.subgrupoId);
-                    const subg = subgrupos.find(s => Number(s.codigo) === subgId);
-                    const parentGrp = subg ? grupos.find(g => Number(g.codigo) === Number(subg.g1 || subg.gru_g1)) : null;
 
                     return (
                       <tr key={item.codigo || idx}>
@@ -932,19 +913,7 @@ export default function CadastrosTab() {
                             item.fabricante ? <span>{item.fabricante}</span> : <span style={{ opacity: 0.4 }}>-</span>
                           )}
                         </td>
-                        <td>
-                          {subg ? (
-                            <span className="badge badge-info" title={parentGrp ? `Grupo #${parentGrp.codigo}: ${parentGrp.nome}` : ''}>
-                              {subg.nome}{parentGrp ? ` (${parentGrp.nome})` : ''}
-                            </span>
-                          ) : (
-                            <span style={{ opacity: 0.4 }}>-</span>
-                          )}
-                        </td>
-                        <td><span className="badge badge-info">{item.ncm || item.pro_ncm || '6109.10.00'}</span></td>
-                        <td><strong>{item.um || item.embalagem || item.pro_um || 'UN'}</strong></td>
-                        <td><span className="badge badge-success">#{item.codTotalizador || item.pro_totalizador || 1}</span></td>
-                        <td><strong style={{ color: getProductStockForActiveUnit(item) > 0 ? '#10b981' : '#ef4444' }}>{getProductStockForActiveUnit(item)}</strong></td>
+                        <td style={{ textAlign: 'center' }}><strong style={{ color: getProductStockForActiveUnit(item) > 0 ? '#10b981' : '#ef4444' }}>{getProductStockForActiveUnit(item)}</strong></td>
                         <td className="prices-cell">
                           <div className="price-badge-container">
                             <div className="price-primary" title="Preço Vista (Débito / PIX)">
@@ -956,8 +925,7 @@ export default function CadastrosTab() {
                             </div>
                           </div>
                         </td>
-                        <td className="codbarra-cell">{item.codbarra || '-'}</td>
-                        <td className="actions-cell">
+                        <td className="actions-cell" style={{ textAlign: 'center' }}>
                           <button className="crud-row-btn" onClick={() => handleOpenProductGradesModal(item)} title="Gerenciar Grades / Variações" style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b' }}><Grid size={14} /></button>
                           <button className="crud-row-btn" onClick={() => handleOpenHistoryModal(item)} title="Ver Histórico (HIS_PRO)" style={{ background: 'rgba(99, 102, 241, 0.15)', color: '#6366f1' }}><History size={14} /></button>
                           <button className="crud-row-btn edit" onClick={() => handleOpenEdit(item)}><Edit size={14} /></button>
@@ -1448,6 +1416,44 @@ export default function CadastrosTab() {
           </div>
         </div>,
         document.body
+      )}
+
+      {/* POP-UPS DE CADASTRO (SISTEMA LEGADO MODERNIZADO) */}
+      {showProductModal && (
+        <ProductFormModal
+          isOpen={showProductModal}
+          onClose={() => setShowProductModal(false)}
+          productToEdit={productToEditModal}
+          onSaveSuccess={() => {
+            setShowProductModal(false);
+            fetchData();
+          }}
+          grupos={grupos}
+          subgrupos={subgrupos}
+          fornecedores={fornecedores}
+        />
+      )}
+
+      {showGruposSubgruposModal && (
+        <GruposSubgruposModal
+          isOpen={showGruposSubgruposModal}
+          onClose={() => {
+            setShowGruposSubgruposModal(false);
+            fetchData();
+          }}
+        />
+      )}
+
+      {showGradesModal && (
+        <GradesModal
+          isOpen={showGradesModal}
+          onClose={() => {
+            setShowGradesModal(false);
+            fetchData();
+          }}
+          product={productForGrades}
+          onGradesUpdated={() => fetchData()}
+        />
       )}
 
     </div>

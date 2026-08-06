@@ -1,0 +1,89 @@
+.gra-modal-window {
+  width: 95%;
+  max-width: 980px;
+  background: var(--bg-card, #ffffff);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 1.25rem;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35);
+}
+
+.gra-modal-body {
+  padding: 1.25rem 1.5rem;
+  background-color: var(--bg-primary, #f8fafc);
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  overflow-y: auto;
+}
+
+.gra-inputs-grid {
+  display: grid;
+  grid-template-columns: 85px 110px 140px 110px 120px 120px 120px 1fr;
+  gap: 0.75rem;
+  background: var(--bg-secondary, #ffffff);
+  padding: 1.1rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.03);
+}
+
+.gra-input-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.gra-input-field label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-secondary, #64748b);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.btn-barcode-gen {
+  background: var(--accent-primary, #2563eb);
+  color: #ffffff;
+  border: none;
+  border-radius: 0.6rem;
+  padding: 0 0.6rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.btn-barcode-gen:hover:not(:disabled) {
+  background: #1d4ed8;
+  transform: translateY(-1px);
+}
+
+.btn-barcode-gen:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.gra-table-and-actions {
+  display: grid;
+  grid-template-columns: 1fr 130px;
+  gap: 1rem;
+  height: 340px;
+}
+
+.gra-table-container {
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 0.85rem;
+  overflow-y: auto;
+  background: var(--bg-secondary, #ffffff);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+}
+
+.grade-badge {
+  background: rgba(3, 105, 161, 0.12);
+  color: #0369a1;
+  font-weight: 800;
+  padding: 0.2rem 0.5rem;
+  border-radius: 0.4rem;
+  font-size: 0.8rem;
+}
