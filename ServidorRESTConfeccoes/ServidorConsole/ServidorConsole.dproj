@@ -117,9 +117,10 @@
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_2_Win32)'!=''">
         <Debugger_IncludeSystemVars>true</Debugger_IncludeSystemVars>
-        <Debugger_EnvVars>PORT=8080;CAMINHO_BD=D:\PROJETOS\Confeccoes\GRUPO GIGANTE\CENTRO_DISTRIBUICAO\PRINCIPAL.FDB;$(Debugger_EnvVars)</Debugger_EnvVars>
+        <Debugger_EnvVars>PORT=8081;CAMINHO_BD=D:\PROJETOS\Confeccoes\GRUPO GIGANTE\CENTRO_DISTRIBUICAO\PRINCIPAL.FDB;$(Debugger_EnvVars)</Debugger_EnvVars>
         <VerInfo_Locale>1033</VerInfo_Locale>
         <Manifest_File>(None)</Manifest_File>
+        <DCC_ExeOutput>./dist</DCC_ExeOutput>
     </PropertyGroup>
     <ItemGroup>
         <DelphiCompile Include="$(MainSource)">
@@ -199,17 +200,17 @@
                     <Source Name="MainSource">ServidorConsole.dpr</Source>
                 </Source>
                 <Excluded_Packages>
+                    <Excluded_Packages Name="D:\PROJETOS\ACBR\Lib\Delphi\LibD25\Win32\DCLACBr_OpenSSL.bpl">ACBr - (design-time) Bind para OpenSSL 1.1.1 - (http://www.projetoacbr.com.br/)</Excluded_Packages>
+                    <Excluded_Packages Name="D:\PROJETOS\ACBR\Lib\Delphi\LibD25\Win32\DCLACBr_Serial.bpl">ACBr - (design-time) ECF, Balanças, Cheques, Displays, Etiquetas, Gavetas, Terminais, SMS, RFD, Leitores - (http://www.projetoacbr.com.br/)</Excluded_Packages>
+                    <Excluded_Packages Name="D:\PROJETOS\ACBR\Lib\Delphi\LibD25\Win32\DCLACBr_Convenio115.bpl">ACBr - (design-time) Convênio ICMS 115 - (http://www.projetoacbr.com.br/)</Excluded_Packages>
+                    <Excluded_Packages Name="D:\PROJETOS\ACBR\Lib\Delphi\LibD25\Win32\DCLACBr_LFD.bpl">ACBr - (design-time) Livro Fiscal Digital - (http://www.projetoacbr.com.br/)</Excluded_Packages>
+                    <Excluded_Packages Name="D:\PROJETOS\ACBR\Lib\Delphi\LibD25\Win32\DCLACBr_EDI.bpl">ACBr - (design-time) Intercâmbio de Arquivos para Transportadora - (http://www.projetoacbr.com.br/)</Excluded_Packages>
+                    <Excluded_Packages Name="D:\PROJETOS\ACBR\Lib\Delphi\LibD25\Win32\DCLACBr_PAF.bpl">ACBr - (design-time) Programa Aplicativo Fiscal ECF - (http://www.projetoacbr.com.br/)</Excluded_Packages>
+                    <Excluded_Packages Name="D:\PROJETOS\ACBR\Lib\Delphi\LibD25\Win32\DCLACBr_SEF2.bpl">ACBr - (design-time) SEF2 (eDoc e SEF) - (http://www.projetoacbr.com.br/)</Excluded_Packages>
+                    <Excluded_Packages Name="D:\PROJETOS\ACBR\Lib\Delphi\LibD25\Win32\DCLACBr_Sintegra.bpl">ACBr - (design-time) Sintegra - (http://www.projectoacbr.com.br/)</Excluded_Packages>
                     <Excluded_Packages Name="$(BDSBIN)\dclDataSnapNativeServer250.bpl">Embarcadero DBExpress DataSnap Native Server Components</Excluded_Packages>
                     <Excluded_Packages Name="$(BDSBIN)\dcloffice2k250.bpl">Microsoft Office 2000 Sample Automation Server Wrapper Components</Excluded_Packages>
                     <Excluded_Packages Name="$(BDSBIN)\dclofficexp250.bpl">Microsoft Office XP Sample Automation Server Wrapper Components</Excluded_Packages>
-                    <Excluded_Packages Name="D:\PROJETOS\ACBr\Lib\Delphi\LibD25\Win32\DCLACBr_OpenSSL.bpl">ACBr - (design-time) Bind para OpenSSL 1.1.1 - (http://www.projetoacbr.com.br/)</Excluded_Packages>
-                    <Excluded_Packages Name="D:\PROJETOS\ACBr\Lib\Delphi\LibD25\Win32\DCLACBr_Serial.bpl">ACBr - (design-time) ECF, Balanças, Cheques, Displays, Etiquetas, Gavetas, Terminais, SMS, RFD, Leitores - (http://www.projetoacbr.com.br/)</Excluded_Packages>
-                    <Excluded_Packages Name="D:\PROJETOS\ACBr\Lib\Delphi\LibD25\Win32\DCLACBr_Convenio115.bpl">ACBr - (design-time) Convênio ICMS 115 - (http://www.projetoacbr.com.br/)</Excluded_Packages>
-                    <Excluded_Packages Name="D:\PROJETOS\ACBr\Lib\Delphi\LibD25\Win32\DCLACBr_LFD.bpl">ACBr - (design-time) Livro Fiscal Digital - (http://www.projetoacbr.com.br/)</Excluded_Packages>
-                    <Excluded_Packages Name="D:\PROJETOS\ACBr\Lib\Delphi\LibD25\Win32\DCLACBr_EDI.bpl">ACBr - (design-time) Intercâmbio de Arquivos para Transportadora - (http://www.projetoacbr.com.br/)</Excluded_Packages>
-                    <Excluded_Packages Name="D:\PROJETOS\ACBr\Lib\Delphi\LibD25\Win32\DCLACBr_PAF.bpl">ACBr - (design-time) Programa Aplicativo Fiscal ECF - (http://www.projetoacbr.com.br/)</Excluded_Packages>
-                    <Excluded_Packages Name="D:\PROJETOS\ACBr\Lib\Delphi\LibD25\Win32\DCLACBr_SEF2.bpl">ACBr - (design-time) SEF2 (eDoc e SEF) - (http://www.projetoacbr.com.br/)</Excluded_Packages>
-                    <Excluded_Packages Name="D:\PROJETOS\ACBr\Lib\Delphi\LibD25\Win32\DCLACBr_Sintegra.bpl">ACBr - (design-time) Sintegra - (http://www.projectoacbr.com.br/)</Excluded_Packages>
                 </Excluded_Packages>
             </Delphi.Personality>
             <Deployment Version="3">

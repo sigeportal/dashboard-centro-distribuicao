@@ -129,19 +129,42 @@ export default function ProductFormModal({ isOpen, onClose, productToEdit, onSav
     }
   }, [productToEdit]);
 
-  // Atalhos Teclado: ESC (fechar), F4 (grupos)
+  // Atalhos Teclado: ESC (fechar), F2 (NCM), F4 (Grupos), F5 (Etiquetas), F6 (Marca), F9 (Pesquisa), F10 (Grades), Ctrl+S (Salvar)
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.key === 'Escape' && !showGradesModal && !showGruposSubgruposModal) {
+      if (showGradesModal || showGruposSubgruposModal) return;
+
+      if (e.key === 'Escape') {
         onClose();
+      } else if (e.key === 'F2') {
+        e.preventDefault();
+        const ncmEl = document.querySelector('input[name="ncm"], input[placeholder*="NCM"]');
+        if (ncmEl) ncmEl.focus();
       } else if (e.key === 'F4') {
         e.preventDefault();
         setShowGruposSubgruposModal(true);
+      } else if (e.key === 'F5') {
+        e.preventDefault();
+        alert(`F5: Etiquetas para o produto #${form.codigo || 'novo'}`);
+      } else if (e.key === 'F6') {
+        e.preventDefault();
+        const marcaEl = document.querySelector('input[name="marca"], select[name="marca"]');
+        if (marcaEl) marcaEl.focus();
+      } else if (e.key === 'F9') {
+        e.preventDefault();
+        const nomeEl = document.querySelector('input[name="nome"]');
+        if (nomeEl) nomeEl.focus();
+      } else if (e.key === 'F10') {
+        e.preventDefault();
+        setShowGradesModal(true);
+      } else if (e.ctrlKey && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        if (mode !== 'browse') handleSave();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose, showGradesModal, showGruposSubgruposModal]);
+  }, [onClose, showGradesModal, showGruposSubgruposModal, form, mode]);
 
   const fetchMiniGrades = async (prodCode) => {
     try {

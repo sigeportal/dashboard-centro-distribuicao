@@ -28,16 +28,23 @@ export default function GruposSubgruposModal({ isOpen, onClose, onSelectGrupoSub
     fetchGrupos();
   }, []);
 
-  // Atalhos de Teclado (ESC fecha o modal)
+  // Atalhos de Teclado (ESC fecha o modal, F2 insere grupo, F9 foca pesquisa)
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
         onClose();
+      } else if (e.key === 'F2' || e.key === 'Insert') {
+        e.preventDefault();
+        if (grupoMode === 'browse') handleGrupoInsert();
+      } else if (e.key === 'F9') {
+        e.preventDefault();
+        const searchEl = document.querySelector('.gru-modal-body input[type="text"]');
+        if (searchEl) searchEl.focus();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
+  }, [onClose, grupoMode, subgrupoMode]);
 
   const fetchGrupos = async () => {
     setLoading(true);

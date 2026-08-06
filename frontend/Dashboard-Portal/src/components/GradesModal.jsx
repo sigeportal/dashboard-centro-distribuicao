@@ -4,6 +4,28 @@ import { Grid, Plus, Trash2, Check, X, Edit2, Barcode, Search } from 'lucide-rea
 import { createApi } from '../services/api';
 import './GradesModal.css';
 
+// Função de cálculo do Dígito Verificador EAN-13 do sistema legado (UnitFuncoesUtils.pas / GeraDVEAN)
+function geraDVEAN(cadeia) {
+  const str = String(cadeia).replace(/\s+/g, '');
+  let indice = 3;
+  let soma = 0;
+  for (let i = str.length - 1; i >= 0; i--) {
+    soma += parseInt(str[i], 10) * indice;
+    indice = Math.abs(4 - indice);
+  }
+  let dv = (((Math.floor(soma / 10)) + 1) * 10) - soma;
+  if (dv > 9) dv = 0;
+  return dv.toString();
+}
+
+// Gera código de barras EAN-13 no padrão 189600 + 6 dígitos + DV (UnitCadGrades.pas)
+function geraCodBarraGrade(gradeCodigo) {
+  const codPadded = String(gradeCodigo || 1).padStart(6, '0');
+  const cadeia = '18960000' + codPadded;
+  const dv = geraDVEAN(cadeia);
+  return '189600' + codPadded + dv;
+}
+
 export default function GradesModal({ isOpen, onClose, product, onGradesUpdated }) {
   if (!isOpen) return null;
 
@@ -20,9 +42,9 @@ export default function GradesModal({ isOpen, onClose, product, onGradesUpdated 
     tam: 'M',
     cor: 'PADRAO',
     quantidade: '0',
-    valor_dinheiro: product?.pro_valor_dinheiro || product?.valorv || '0',
+    valor_dinheiro: product?.pro_valor_dinheiro ?? product?.valordinheiro ?? product?.valorv ?? '0',
     valor: product?.valorv || '0', // Vlr Vista
-    valor_prazo: product?.pro_valorv_prazo || product?.valorv || '0',
+    valor_prazo: product?.pro_valorv_prazo ?? product?.valorprazo ?? product?.valorv ?? '0',
     codbarra: ''
   });
 
@@ -48,7 +70,7 @@ export default function GradesModal({ isOpen, onClose, product, onGradesUpdated 
     }
   };
 
-  // Atalhos de Teclado (ESC fecha, F10 gera código de barras)
+  // Atalhos de Teclado (ESC fecha, F2 novo, F10 gera código de barras, Ctrl+S salva)
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
@@ -56,11 +78,17 @@ export default function GradesModal({ isOpen, onClose, product, onGradesUpdated 
       } else if (e.key === 'F10') {
         e.preventDefault();
         handleGenerateBarcode();
+      } else if (e.key === 'F2' || e.key === 'Insert') {
+        e.preventDefault();
+        if (mode === 'browse') handleInsert();
+      } else if (e.ctrlKey && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        if (mode !== 'browse') handleConfirm();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose, form.tam]);
+  }, [onClose, form, mode, grades]);
 
   const fetchGradesForProduct = async () => {
     setLoading(true);
@@ -97,30 +125,65 @@ export default function GradesModal({ isOpen, onClose, product, onGradesUpdated 
       tam: g.tam || g.tamanho || (tamanhosList[0]?.codigo || 'M'),
       cor: g.cor || 'PADRAO',
       quantidade: String(g.quantidade || 0),
-      valor_dinheiro: String(g.valor_dinheiro ?? g.valor ?? 0),
+      valor_dinheiro: String(g.valor_dinheiro ?? g.valorDinheiro ?? g.valordinheiro ?? g.valor ?? 0),
       valor: String(g.valor || 0),
-      valor_prazo: String(g.valor_prazo ?? g.valor ?? 0),
+      valor_prazo: String(g.valor_prazo ?? g.valorPrazo ?? g.valorprazo ?? g.valor ?? 0),
       codbarra: g.codbarra || ''
     });
     setMode('browse');
   };
 
+  // Gerador de código de barras (Individial ou Em Lote para todas as grades - Legado Delphi)
+  const handleGenerateAllBarcodes = async () => {
+    if (grades.length === 0) {
+      alert('Nenhuma grade cadastrada para este produto.');
+      return;
+    }
+    if (!window.confirm('Deseja gerar código de barras EAN-13 para TODAS as grades deste produto?')) return;
+
+    setLoading(true);
+    try {
+      const updatedGrades = grades.map(g => ({
+        codigo: Number(g.codigo || g.id),
+        pro: Number(product?.codigo || product?.id),
+        tam: Number(g.tam || g.tamanho || 1),
+        cor: g.cor || 'PADRAO',
+        quantidade: Number(g.quantidade || 0),
+        valor: Number(g.valor || 0),
+        valor_dinheiro: Number(g.valor_dinheiro ?? g.valorDinheiro ?? g.valordinheiro ?? g.valor ?? 0),
+        valorDinheiro: Number(g.valor_dinheiro ?? g.valorDinheiro ?? g.valordinheiro ?? g.valor ?? 0),
+        valor_prazo: Number(g.valor_prazo ?? g.valorPrazo ?? g.valorprazo ?? g.valor ?? 0),
+        valorPrazo: Number(g.valor_prazo ?? g.valorPrazo ?? g.valorprazo ?? g.valor ?? 0),
+        codbarra: geraCodBarraGrade(g.codigo || g.id)
+      }));
+
+      await api.post('/v1/grades/emLote', { itens: updatedGrades });
+      alert('Cod. de Barras das Grades gerado com sucesso!');
+      await fetchGradesForProduct();
+      if (onGradesUpdated) onGradesUpdated();
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao gerar Cod. Barras das Grades.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleGenerateBarcode = () => {
-    const prodCode = String(product?.codigo || product?.id || 1000).padStart(6, '0');
-    const tamIndex = tamanhosDisponiveis.indexOf(String(form.tam));
-    const tamCode = String(tamIndex >= 0 ? tamIndex + 1 : Number(form.tam) || 1).padStart(2, '0');
-    const rand = Math.floor(Math.random() * 90) + 10;
-    const generated = `789${prodCode}${tamCode}${rand}`;
-    setForm(prev => ({ ...prev, codbarra: generated }));
+    if (mode === 'browse') {
+      handleGenerateAllBarcodes();
+    } else {
+      const barcode = geraCodBarraGrade(form.codigo || 1);
+      setForm(prev => ({ ...prev, codbarra: barcode }));
+    }
   };
 
   const handleInsert = () => {
     setMode('insert');
     const nextCode = grades.length > 0 ? Math.max(...grades.map(g => Number(g.codigo) || 0)) + 1 : 1;
-    const defaultValDin = product?.pro_valor_dinheiro || product?.valorv || 0;
+    const defaultValDin = product?.pro_valor_dinheiro ?? product?.valordinheiro ?? product?.valorv ?? 0;
     const defaultValVis = product?.valorv || 0;
-    const defaultValPrz = product?.pro_valorv_prazo || product?.valorv || 0;
-
+    const defaultValPrz = product?.pro_valorv_prazo ?? product?.valorprazo ?? product?.valorv ?? 0;
     const defaultTam = tamanhosList.length > 0 ? tamanhosList[0].codigo : 'M';
 
     setForm({
@@ -132,7 +195,7 @@ export default function GradesModal({ isOpen, onClose, product, onGradesUpdated 
       valor_dinheiro: String(defaultValDin),
       valor: String(defaultValVis),
       valor_prazo: String(defaultValPrz),
-      codbarra: ''
+      codbarra: geraCodBarraGrade(nextCode)
     });
   };
 
@@ -167,9 +230,11 @@ export default function GradesModal({ isOpen, onClose, product, onGradesUpdated 
         tam: sizeId,
         cor: form.cor || 'PADRAO',
         quantidade: Number(form.quantidade) || 0,
-        valor_dinheiro: Number(form.valor_dinheiro) || 0,
         valor: Number(form.valor) || 0,
+        valor_dinheiro: Number(form.valor_dinheiro) || 0,
+        valorDinheiro: Number(form.valor_dinheiro) || 0,
         valor_prazo: Number(form.valor_prazo) || 0,
+        valorPrazo: Number(form.valor_prazo) || 0,
         codbarra: form.codbarra || ''
       };
 
@@ -191,7 +256,7 @@ export default function GradesModal({ isOpen, onClose, product, onGradesUpdated 
 
   const handleDelete = async () => {
     if (!selectedGrade) return;
-    if (!window.confirm('Tem certeza que deseja excluir esta grade?')) return;
+    if (!window.confirm('Deseja realmente excluir este registro?')) return;
     setLoading(true);
     try {
       await api.delete(`/v1/grades/${selectedGrade.codigo}`);
@@ -312,25 +377,27 @@ export default function GradesModal({ isOpen, onClose, product, onGradesUpdated 
               />
             </div>
 
-            <div className="gra-input-field gra-barcode-field">
+            <div className="gra-input-field gra-barcode-field" style={{ minWidth: '180px' }}>
               <label>Cód. Barras</label>
-              <div style={{ display: 'flex', gap: '4px' }}>
+              <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
                 <input 
                   type="text" 
                   value={form.codbarra} 
                   onChange={(e) => setForm({ ...form, codbarra: e.target.value })}
                   disabled={mode === 'browse'}
                   className="legacy-input"
-                  placeholder="EAN-13"
+                  placeholder="EAN-13 (F10)"
+                  style={{ flex: 1, minWidth: '120px' }}
                 />
                 <button 
                   type="button"
                   className="btn-barcode-gen"
                   onClick={handleGenerateBarcode}
-                  disabled={mode === 'browse'}
-                  title="Gerar Cód. Barras (F10)"
+                  disabled={loading}
+                  title="Gerar Cód. Barras EAN-13 (F10)"
+                  style={{ height: '36px', padding: '0 8px', flexShrink: 0 }}
                 >
-                  <Barcode size={16} />
+                  <Barcode size={18} />
                 </button>
               </div>
             </div>
@@ -355,9 +422,9 @@ export default function GradesModal({ isOpen, onClose, product, onGradesUpdated 
                 <tbody>
                   {grades.map((g) => {
                     const isSelected = selectedGrade && selectedGrade.codigo === g.codigo;
-                    const vDin = Number(g.valor_dinheiro ?? g.valor ?? 0);
+                    const vDin = Number(g.valor_dinheiro ?? g.valorDinheiro ?? g.valordinheiro ?? g.valor ?? 0);
                     const vVis = Number(g.valor || 0);
-                    const vPrz = Number(g.valor_prazo ?? g.valor ?? 0);
+                    const vPrz = Number(g.valor_prazo ?? g.valorPrazo ?? g.valorprazo ?? g.valor ?? 0);
                     const tamObj = tamanhosList.find(t => Number(t.codigo) === Number(g.tam));
                     const tamLabel = tamObj ? (tamObj.sigla || tamObj.tamanho) : (g.tamanho || g.tam || '-');
 
@@ -431,9 +498,9 @@ export default function GradesModal({ isOpen, onClose, product, onGradesUpdated 
         {/* Rodapé com Atalhos */}
         <div className="legacy-modal-footer">
           <div className="legacy-shortcuts">
-            <span className="shortcut-tag"><kbd>ESC</kbd> Sair</span>
-            <span className="shortcut-tag"><kbd>F9</kbd> Pesquisa</span>
-            <span className="shortcut-tag"><kbd>F10</kbd> Gerar Cód. Barras</span>
+            <span className="shortcut-tag" onClick={onClose} style={{ cursor: 'pointer' }}><kbd>ESC</kbd> Sair</span>
+            <span className="shortcut-tag" onClick={handleInsert} style={{ cursor: 'pointer' }}><kbd>F2</kbd> Inserir</span>
+            <span className="shortcut-tag" onClick={handleGenerateAllBarcodes} style={{ cursor: 'pointer' }}><kbd>F10</kbd> Gerar Cód. Barras</span>
           </div>
         </div>
       </div>

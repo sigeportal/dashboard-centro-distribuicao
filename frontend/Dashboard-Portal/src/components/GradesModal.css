@@ -1,6 +1,6 @@
 .gra-modal-window {
-  width: 95%;
-  max-width: 980px;
+  width: 96%;
+  max-width: 1150px;
   background: var(--bg-card, #ffffff);
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 1.25rem;
@@ -18,10 +18,10 @@
 
 .gra-inputs-grid {
   display: grid;
-  grid-template-columns: 85px 110px 140px 110px 120px 120px 120px 1fr;
-  gap: 0.75rem;
+  grid-template-columns: 75px 105px 115px 80px 105px 105px 105px minmax(190px, 1fr);
+  gap: 0.6rem;
   background: var(--bg-secondary, #ffffff);
-  padding: 1.1rem;
+  padding: 1rem;
   border-radius: 1rem;
   border: 1px solid rgba(0, 0, 0, 0.08);
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.03);
