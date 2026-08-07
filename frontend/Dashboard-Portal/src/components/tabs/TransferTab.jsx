@@ -739,20 +739,22 @@ export default function TransferTab() {
                           <Printer size={13} /> Romaneio
                         </button>
 
-                        <button 
-                          className="cd-action-btn view" 
-                          onClick={() => handleOpenNfeModal(item)} 
-                          title="Visualizar, Editar ou Emitir NF-e de Transferência"
-                          style={{ 
-                            background: item.chaveNfe ? 'linear-gradient(135deg, #059669, #10b981)' : 'linear-gradient(135deg, #7c3aed, #6366f1)', 
-                            color: '#ffffff', 
-                            padding: '4px 8px', 
-                            fontSize: '0.78rem', 
-                            gap: '3px' 
-                          }}
-                        >
-                          <FileText size={13} /> {item.chaveNfe ? 'Ver NF-e' : 'Emitir NF-e'}
-                        </button>
+                        {item.tipoFiscal !== 'NAO_FISCAL' && (
+                          <button 
+                            className="cd-action-btn view" 
+                            onClick={() => handleOpenNfeModal(item)} 
+                            title="Visualizar, Editar ou Emitir NF-e de Transferência"
+                            style={{ 
+                              background: item.chaveNfe ? 'linear-gradient(135deg, #059669, #10b981)' : 'linear-gradient(135deg, #7c3aed, #6366f1)', 
+                              color: '#ffffff', 
+                              padding: '4px 8px', 
+                              fontSize: '0.78rem', 
+                              gap: '3px' 
+                            }}
+                          >
+                            <FileText size={13} /> {item.chaveNfe ? 'Ver NF-e' : 'Emitir NF-e'}
+                          </button>
+                        )}
                         
                         {item.status === 'Em Trânsito' && (
                           <button 

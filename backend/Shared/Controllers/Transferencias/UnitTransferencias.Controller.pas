@@ -18,6 +18,7 @@ type
     class procedure Post(Req: THorseRequest; Res: THorseResponse; Next: TProc);
     class procedure PostEmLote(Req: THorseRequest; Res: THorseResponse);
     class procedure Put(Req: THorseRequest; Res: THorseResponse; Next: TProc);
+    class procedure AtualizarStatus(Req: THorseRequest; Res: THorseResponse; Next: TProc);
     class procedure Delete(Req: THorseRequest; Res: THorseResponse; Next: TProc);
 
     // Itens
@@ -128,39 +129,82 @@ begin
 end;
 
 class procedure TTransferenciasController.GetItens(Req: THorseRequest; Res: THorseResponse; Next: TProc);
-var TransferenciaItem: TTransferenciaItem;
+var
     aJson: TJSONArray;
     Query: iQuery;
     tr_id: string;
+    itemObj: TJSONObject;
 begin
   aJson := TJSONArray.Create;
   Query := TDatabase.Query;
   try
-    TransferenciaItem := TTransferenciaItem.Create(TDatabase.Connection);
-    try
-      TransferenciaItem.BuscaDadosTabela(GeraCodigo('TRANSFERENCIA_ITEM', 'TRI_ID')-1);
-    except
-      TransferenciaItem.BuscaDadosTabela(1);
-    end;
-    
-    if Req.Query.ContainsKey('transferencia_id') then
-    begin
-      tr_id := Req.Query.Items['transferencia_id'];
-      Query.Open('SELECT TRI_ID FROM TRANSFERENCIA_ITEM WHERE TRI_TRANSFERENCIA_ID = ' + tr_id + ' ORDER BY TRI_ID');
-    end
+    if Req.Params.ContainsKey('id') then
+      tr_id := Req.Params.Items['id']
+    else if Req.Query.ContainsKey('transferencia_id') then
+      tr_id := Req.Query.Items['transferencia_id']
+    else if Req.Query.ContainsKey('TR_ID') then
+      tr_id := Req.Query.Items['TR_ID']
+    else if Req.Query.ContainsKey('id') then
+      tr_id := Req.Query.Items['id']
     else
-      Query.Open('SELECT TRI_ID FROM TRANSFERENCIA_ITEM ORDER BY TRI_ID');
+      tr_id := '';
+
+    if tr_id <> '' then
+      Query.Open(
+        'SELECT TI.TRI_ID, TI.TRI_TRANSFERENCIA_ID, TI.TRI_PRODUTO_ID, TI.TRI_QUANTIDADE, TI.TRI_VALOR, TI.TRI_QTD_CONFERIDA, TI.TRI_JUSTIFICATIVA, ' +
+        '       P.PRO_NOME, P.PRO_CODBARRA, P.PRO_NCM, P.PRO_CFOP, P.PRO_CEST, P.PRO_EMBALAGEM, P.PRO_BALANCA, P.PRO_GRU, P.PRO_VALORC ' +
+        'FROM TRANSFERENCIA_ITEM TI ' +
+        'LEFT JOIN PRODUTOS P ON (P.PRO_CODIGO = TI.TRI_PRODUTO_ID) ' +
+        'WHERE TI.TRI_TRANSFERENCIA_ID = ' + tr_id + ' ' +
+        'ORDER BY TI.TRI_ID'
+      )
+    else
+      Query.Open(
+        'SELECT TI.TRI_ID, TI.TRI_TRANSFERENCIA_ID, TI.TRI_PRODUTO_ID, TI.TRI_QUANTIDADE, TI.TRI_VALOR, TI.TRI_QTD_CONFERIDA, TI.TRI_JUSTIFICATIVA, ' +
+        '       P.PRO_NOME, P.PRO_CODBARRA, P.PRO_NCM, P.PRO_CFOP, P.PRO_CEST, P.PRO_EMBALAGEM, P.PRO_BALANCA, P.PRO_GRU, P.PRO_VALORC ' +
+        'FROM TRANSFERENCIA_ITEM TI ' +
+        'LEFT JOIN PRODUTOS P ON (P.PRO_CODIGO = TI.TRI_PRODUTO_ID) ' +
+        'ORDER BY TI.TRI_ID'
+      );
       
     Query.Dataset.First;
     while not Query.Dataset.Eof do
     begin
-      TransferenciaItem.BuscaDadosTabela(Query.Dataset.FieldByName('TRI_ID').AsInteger);
-      aJson.Add(TJSONObject.ParseJSONValue(TransferenciaItem.ToJson) as TJSONObject);
+      itemObj := TJSONObject.Create;
+      itemObj.AddPair('id', TJSONNumber.Create(Query.Dataset.FieldByName('TRI_ID').AsInteger));
+      itemObj.AddPair('tri_id', TJSONNumber.Create(Query.Dataset.FieldByName('TRI_ID').AsInteger));
+      itemObj.AddPair('transferenciaId', TJSONNumber.Create(Query.Dataset.FieldByName('TRI_TRANSFERENCIA_ID').AsInteger));
+      itemObj.AddPair('tri_transferencia_id', TJSONNumber.Create(Query.Dataset.FieldByName('TRI_TRANSFERENCIA_ID').AsInteger));
+      itemObj.AddPair('produtoId', TJSONNumber.Create(Query.Dataset.FieldByName('TRI_PRODUTO_ID').AsInteger));
+      itemObj.AddPair('tri_produto_id', TJSONNumber.Create(Query.Dataset.FieldByName('TRI_PRODUTO_ID').AsInteger));
+      itemObj.AddPair('quantidade', TJSONNumber.Create(Query.Dataset.FieldByName('TRI_QUANTIDADE').AsFloat));
+      itemObj.AddPair('tri_quantidade', TJSONNumber.Create(Query.Dataset.FieldByName('TRI_QUANTIDADE').AsFloat));
+      itemObj.AddPair('valor', TJSONNumber.Create(Query.Dataset.FieldByName('TRI_VALOR').AsFloat));
+      itemObj.AddPair('tri_valor', TJSONNumber.Create(Query.Dataset.FieldByName('TRI_VALOR').AsFloat));
+      itemObj.AddPair('quantidadeConferida', TJSONNumber.Create(Query.Dataset.FieldByName('TRI_QTD_CONFERIDA').AsFloat));
+      itemObj.AddPair('tri_qtd_conferida', TJSONNumber.Create(Query.Dataset.FieldByName('TRI_QTD_CONFERIDA').AsFloat));
+      itemObj.AddPair('justificativa', Query.Dataset.FieldByName('TRI_JUSTIFICATIVA').AsString);
+      itemObj.AddPair('tri_justificativa', Query.Dataset.FieldByName('TRI_JUSTIFICATIVA').AsString);
+      
+      // Dados completos do produto
+      itemObj.AddPair('nome', Query.Dataset.FieldByName('PRO_NOME').AsString);
+      itemObj.AddPair('PRO_NOME', Query.Dataset.FieldByName('PRO_NOME').AsString);
+      itemObj.AddPair('codbarra', Query.Dataset.FieldByName('PRO_CODBARRA').AsString);
+      itemObj.AddPair('PRO_CODBARRA', Query.Dataset.FieldByName('PRO_CODBARRA').AsString);
+      itemObj.AddPair('ncm', Query.Dataset.FieldByName('PRO_NCM').AsString);
+      itemObj.AddPair('PRO_NCM', Query.Dataset.FieldByName('PRO_NCM').AsString);
+      itemObj.AddPair('cfop', Query.Dataset.FieldByName('PRO_CFOP').AsString);
+      itemObj.AddPair('PRO_CFOP', Query.Dataset.FieldByName('PRO_CFOP').AsString);
+      itemObj.AddPair('cest', Query.Dataset.FieldByName('PRO_CEST').AsString);
+      itemObj.AddPair('embalagem', Query.Dataset.FieldByName('PRO_EMBALAGEM').AsString);
+      itemObj.AddPair('balanca', Query.Dataset.FieldByName('PRO_BALANCA').AsString);
+      itemObj.AddPair('custo', TJSONNumber.Create(Query.Dataset.FieldByName('PRO_VALORC').AsFloat));
+      
+      aJson.Add(itemObj);
       Query.Dataset.Next;
     end;
     Res.Send<TJSONArray>(aJson);
   finally
-    TransferenciaItem.DisposeOf;
   end;
 end;
 
@@ -462,6 +506,52 @@ begin
   end;
 end;
 
+class procedure TTransferenciasController.AtualizarStatus(Req: THorseRequest; Res: THorseResponse; Next: TProc);
+var
+  id: string;
+  oJson: TJSONObject;
+  st, obs, usr: string;
+  Query: iQuery;
+begin
+  id := Req.Params.Items['id'];
+  st := 'RECEBIDO';
+  obs := '';
+  usr := 'OPERADOR';
+  try
+    oJson := TJSONObject.ParseJSONValue(Req.Body) as TJSONObject;
+    if oJson <> nil then
+    begin
+      if oJson.GetValue('status') <> nil then
+        st := oJson.GetValue('status').Value
+      else if oJson.GetValue('TR_STATUS') <> nil then
+        st := oJson.GetValue('TR_STATUS').Value;
+
+      if oJson.GetValue('obs') <> nil then
+        obs := oJson.GetValue('obs').Value
+      else if oJson.GetValue('TR_OBS') <> nil then
+        obs := oJson.GetValue('TR_OBS').Value;
+
+      if oJson.GetValue('usuario') <> nil then
+        usr := oJson.GetValue('usuario').Value
+      else if oJson.GetValue('usuarioRecebimento') <> nil then
+        usr := oJson.GetValue('usuarioRecebimento').Value
+      else if oJson.GetValue('TR_USUARIO_RECEBIMENTO') <> nil then
+        usr := oJson.GetValue('TR_USUARIO_RECEBIMENTO').Value;
+      oJson.DisposeOf;
+    end;
+  except
+  end;
+
+  try
+    Query := TDatabase.Query;
+    Query.Add('UPDATE TRANSFERENCIA SET TR_STATUS = ''' + st + ''', TR_USUARIO_RECEBIMENTO = ''' + usr + ''', TR_DATA_RECEBIMENTO = CURRENT_TIMESTAMP WHERE TR_ID = ' + id);
+    Query.ExecSQL;
+  except
+  end;
+
+  Res.Send<TJSONObject>(TJSONObject.Create.AddPair('sucesso', TJSONBool.Create(True)).AddPair('status', st));
+end;
+
 class procedure TTransferenciasController.Router;
 begin
   THorse.Group
@@ -475,7 +565,14 @@ begin
         .Prefix('/v1')
         .Route('/transferencias/:id')
           .Get(GetForID)
+          .Put(Put)
           .Delete(Delete)
+        .&End
+        .Group
+        .Prefix('/v1')
+        .Route('/transferencias/:id/status')
+          .Put(AtualizarStatus)
+          .Post(AtualizarStatus)
         .&End
         .Group
         .Prefix('/v1')
@@ -497,8 +594,33 @@ begin
         .&End
         .Group
         .Prefix('/v1')
+        .Route('/transferencias/itens')
+          .Get(GetItens)
+        .&End
+        .Group
+        .Prefix('/v1')
+        .Route('/transferencias/:id/itens')
+          .Get(GetItens)
+        .&End
+        .Group
+        .Prefix('/v1')
         .Route('/transferenciaItens/emLote')
           .Post(PostItensEmLote)
+        .&End
+        .Group
+        .Prefix('/v1')
+        .Route('/transferenciaItens/lote')
+          .Post(PostItensEmLote)
+        .&End
+        .Group
+        .Prefix('/v1')
+        .Route('/transferencias/itens/lote')
+          .Post(PostItensEmLote)
+        .&End
+        .Group
+        .Prefix('/v1')
+        .Route('/transferencias/lote')
+          .Post(PostEmLote)
         .&End;
 end;
 
