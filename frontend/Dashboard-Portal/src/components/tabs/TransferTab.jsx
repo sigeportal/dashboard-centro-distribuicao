@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowRightLeft, Plus, CheckCircle, AlertCircle, Eye, RefreshCw, Send, ShieldCheck, XCircle, Search, Package, X, Printer } from 'lucide-react';
+import { ArrowRightLeft, Plus, CheckCircle, AlertCircle, Eye, RefreshCw, Send, ShieldCheck, XCircle, Search, Package, X, Printer, FileText } from 'lucide-react';
 import { createApi } from '../../services/api';
 import SearchBar from '../SearchBar';
 import Pagination from '../Pagination';
 import RomaneioModal from '../RomaneioModal';
+import NfeTransferModal from '../NfeTransferModal';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import './TransferTab.css';
 
@@ -31,6 +32,11 @@ export default function TransferTab() {
   const [showRomaneioModal, setShowRomaneioModal] = useState(false);
   const [romaneioTransfer, setRomaneioTransfer] = useState(null);
   const [romaneioItems, setRomaneioItems] = useState([]);
+
+  // Modal de Emissão e Visualização de NF-e de Transferência
+  const [showNfeModal, setShowNfeModal] = useState(false);
+  const [nfeTransfer, setNfeTransfer] = useState(null);
+  const [nfeItems, setNfeItems] = useState([]);
 
   // Nova Transferência
   const [origin, setOrigin] = useState('');
@@ -464,6 +470,38 @@ export default function TransferTab() {
     }
   };
 
+  const handleOpenNfeModal = async (transferItem) => {
+    setLoading(true);
+    setNfeTransfer(transferItem);
+    try {
+      const res = await api.get(`/v1/transferenciaItens?transferencia_id=${transferItem.id}`);
+      let rawItems = [];
+      if (Array.isArray(res.data)) rawItems = res.data;
+      else if (res.data?.data && Array.isArray(res.data.data)) rawItems = res.data.data;
+      
+      const enriched = rawItems.map(it => {
+        const prod = products.find(p => Number(p.codigo || p.id) === Number(it.produtoId || it.produto_id));
+        return {
+          ...it,
+          produto_id: it.produtoId || it.produto_id,
+          nome: prod?.nome || it.produto_nome || `Produto #${it.produtoId || it.produto_id}`,
+          ncm: prod?.ncm || '6109.10.00',
+          cest: prod?.cest || '28.038.00',
+          quantidade: it.quantidade,
+          valor: it.valor || prod?.valorv || 10.00
+        };
+      });
+      setNfeItems(enriched);
+      setShowNfeModal(true);
+    } catch (err) {
+      console.warn('Erro ao carregar itens para NF-e:', err);
+      setNfeItems([]);
+      setShowNfeModal(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleOpenConference = async (transfer) => {
     setLoading(true);
     try {
@@ -699,6 +737,21 @@ export default function TransferTab() {
                           style={{ background: 'linear-gradient(135deg, #2563eb, #3b82f6)', color: '#ffffff', padding: '4px 8px', fontSize: '0.78rem', gap: '3px' }}
                         >
                           <Printer size={13} /> Romaneio
+                        </button>
+
+                        <button 
+                          className="cd-action-btn view" 
+                          onClick={() => handleOpenNfeModal(item)} 
+                          title="Visualizar, Editar ou Emitir NF-e de Transferência"
+                          style={{ 
+                            background: item.chaveNfe ? 'linear-gradient(135deg, #059669, #10b981)' : 'linear-gradient(135deg, #7c3aed, #6366f1)', 
+                            color: '#ffffff', 
+                            padding: '4px 8px', 
+                            fontSize: '0.78rem', 
+                            gap: '3px' 
+                          }}
+                        >
+                          <FileText size={13} /> {item.chaveNfe ? 'Ver NF-e' : 'Emitir NF-e'}
                         </button>
                         
                         {item.status === 'Em Trânsito' && (
@@ -1268,6 +1321,19 @@ export default function TransferTab() {
           products={products}
           units={units}
           onClose={() => setShowRomaneioModal(false)}
+        />
+      )}
+
+      {/* MODAL DE EMISSÃO, EDIÇÃO E VISUALIZAÇÃO DE NF-E DE TRANSFERÊNCIA */}
+      {showNfeModal && nfeTransfer && (
+        <NfeTransferModal
+          transfer={nfeTransfer}
+          items={nfeItems}
+          units={units}
+          onClose={() => setShowNfeModal(false)}
+          onNfeUpdated={() => {
+            fetchTransfers();
+          }}
         />
       )}
 

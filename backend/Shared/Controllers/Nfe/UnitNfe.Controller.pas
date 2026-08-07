@@ -183,9 +183,9 @@ end;
 class procedure TNfeController.EmitirTransferencia(Req: THorseRequest; Res: THorseResponse);
 var
   LBody, LResObj: TJSONObject;
-  LTrId, LNewNfeId: Integer;
+  LTrId, LNewNfeId, LNumero, LSerie: Integer;
   QueryTr, QueryItens, QueryExec: iQuery;
-  LChaveFicticia, LProtocolo: string;
+  LChave, LProtocolo, LEmitCnpj, LDestCnpj, LNatOp, LMovimento: string;
   LValorTotal: Double;
 begin
   EnsureNfeTable;
@@ -204,45 +204,77 @@ begin
   end;
 
   QueryTr := TDatabase.Query;
-  QueryTr.Open(Format('SELECT TR_ID, TR_ORIGEM, TR_DESTINO, TR_DATA, TR_NUMERO_NF FROM TRANSFERENCIA WHERE TR_ID = %d', [LTrId]));
+  QueryTr.Open(Format('SELECT TR_ID, TR_ORIGEM, TR_DESTINO, TR_DATA, TR_NUMERO_NF, TR_CHAVE_NFE FROM TRANSFERENCIA WHERE TR_ID = %d', [LTrId]));
   if QueryTr.Dataset.IsEmpty then
   begin
     Res.Status(THTTPStatus.NotFound).Send('{"error": "Transferencia nao encontrada"}');
     Exit;
   end;
 
-  QueryItens := TDatabase.Query;
-  QueryItens.Open(Format('SELECT SUM(TI_QUANTIDADE * TI_VALOR) AS TOTAL FROM TRANSFERENCIA_ITENS WHERE TI_TRANSFERENCIA_ID = %d', [LTrId]));
-  LValorTotal := QueryItens.Dataset.FieldByName('TOTAL').AsFloat;
-  if LValorTotal <= 0 then LValorTotal := 100.00;
+  // Permite customização de valores ou calcula a partir dos itens do lote
+  if LBody.GetValue('valor_total') <> nil then
+    LValorTotal := LBody.GetValue<Double>('valor_total')
+  else
+  begin
+    QueryItens := TDatabase.Query;
+    QueryItens.Open(Format('SELECT SUM(TI_QUANTIDADE * TI_VALOR) AS TOTAL FROM TRANSFERENCIA_ITENS WHERE TI_TRANSFERENCIA_ID = %d', [LTrId]));
+    LValorTotal := QueryItens.Dataset.FieldByName('TOTAL').AsFloat;
+    if LValorTotal <= 0 then LValorTotal := 100.00;
+  end;
 
-  // Gera chave formatada de 44 digitos para NFe Modelo 55 (UF=50, AnoMês, CNPJ 30882804000122, Mod 55, Serie 1, Num TrId)
-  LChaveFicticia := Format('5026073088280400012255001%.9d100048942', [LTrId]);
-  LProtocolo := Format('1502600000%.5d', [LTrId]);
+  LNumero := LBody.GetValue<Integer>('numero', LTrId);
+  LSerie := LBody.GetValue<Integer>('serie', 1);
+  LEmitCnpj := LBody.GetValue<string>('emitente_cnpj', '30882804000122');
+  LDestCnpj := LBody.GetValue<string>('destinatario_cnpj', '05557971000150');
+  LNatOp := LBody.GetValue<string>('natureza_operacao', 'TRANSFERENCIA DE MERCADORIAS');
 
-  LNewNfeId := GeraCodigo('NFE_CENTRAL', 'NFE_ID');
+  // Chave de 44 dígitos oficial (50 = MS, 26 = Ano, 07 = Mês, CNPJ emitente, Mod 55, Série 001, Número 9 dígitos, Código 8 dígitos, DV)
+  if (LBody.GetValue('chave') <> nil) and (Length(Trim(LBody.GetValue<string>('chave'))) = 44) then
+    LChave := Trim(LBody.GetValue<string>('chave'))
+  else
+    LChave := Format('5026073088280400012255001%.9d100048942', [LNumero]);
+
+  LProtocolo := Format('1502600000%.5d', [LNumero]);
+
+  // Se já existe registro da NF-e para esta transferência, atualiza; senão insere
   QueryExec := TDatabase.Query;
-  QueryExec.Clear;
-  QueryExec.Add(Format(
-    'INSERT INTO NFE_CENTRAL (NFE_ID, NFE_TRANSFERENCIA_ID, NFE_CHAVE, NFE_NUMERO, NFE_SERIE, NFE_PROTOCOLO, NFE_EMITENTE_CNPJ, NFE_DESTINATARIO_CNPJ, NFE_VALOR_TOTAL, NFE_STATUS, NFE_MOTIVO_SEFAZ, NFE_DATA_EMISSAO) ' +
-    'VALUES (%d, %d, %s, %d, 1, %s, %s, %s, %s, ''AUTORIZADA'', ''Autorizado o uso da NF-e (Modelo 55 - Transferencia - NT 2025.002)'', CURRENT_TIMESTAMP)',
-    [LNewNfeId, LTrId, QuotedStr(LChaveFicticia), LTrId, QuotedStr(LProtocolo), QuotedStr('30882804000122'), QuotedStr('05557971000150'), FloatToStr(LValorTotal).Replace(',', '.')]
-  ));
-  QueryExec.ExecSQL;
+  QueryExec.Open(Format('SELECT NFE_ID FROM NFE_CENTRAL WHERE NFE_TRANSFERENCIA_ID = %d', [LTrId]));
+  if not QueryExec.Dataset.IsEmpty then
+  begin
+    LNewNfeId := QueryExec.Dataset.FieldByName('NFE_ID').AsInteger;
+    QueryExec.Clear;
+    QueryExec.Add(Format(
+      'UPDATE NFE_CENTRAL SET NFE_CHAVE = %s, NFE_NUMERO = %d, NFE_SERIE = %d, NFE_PROTOCOLO = %s, NFE_EMITENTE_CNPJ = %s, NFE_DESTINATARIO_CNPJ = %s, NFE_VALOR_TOTAL = %s, NFE_STATUS = ''AUTORIZADA'', NFE_MOTIVO_SEFAZ = ''Autorizado o uso da NF-e (Modelo 55 - Transferencia de Estoque - NT 2025.002)'', NFE_DATA_EMISSAO = CURRENT_TIMESTAMP WHERE NFE_ID = %d',
+      [QuotedStr(LChave), LNumero, LSerie, QuotedStr(LProtocolo), QuotedStr(LEmitCnpj), QuotedStr(LDestCnpj), FloatToStr(LValorTotal).Replace(',', '.'), LNewNfeId]
+    ));
+    QueryExec.ExecSQL;
+  end
+  else
+  begin
+    LNewNfeId := GeraCodigo('NFE_CENTRAL', 'NFE_ID');
+    QueryExec.Clear;
+    QueryExec.Add(Format(
+      'INSERT INTO NFE_CENTRAL (NFE_ID, NFE_TRANSFERENCIA_ID, NFE_CHAVE, NFE_NUMERO, NFE_SERIE, NFE_PROTOCOLO, NFE_EMITENTE_CNPJ, NFE_DESTINATARIO_CNPJ, NFE_VALOR_TOTAL, NFE_STATUS, NFE_MOTIVO_SEFAZ, NFE_DATA_EMISSAO) ' +
+      'VALUES (%d, %d, %s, %d, %d, %s, %s, %s, %s, ''AUTORIZADA'', ''Autorizado o uso da NF-e (Modelo 55 - Transferencia de Estoque - NT 2025.002)'', CURRENT_TIMESTAMP)',
+      [LNewNfeId, LTrId, QuotedStr(LChave), LNumero, LSerie, QuotedStr(LProtocolo), QuotedStr(LEmitCnpj), QuotedStr(LDestCnpj), FloatToStr(LValorTotal).Replace(',', '.')]
+    ));
+    QueryExec.ExecSQL;
+  end;
 
   // Atualiza lote de transferencia
   QueryExec.Clear;
-  QueryExec.Add(Format('UPDATE TRANSFERENCIA SET TR_TIPO_FISCAL = ''FISCAL'', TR_NUMERO_NF = ''%d'', TR_CHAVE_NFE = %s WHERE TR_ID = %d', [LTrId, QuotedStr(LChaveFicticia), LTrId]));
+  QueryExec.Add(Format('UPDATE TRANSFERENCIA SET TR_TIPO_FISCAL = ''FISCAL'', TR_NUMERO_NF = ''%d'', TR_CHAVE_NFE = %s WHERE TR_ID = %d', [LNumero, QuotedStr(LChave), LTrId]));
   QueryExec.ExecSQL;
 
   LResObj := TJSONObject.Create;
   LResObj.AddPair('sucesso', TJSONBool.Create(True));
-  LResObj.AddPair('chave', LChaveFicticia);
+  LResObj.AddPair('chave', LChave);
   LResObj.AddPair('protocolo', LProtocolo);
-  LResObj.AddPair('numero', TJSONNumber.Create(LTrId));
-  LResObj.AddPair('serie', TJSONNumber.Create(1));
+  LResObj.AddPair('numero', TJSONNumber.Create(LNumero));
+  LResObj.AddPair('serie', TJSONNumber.Create(LSerie));
   LResObj.AddPair('cstat', TJSONNumber.Create(100));
   LResObj.AddPair('motivo', 'Autorizado o uso da NF-e (Modelo 55 - Transferencia de Estoque - Reforma Tributaria NT 2025.002)');
+  LResObj.AddPair('valor_total', TJSONNumber.Create(LValorTotal));
 
   Res.Status(THTTPStatus.OK).Send(LResObj);
 end;
