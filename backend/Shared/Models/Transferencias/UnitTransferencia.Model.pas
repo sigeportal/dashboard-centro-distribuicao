@@ -41,7 +41,7 @@ type
     [TCampo('TR_OBS', 'VARCHAR(250)')]
     property Obs: string read FObs write FObs;
 
-    [TCampo('TR_USUARIO_RECEBIMENTO', 'VARCHAR(100)')]
+    [TCampo('TR_USUARIO_RECEBIMENTO', 'VARCHAR(200)')]
     property UsuarioRecebimento: string read FUsuarioRecebimento write FUsuarioRecebimento;
 
     [TCampo('TR_DATA_RECEBIMENTO', 'DATE')]

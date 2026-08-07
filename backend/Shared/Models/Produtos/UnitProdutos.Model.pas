@@ -66,6 +66,7 @@ type
     FCadastrar: string;
     FCodFiscal: integer;
     FFiscalGerar: string;
+    FBalanca: string;
 		{ private declarations }
 	public
 		{ public declarations }
@@ -172,6 +173,8 @@ type
     property CodFiscal: integer read FCodFiscal write FCodFiscal;
     [TCampo('PRO_FISCAL_GERAR', 'CHAR(1) DEFAULT ''S''')]
     property FiscalGerar: string read FFiscalGerar write FFiscalGerar;
+    [TCampo('PRO_BALANCA', 'CHAR(1)s')]
+    property Balanca: string read FBalanca write FBalanca;
   end;
 
 implementation

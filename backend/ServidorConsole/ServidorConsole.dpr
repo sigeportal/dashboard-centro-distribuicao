@@ -64,7 +64,8 @@ uses
   UnitNfeCentral.Model in '..\Shared\Models\Nfe\UnitNfeCentral.Model.pas',
   UnitNfe.Controller in '..\Shared\Controllers\Nfe\UnitNfe.Controller.pas',
   UnitClientes.Model in '..\Shared\Models\Clientes\UnitClientes.Model.pas',
-  UnitClientes.Controller in '..\Shared\Controllers\Clientes\UnitClientes.Controller.pas';
+  UnitClientes.Controller in '..\Shared\Controllers\Clientes\UnitClientes.Controller.pas',
+  ConciliacaoFiscal.Controller in '..\Shared\Controllers\ConciliacaoFiscal.Controller.pas';
 
 var
 	LLogFileConfig: THorseLoggerConsoleConfig;

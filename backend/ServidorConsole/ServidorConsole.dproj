@@ -179,6 +179,7 @@
         <DCCReference Include="..\Shared\Controllers\Nfe\UnitNfe.Controller.pas"/>
         <DCCReference Include="..\Shared\Models\Clientes\UnitClientes.Model.pas"/>
         <DCCReference Include="..\Shared\Controllers\Clientes\UnitClientes.Controller.pas"/>
+        <DCCReference Include="..\Shared\Controllers\ConciliacaoFiscal.Controller.pas"/>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>
             <CfgParent>Base</CfgParent>
@@ -225,7 +226,7 @@
                         <Overwrite>true</Overwrite>
                     </Platform>
                 </DeployFile>
-                <DeployFile LocalName="Win32\Release\ServidorConsole.exe" Configuration="Release" Class="ProjectOutput">
+                <DeployFile LocalName="dist\ServidorConsole.exe" Configuration="Release" Class="ProjectOutput">
                     <Platform Name="Win32">
                         <RemoteName>ServidorConsole.exe</RemoteName>
                         <Overwrite>true</Overwrite>
