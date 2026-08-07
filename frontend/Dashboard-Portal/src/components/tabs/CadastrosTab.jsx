@@ -348,41 +348,6 @@ export default function CadastrosTab() {
           await api.put('/v1/produtos', payload);
         } else {
           await api.post('/v1/produtos', payload);
-          
-          if (prodForm.distribute) {
-            // Obter empresas e criar transferencia
-            const empRes = await api.get('/v1/empresa');
-            if (Array.isArray(empRes.data)) {
-              const activeUnitId = Number(localStorage.getItem('selected_company_id')) || 1;
-              const otherUnits = empRes.data.filter(u => u.codigo !== activeUnitId);
-              
-              for (const unit of otherUnits) {
-                const transferId = Math.floor(Math.random() * 90000) + 10000;
-                const transferData = {
-                  id: transferId,
-                  origem: activeUnitId,
-                  destino: unit.codigo,
-                  data: new Date().toISOString().split('T')[0],
-                  status: 'Em Trânsito',
-                  obs: 'Distribuição automática de novo produto',
-                  usuarioRecebimento: '',
-                  dataRecebimento: '1899-12-30'
-                };
-                
-                await api.post('/v1/transferencias', transferData);
-                
-                const itemData = {
-                  id: Math.floor(Math.random() * 900000) + 100000,
-                  transferenciaId: transferId,
-                  produtoId: productCode,
-                  quantidade: payload.quantidade > 0 ? payload.quantidade : 0, // Se houver estoque inicial pode transferir a quantidade
-                  valor: payload.valorv,
-                  quantidadeConferida: 0
-                };
-                await api.post('/v1/transferenciaItens/emLote', { itens: [itemData] });
-              }
-            }
-          }
         }
       } else if (activeSubTab === 'grupos') {
         const payload = {

@@ -221,6 +221,9 @@ class procedure TProdutosController.Post(Req: THorseRequest; Res: THorseResponse
 var
 	Produtos: TProdutos;
 	LBodyObj: TJSONObject;
+	LQueryEmp, LQueryEE, LQueryInsert: iQuery;
+	LEmpId, LNewEEId: Integer;
+	LQtdEE: Double;
 begin
 	try
 		LBodyObj := Req.Body<TJSONObject>;
@@ -259,6 +262,41 @@ begin
 		end;
 		Produtos.Cadastrar := 'S';
 		Produtos.SalvaNoBanco(0);
+
+		// Cria o vinculo ESTOQUE_EMPRESA para cada empresa cadastrada (zerado para filiais, mantendo padronizacao)
+		try
+			LQueryEmp := TDatabase.Query;
+			LQueryEmp.Open('SELECT EMP_CODIGO FROM EMPRESA');
+			LQueryEmp.Dataset.First;
+			while not LQueryEmp.Dataset.Eof do
+			begin
+				LEmpId := LQueryEmp.Dataset.FieldByName('EMP_CODIGO').AsInteger;
+				LQueryEE := TDatabase.Query;
+				LQueryEE.Open(Format('SELECT EE_ID FROM ESTOQUE_EMPRESA WHERE EE_EMPRESA_ID = %d AND EE_PRO_CODIGO = %d', [LEmpId, Produtos.Codigo]));
+				if LQueryEE.Dataset.IsEmpty then
+				begin
+					LNewEEId := GeraCodigo('ESTOQUE_EMPRESA', 'EE_ID');
+					LQueryInsert := TDatabase.Query;
+					LQueryInsert.Clear;
+					if LEmpId = 1 then
+						LQtdEE := Produtos.Quantidade
+					else
+						LQtdEE := 0;
+
+					LQueryInsert.Add(Format(
+						'INSERT INTO ESTOQUE_EMPRESA (EE_ID, EE_EMPRESA_ID, EE_PRO_CODIGO, EE_QUANTIDADE, EE_DATA_ATUALIZACAO) ' +
+						'VALUES (%d, %d, %d, %s, CURRENT_TIMESTAMP)',
+						[LNewEEId, LEmpId, Produtos.Codigo, FloatToStr(LQtdEE).Replace(',', '.')]
+					));
+					LQueryInsert.ExecSQL;
+				end;
+				LQueryEmp.Dataset.Next;
+			end;
+		except
+			on E: Exception do
+				Writeln('-> Erro ao criar vinculo ESTOQUE_EMPRESA: ' + E.Message);
+		end;
+
 		Res.Send<TJSONObject>(TJSONObject.ParseJSONValue(Produtos.ToJson) as TJSONObject).Status(THTTPStatus.Created);
 	finally
 		Produtos.DisposeOf;
