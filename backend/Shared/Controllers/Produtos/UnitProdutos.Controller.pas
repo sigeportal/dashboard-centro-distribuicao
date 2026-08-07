@@ -32,7 +32,8 @@ uses
 	UnitDatabase,
 	UnitFunctions,
 	UnitProdutos.Model,
-	UnitTabela.Helpers;
+	UnitTabela.Helpers,
+	ConciliacaoFiscal.Controller;
 
 class procedure TProdutosController.Delete(Req: THorseRequest; Res: THorseResponse; Next: TProc);
 var
@@ -433,6 +434,16 @@ begin
 				Produtos.Gru := LBodyObj.GetValue<Integer>('gru')
 			else if LBodyObj.GetValue('subgrupoId') <> nil then
 				Produtos.Gru := LBodyObj.GetValue<Integer>('subgrupoId');
+
+			if LBodyObj.GetValue('pro_cod_fiscal') <> nil then
+				Produtos.CodFiscal := LBodyObj.GetValue<Integer>('pro_cod_fiscal')
+			else if LBodyObj.GetValue('codFiscal') <> nil then
+				Produtos.CodFiscal := LBodyObj.GetValue<Integer>('codFiscal');
+
+			if LBodyObj.GetValue('pro_fiscal_gerar') <> nil then
+				Produtos.FiscalGerar := LBodyObj.GetValue<string>('pro_fiscal_gerar')
+			else if LBodyObj.GetValue('fiscalGerar') <> nil then
+				Produtos.FiscalGerar := LBodyObj.GetValue<string>('fiscalGerar');
 		end;
 		Produtos.Cadastrar := 'S';
 		Produtos.SalvaNoBanco(1);
@@ -464,6 +475,9 @@ begin
     	.Post(UploadImage)
     	.Delete(DeleteImage)
 	  .&End;
+
+	// Registra rotas da Conciliacao Fiscal (PDV e Dashboard)
+	TConciliacaoFiscalController.Registrar;
 end;
 
 class procedure TProdutosController.UploadImage(Req: THorseRequest; Res: THorseResponse);

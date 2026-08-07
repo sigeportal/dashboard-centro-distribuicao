@@ -13,6 +13,7 @@ import TransferTab from '../components/tabs/TransferTab';
 import CadastrosTab from '../components/tabs/CadastrosTab';
 import PurchasesTab from '../components/tabs/PurchasesTab';
 import NfeTab from '../components/tabs/NfeTab';
+import ConciliacaoFiscalModal from '../components/ConciliacaoFiscalModal';
 
 export default function Dashboard() {
   const [searchParams] = useSearchParams();
@@ -144,6 +145,7 @@ export default function Dashboard() {
       {activeTab === 'compras' && <PurchasesTab />}
       {activeTab === 'transferencias' && <TransferTab />}
       {activeTab === 'nfe' && <NfeTab />}
+      {activeTab === 'conciliacao' && <ConciliacaoFiscalModal onClose={() => navigate('/dashboard?tab=produtos')} />}
       {activeTab === 'cadastros' && <CadastrosTab />}
     </div>
   );

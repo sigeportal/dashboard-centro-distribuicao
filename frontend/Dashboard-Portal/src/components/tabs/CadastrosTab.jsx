@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Package, Folder, Layers, Ruler, Plus, Edit, Trash2, Save, X, RefreshCw, Grid, AlertCircle, History, Search } from 'lucide-react';
+import { Package, Folder, Layers, Ruler, Plus, Edit, Trash2, Save, X, RefreshCw, Grid, AlertCircle, History, Search, FileCheck2 } from 'lucide-react';
 import { createApi } from '../../services/api';
 import { formatCurrency, formatDatehora } from '../../utils/formatters';
 import Pagination from '../Pagination';
@@ -8,6 +8,7 @@ import SearchBar from '../SearchBar';
 import ProductFormModal from '../ProductFormModal';
 import GruposSubgruposModal from '../GruposSubgruposModal';
 import GradesModal from '../GradesModal';
+import ConciliacaoFiscalModal from '../ConciliacaoFiscalModal';
 import './CadastrosTab.css';
 
 export default function CadastrosTab() {
@@ -19,6 +20,9 @@ export default function CadastrosTab() {
   const [meta, setMeta] = useState({ page: 1, limit: 10, total: 0, pages: 1 });
   const [searchTerm, setSearchTerm] = useState('');
   const [gradeProductFilter, setGradeProductFilter] = useState('');
+
+  // Modal de Conciliação Fiscal de Produtos (Madenorte / PDV)
+  const [showConciliacaoModal, setShowConciliacaoModal] = useState(false);
 
   // Histórico de Movimentações (HIS_PRO)
   const [selectedHistoryProduct, setSelectedHistoryProduct] = useState(null);
@@ -591,6 +595,14 @@ export default function CadastrosTab() {
         </button>
         <button className={`crud-tab-btn ${activeSubTab === 'produtos' ? 'active' : ''}`} onClick={() => { setActiveSubTab('produtos'); setShowForm(false); }}>
           <Package size={18} /> Produtos
+        </button>
+        <button 
+          className="crud-tab-btn" 
+          style={{ background: 'linear-gradient(135deg, #1e40af, #2563eb)', color: '#ffffff', marginLeft: 'auto', gap: '6px' }}
+          onClick={() => setShowConciliacaoModal(true)}
+          title="Abrir Relatório Comparativo de Estoque Fiscal vs Físico"
+        >
+          <FileCheck2 size={18} /> Conciliação Fiscal
         </button>
       </div>
 
@@ -1418,6 +1430,12 @@ export default function CadastrosTab() {
           }}
           product={productForGrades}
           onGradesUpdated={() => fetchData()}
+        />
+      )}
+
+      {showConciliacaoModal && (
+        <ConciliacaoFiscalModal
+          onClose={() => setShowConciliacaoModal(false)}
         />
       )}
 

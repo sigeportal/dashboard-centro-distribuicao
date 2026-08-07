@@ -1,4 +1,4 @@
-unit UnitNfe.Controller;
+﻿unit UnitNfe.Controller;
 
 interface
 
@@ -244,7 +244,8 @@ begin
     LNewNfeId := QueryExec.Dataset.FieldByName('NFE_ID').AsInteger;
     QueryExec.Clear;
     QueryExec.Add(Format(
-      'UPDATE NFE_CENTRAL SET NFE_CHAVE = %s, NFE_NUMERO = %d, NFE_SERIE = %d, NFE_PROTOCOLO = %s, NFE_EMITENTE_CNPJ = %s, NFE_DESTINATARIO_CNPJ = %s, NFE_VALOR_TOTAL = %s, NFE_STATUS = ''AUTORIZADA'', NFE_MOTIVO_SEFAZ = ''Autorizado o uso da NF-e (Modelo 55 - Transferencia de Estoque - NT 2025.002)'', NFE_DATA_EMISSAO = CURRENT_TIMESTAMP WHERE NFE_ID = %d',
+      'UPDATE NFE_CENTRAL SET NFE_CHAVE = %s, NFE_NUMERO = %d, NFE_SERIE = %d, NFE_PROTOCOLO = %s, NFE_EMITENTE_CNPJ = %s, '
+     +'NFE_DESTINATARIO_CNPJ = %s, NFE_VALOR_TOTAL = %s, NFE_STATUS = ''AUTORIZADA'', NFE_MOTIVO_SEFAZ = ''Autorizado o uso da NF-e (Modelo 55 - Transferencia de Estoque - NT 2025.002)'', NFE_DATA_EMISSAO = CURRENT_TIMESTAMP WHERE NFE_ID = %d',
       [QuotedStr(LChave), LNumero, LSerie, QuotedStr(LProtocolo), QuotedStr(LEmitCnpj), QuotedStr(LDestCnpj), FloatToStr(LValorTotal).Replace(',', '.'), LNewNfeId]
     ));
     QueryExec.ExecSQL;

@@ -272,7 +272,10 @@ export default function ProductFormModal({ isOpen, onClose, productToEdit, onSav
         pro_valorv_prazo: vPrz,
         valor_prazo: vPrz,
         valorprazo: vPrz,
-        valorPrazo: vPrz,
+        pro_cod_fiscal: Number(form.pro_cod_fiscal) || Number(form.codFiscal) || 0,
+        codFiscal: Number(form.pro_cod_fiscal) || Number(form.codFiscal) || 0,
+        pro_fiscal_gerar: form.pro_fiscal_gerar || form.fiscalGerar || 'S',
+        fiscalGerar: form.pro_fiscal_gerar || form.fiscalGerar || 'S',
         codTotalizador: 1,
         ncm: form.ncm || '6109.10.00',
         um: form.um || 'UN',
@@ -530,7 +533,45 @@ export default function ProductFormModal({ isOpen, onClose, productToEdit, onSav
 
             {/* SEÇÃO 3: DADOS PAF-ECF / FISCAIS */}
             <fieldset className="pro-fieldset">
-              <legend>Dados PAF-ECF / Fiscais</legend>
+              <legend>Dados PAF-ECF / Enquadramento Fiscal</legend>
+
+              {/* Vínculo de Conciliação Fiscal Mestre (Madenorte & PDV_NOVO) */}
+              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '0.5rem', padding: '0.75rem', marginBottom: '0.75rem' }}>
+                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <div className="pro-field" style={{ flex: '0 0 160px', minWidth: 0 }}>
+                    <label style={{ color: '#1d4ed8', fontWeight: 800 }}>*Cód. Fiscal Mestre</label>
+                    <input 
+                      type="number" 
+                      placeholder="Ex: 251"
+                      value={form.pro_cod_fiscal || form.codFiscal || ''} 
+                      onChange={e => setForm({ ...form, pro_cod_fiscal: e.target.value, codFiscal: e.target.value })} 
+                      disabled={mode === 'browse'} 
+                      className="legacy-input" 
+                      style={{ fontWeight: 800, color: '#1d4ed8', borderColor: '#93c5fd' }}
+                    />
+                  </div>
+
+                  <div className="pro-field" style={{ flex: '0 0 180px', minWidth: 0 }}>
+                    <label>Emissão de Documento Fiscal</label>
+                    <select 
+                      value={form.pro_fiscal_gerar || form.fiscalGerar || 'S'} 
+                      onChange={e => setForm({ ...form, pro_fiscal_gerar: e.target.value, fiscalGerar: e.target.value })} 
+                      disabled={mode === 'browse'} 
+                      className="legacy-input"
+                    >
+                      <option value="S">S - Sim (Gera NF-e / Fiscal)</option>
+                      <option value="N">N - Não (Apenas Interno)</option>
+                    </select>
+                  </div>
+
+                  <div style={{ flex: 1, minWidth: '180px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span className={`badge ${form.pro_fiscal_gerar !== 'N' ? 'badge-info' : 'badge-warning'}`} style={{ padding: '6px 12px', fontSize: '0.78rem' }}>
+                      {form.pro_fiscal_gerar !== 'N' ? '📄 Fiscal (Gera NF-e / Vinculado ao Mestre)' : '📦 Não Fiscal (Controle Interno / Sem Nota)'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
               <div className="pro-paf-grid-1">
                 <div className="pro-field" style={{ flex: '0 0 110px', minWidth: 0 }}>
                   <label>NCM</label>

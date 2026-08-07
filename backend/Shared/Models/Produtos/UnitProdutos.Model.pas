@@ -64,6 +64,8 @@ type
 		FValorv_prazo: Real;
     FEmp: integer;
     FCadastrar: string;
+    FCodFiscal: integer;
+    FFiscalGerar: string;
 		{ private declarations }
 	public
 		{ public declarations }
@@ -162,13 +164,14 @@ type
     [TRelacionamento('GRUPOS', 'GRU_CODIGO', 'PRO_GRU', TSubGrupos, UmPraUm)]
     property SubGrupo: TSubGrupos read FSubGrupo write FSubGrupo;
     [TRelacionamento('FORNECEDORES', 'FOR_CODIGO', 'PRO_FOR', TFornecedores, UmPraUm)]
-		property Fornecedor: TFornecedores read FFornecedor write FFornecedor;
-    [TRelacionamento('TOTALIZADORES', 'TOT_CODIGO', 'PRO_TOTALIZADOR', TTotalizadores, TTipoRelacionamento.UmPraUm)]
-    property Totalizador: TTotalizadores read FTotalizador write FTotalizador;
-		[TCampo('PRO_URL_IMAGEM', 'VARCHAR(1000)')]
-		property URL_Imagem: string read FURL_Imagem write FURL_Imagem;
+    [TCampo('PRO_URL_IMAGEM', 'VARCHAR(1000)')]
+    property URL_Imagem: string read FURL_Imagem write FURL_Imagem;
     [TCampo('PRO_CADASTRAR', 'CHAR(1) DEFAULT ''N''')]
     property Cadastrar: string read FCadastrar write FCadastrar;
+    [TCampo('PRO_COD_FISCAL', 'INTEGER')]
+    property CodFiscal: integer read FCodFiscal write FCodFiscal;
+    [TCampo('PRO_FISCAL_GERAR', 'CHAR(1) DEFAULT ''S''')]
+    property FiscalGerar: string read FFiscalGerar write FFiscalGerar;
   end;
 
 implementation

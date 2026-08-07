@@ -24,6 +24,8 @@ export default function Layout() {
     movimentacoes: 'Movimentações',
     recebimentos: 'Recebimentos',
     transferencias: 'Centro de Distribuição',
+    nfe: 'Notas Fiscais Eletrônicas (NF-e)',
+    conciliacao: 'Conciliação Fiscal de Estoque',
     cadastros: 'Cadastros Centralizados',
   };
 
