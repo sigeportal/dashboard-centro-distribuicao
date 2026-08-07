@@ -52,13 +52,21 @@ export default function NfeTransferModal({ transfer, items = [], units = [], onC
   const [nfeItems, setNfeItems] = useState([]);
 
   useEffect(() => {
-    // Popula itens a partir da transferência
+    // Popula apenas itens fiscais a partir da transferência (produtos não fiscais constam no Romaneio de Carga)
     if (items && items.length > 0) {
-      const populated = items.map((it, idx) => ({
-        id: it.produto_id || idx + 1,
+      const fiscalOnly = items.filter(it => {
+        if (it.fiscalGerar === 'N' || it.pro_fiscal_gerar === 'N') return false;
+        if (it.fiscalGerar === 'S' || it.pro_fiscal_gerar === 'S') return true;
+        if (Number(it.codFiscal || it.pro_cod_fiscal) > 0) return true;
+        if (it.ncm && it.ncm.length >= 4) return true;
+        return true;
+      });
+
+      const populated = fiscalOnly.map((it, idx) => ({
+        id: it.produto_id || it.produtoId || idx + 1,
         seq: idx + 1,
-        codigo: it.produto_id,
-        nome: it.nome || it.descricao || `PRODUTO #${it.produto_id}`,
+        codigo: it.produto_id || it.produtoId,
+        nome: it.nome || it.descricao || `PRODUTO #${it.produto_id || it.produtoId}`,
         ncm: it.ncm || '6109.10.00',
         cest: it.cest || '28.038.00',
         cfop: header.cfopPadrao.replace('.', ''),

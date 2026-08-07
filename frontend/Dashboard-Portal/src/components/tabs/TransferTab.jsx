@@ -377,11 +377,7 @@ export default function TransferTab() {
     const prod = products.find(p => p.codigo === Number(selectedProduct));
     if (!prod) return;
 
-    // Impede duplicados no formulário
-    if (transferItems.find(item => item.produto_id === prod.codigo)) {
-      alert('Este produto já foi adicionado.');
-      return;
-    }
+    const isFiscal = prod.fiscalGerar !== 'N' && (prod.fiscalGerar === 'S' || Number(prod.codFiscal || prod.pro_cod_fiscal) > 0 || (prod.ncm && prod.ncm.length >= 4));
 
     setTransferItems([
       ...transferItems,
@@ -389,7 +385,11 @@ export default function TransferTab() {
         produto_id: prod.codigo,
         nome: prod.nome,
         quantidade: Number(quantity),
-        valor: Number(price) || prod.valorv || 0
+        valor: Number(price) || prod.valorv || 0,
+        codFiscal: prod.codFiscal || prod.pro_cod_fiscal || 0,
+        fiscalGerar: prod.fiscalGerar || prod.pro_fiscal_gerar || 'S',
+        ncm: prod.ncm || '6109.10.00',
+        isFiscal: isFiscal
       }
     ]);
 
@@ -419,10 +419,10 @@ export default function TransferTab() {
 
     setLoading(true);
     try {
-      const transferId = Math.floor(Math.random() * 90000) + 10000; // Gera código temporário para o lote
-      
+      const hasFiscalItems = transferItems.some(it => it.isFiscal !== false && it.fiscalGerar !== 'N');
+
       const transferData = {
-        id: transferId,
+        id: 0, // 0 para o backend gerar numeração sequencial estrita (GEN_TR_ID / 1, 2, 3...)
         origem: Number(origin),
         destino: Number(destination),
         data: new Date().toISOString().split('T')[0],
@@ -430,18 +430,20 @@ export default function TransferTab() {
         obs: obs,
         usuarioRecebimento: '',
         dataRecebimento: '1899-12-30', // Data padrão nula Delphi
-        tipoFiscal: tipoFiscal,
+        tipoFiscal: hasFiscalItems ? 'FISCAL' : 'NAO_FISCAL',
         numeroNf: tipoFiscal === 'FISCAL' ? numeroNf : '',
         chaveNfe: tipoFiscal === 'FISCAL' ? chaveNfe : ''
       };
 
-      // Cria cabeçalho
-      await api.post('/v1/transferencias', transferData);
+      // Cria cabeçalho e obtém ID sequencial real do backend
+      const resHeader = await api.post('/v1/transferencias', transferData);
+      const realTrId = resHeader.data?.id || resHeader.data?.tr_id || (Number(resHeader.data) || 0);
+      const finalTransferId = realTrId > 0 ? realTrId : (transfers.length > 0 ? Math.max(...transfers.map(t => Number(t.id) || 0)) + 1 : 1);
 
-      // Cria itens em Lote (alta performance ArrayDML)
+      // Cria itens em Lote vinculados ao lote sequencial
       const formattedItems = transferItems.map((item, idx) => ({
-        id: Math.floor(Math.random() * 900000) + 100000 + idx,
-        transferenciaId: transferId,
+        id: 0,
+        transferenciaId: finalTransferId,
         produtoId: item.produto_id,
         quantidade: item.quantidade,
         valor: item.valor,
@@ -450,7 +452,7 @@ export default function TransferTab() {
 
       await api.post('/v1/transferenciaItens/emLote', { itens: formattedItems });
 
-      alert(`Transferência (${tipoFiscal === 'FISCAL' ? 'Fiscal com NF-e' : 'Não Fiscal / Sem Nota'}) enviada com sucesso!`);
+      alert(`Transferência #${finalTransferId} (${hasFiscalItems ? 'Itens Fiscais e Não Fiscais' : 'Não Fiscal'}) registrada com sucesso!`);
       
       // Reset formulário
       setOrigin('');

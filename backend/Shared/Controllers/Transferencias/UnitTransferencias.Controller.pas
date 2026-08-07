@@ -152,7 +152,8 @@ begin
     if tr_id <> '' then
       Query.Open(
         'SELECT TI.TRI_ID, TI.TRI_TRANSFERENCIA_ID, TI.TRI_PRODUTO_ID, TI.TRI_QUANTIDADE, TI.TRI_VALOR, TI.TRI_QTD_CONFERIDA, TI.TRI_JUSTIFICATIVA, ' +
-        '       P.PRO_NOME, P.PRO_CODBARRA, P.PRO_NCM, P.PRO_CFOP, P.PRO_CEST, P.PRO_EMBALAGEM, P.PRO_BALANCA, P.PRO_GRU, P.PRO_VALORC ' +
+        '       P.PRO_NOME, P.PRO_CODBARRA, P.PRO_NCM, P.PRO_CFOP, P.PRO_CEST, P.PRO_EMBALAGEM, P.PRO_BALANCA, P.PRO_GRU, P.PRO_VALORC, ' +
+        '       COALESCE(P.PRO_COD_FISCAL, 0) AS PRO_COD_FISCAL, COALESCE(P.PRO_FISCAL_GERAR, ''S'') AS PRO_FISCAL_GERAR, P.PRO_TIPO ' +
         'FROM TRANSFERENCIA_ITEM TI ' +
         'LEFT JOIN PRODUTOS P ON (P.PRO_CODIGO = TI.TRI_PRODUTO_ID) ' +
         'WHERE TI.TRI_TRANSFERENCIA_ID = ' + tr_id + ' ' +
@@ -161,7 +162,8 @@ begin
     else
       Query.Open(
         'SELECT TI.TRI_ID, TI.TRI_TRANSFERENCIA_ID, TI.TRI_PRODUTO_ID, TI.TRI_QUANTIDADE, TI.TRI_VALOR, TI.TRI_QTD_CONFERIDA, TI.TRI_JUSTIFICATIVA, ' +
-        '       P.PRO_NOME, P.PRO_CODBARRA, P.PRO_NCM, P.PRO_CFOP, P.PRO_CEST, P.PRO_EMBALAGEM, P.PRO_BALANCA, P.PRO_GRU, P.PRO_VALORC ' +
+        '       P.PRO_NOME, P.PRO_CODBARRA, P.PRO_NCM, P.PRO_CFOP, P.PRO_CEST, P.PRO_EMBALAGEM, P.PRO_BALANCA, P.PRO_GRU, P.PRO_VALORC, ' +
+        '       COALESCE(P.PRO_COD_FISCAL, 0) AS PRO_COD_FISCAL, COALESCE(P.PRO_FISCAL_GERAR, ''S'') AS PRO_FISCAL_GERAR, P.PRO_TIPO ' +
         'FROM TRANSFERENCIA_ITEM TI ' +
         'LEFT JOIN PRODUTOS P ON (P.PRO_CODIGO = TI.TRI_PRODUTO_ID) ' +
         'ORDER BY TI.TRI_ID'
@@ -186,7 +188,7 @@ begin
       itemObj.AddPair('justificativa', Query.Dataset.FieldByName('TRI_JUSTIFICATIVA').AsString);
       itemObj.AddPair('tri_justificativa', Query.Dataset.FieldByName('TRI_JUSTIFICATIVA').AsString);
       
-      // Dados completos do produto
+      // Dados completos do produto e classificacao fiscal
       itemObj.AddPair('nome', Query.Dataset.FieldByName('PRO_NOME').AsString);
       itemObj.AddPair('PRO_NOME', Query.Dataset.FieldByName('PRO_NOME').AsString);
       itemObj.AddPair('codbarra', Query.Dataset.FieldByName('PRO_CODBARRA').AsString);
@@ -199,6 +201,11 @@ begin
       itemObj.AddPair('embalagem', Query.Dataset.FieldByName('PRO_EMBALAGEM').AsString);
       itemObj.AddPair('balanca', Query.Dataset.FieldByName('PRO_BALANCA').AsString);
       itemObj.AddPair('custo', TJSONNumber.Create(Query.Dataset.FieldByName('PRO_VALORC').AsFloat));
+      itemObj.AddPair('codFiscal', TJSONNumber.Create(Query.Dataset.FieldByName('PRO_COD_FISCAL').AsInteger));
+      itemObj.AddPair('pro_cod_fiscal', TJSONNumber.Create(Query.Dataset.FieldByName('PRO_COD_FISCAL').AsInteger));
+      itemObj.AddPair('fiscalGerar', Query.Dataset.FieldByName('PRO_FISCAL_GERAR').AsString);
+      itemObj.AddPair('pro_fiscal_gerar', Query.Dataset.FieldByName('PRO_FISCAL_GERAR').AsString);
+      itemObj.AddPair('pro_tipo', Query.Dataset.FieldByName('PRO_TIPO').AsString);
       
       aJson.Add(itemObj);
       Query.Dataset.Next;
@@ -209,12 +216,24 @@ begin
 end;
 
 class procedure TTransferenciasController.Post(Req: THorseRequest; Res: THorseResponse; Next: TProc);
-var Transferencia: TTransferencia;
+var
+  Transferencia: TTransferencia;
+  LResObj: TJSONObject;
 begin
   try
     Transferencia := TTransferencia.Create(TDatabase.Connection).fromJson<TTransferencia>(Req.Body);
+    if Transferencia.Id <= 0 then
+      Transferencia.Id := GeraCodigo('TRANSFERENCIA', 'TR_ID');
     Transferencia.SalvaNoBanco(1);
-    Res.Send<TJSONObject>(TJSONObject.ParseJSONValue(Transferencia.ToJson) as TJSONObject);
+
+    LResObj := TJSONObject.ParseJSONValue(Transferencia.ToJson) as TJSONObject;
+    if Assigned(LResObj) then
+    begin
+      LResObj.RemovePair('id');
+      LResObj.AddPair('id', TJSONNumber.Create(Transferencia.Id));
+      LResObj.AddPair('tr_id', TJSONNumber.Create(Transferencia.Id));
+    end;
+    Res.Send<TJSONObject>(LResObj);
   finally
     Transferencia.DisposeOf;
   end;
@@ -253,7 +272,10 @@ begin
       oJsonValue := aJson.Items[i];
       Itens      := TTransferencia.Create(TDatabase.Connection).fromJson<TTransferencia>(oJsonValue.ToJson);
       try
-        FDQuery.ParamByName('TR_ID').AsIntegers[i] := Itens.Id;
+        if Itens.Id <= 0 then
+          FDQuery.ParamByName('TR_ID').AsIntegers[i] := GeraCodigo('TRANSFERENCIA', 'TR_ID')
+        else
+          FDQuery.ParamByName('TR_ID').AsIntegers[i] := Itens.Id;
         FDQuery.ParamByName('TR_ORIGEM').AsIntegers[i] := Itens.Origem;
         FDQuery.ParamByName('TR_DESTINO').AsIntegers[i] := Itens.Destino;
         FDQuery.ParamByName('TR_DATA').AsDateTimes[i] := Itens.Data;
