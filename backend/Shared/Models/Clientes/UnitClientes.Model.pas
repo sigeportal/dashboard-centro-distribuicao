@@ -62,7 +62,7 @@ type
     [TCampo('CLI_RG', 'VARCHAR(20)')]
     property Rg: string read FCLI_RG write FCLI_RG;
 
-    [TCampo('CLI_LIMITE', 'DOUBLE PRECISION')]
+    [TCampo('CLI_LIMITE', 'FLOAT')]
     property Limite: Double read FCLI_LIMITE write FCLI_LIMITE;
 
     [TCampo('CLI_CADASTRAR', 'CHAR(1) DEFAULT ''N''')]
