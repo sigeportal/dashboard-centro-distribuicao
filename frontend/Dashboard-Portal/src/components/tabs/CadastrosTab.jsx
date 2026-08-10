@@ -304,19 +304,39 @@ export default function CadastrosTab() {
       return;
     }
     if (activeSubTab === 'fornecedores') {
+      let cidNome = '';
+      if (item.cidade) {
+        if (typeof item.cidade === 'object') {
+          cidNome = item.cidade.nome || item.cidade.descricao || '';
+        } else {
+          cidNome = String(item.cidade);
+        }
+      }
+
+      let ufSigla = 'PR';
+      if (item.uf) {
+        if (typeof item.uf === 'object') {
+          ufSigla = item.uf.sigla || item.uf.uf || 'PR';
+        } else {
+          ufSigla = String(item.uf);
+        }
+      } else if (item.cidade && typeof item.cidade === 'object' && item.cidade.uf) {
+        ufSigla = item.cidade.uf;
+      }
+
       setFornForm({
         codigo: item.codigo,
-        nome: item.nome || item.razao_social || '',
-        fantasia: item.fantasia || item.nome_fantasia || '',
-        cnpj: item.cnpj || item.cpf_cnpj || '',
-        inscricao: item.inscricao || item.ie || '',
-        telefone: item.telefone || item.fone || '',
-        email: item.email || '',
-        endereco: item.endereco || '',
-        bairro: item.bairro || '',
-        cidade: item.cidade || '',
-        uf: item.uf || 'PR',
-        contato: item.contato || ''
+        nome: typeof item.nome === 'string' ? item.nome : (item.razao_social || ''),
+        fantasia: typeof item.fantasia === 'string' ? item.fantasia : (item.nome_fantasia || ''),
+        cnpj: item.cnpj || item.cnpj_cpf || item.cpf_cnpj || '',
+        inscricao: item.inscricao || item.insc_estadual || item.ie || '',
+        telefone: item.telefone || item.fone || item.celular || '',
+        email: typeof item.email === 'string' ? item.email : '',
+        endereco: typeof item.endereco === 'string' ? item.endereco : '',
+        bairro: typeof item.bairro === 'string' ? item.bairro : '',
+        cidade: cidNome,
+        uf: ufSigla,
+        contato: typeof item.contato === 'string' ? item.contato : ''
       });
     }
     setEditingItem(item);
@@ -1189,20 +1209,30 @@ export default function CadastrosTab() {
                     </tr>
                   </thead>
                   <tbody>
-                    {fornecedores.map((item, idx) => (
-                      <tr key={item.codigo || idx}>
-                        <td><span className="item-code">#{item.codigo}</span></td>
-                        <td><strong>{item.nome || item.razao_social}</strong></td>
-                        <td>{item.fantasia || item.nome_fantasia || '-'}</td>
-                        <td>{item.cnpj || item.cpf_cnpj || '-'}</td>
-                        <td>{item.telefone || item.contato || '-'}</td>
-                        <td>{item.cidade ? `${item.cidade}/${item.uf || ''}` : (item.uf || '-')}</td>
-                        <td className="actions-cell">
-                          <button className="crud-row-btn edit" onClick={() => handleOpenEdit(item)} title="Editar Fornecedor"><Edit size={14} /></button>
-                          <button className="crud-row-btn delete" onClick={() => handleDelete(item.codigo)} title="Excluir Fornecedor"><Trash2 size={14} /></button>
-                        </td>
-                      </tr>
-                    ))}
+                    {fornecedores.map((item, idx) => {
+                      const cidStr = typeof item.cidade === 'object' && item.cidade !== null
+                        ? (item.cidade.nome || item.cidade.descricao || '')
+                        : (item.cidade || '');
+                      const ufStr = typeof item.uf === 'object' && item.uf !== null
+                        ? (item.uf.sigla || item.uf.uf || '')
+                        : (item.uf || (item.cidade && typeof item.cidade === 'object' ? item.cidade.uf : ''));
+                      const locStr = cidStr ? (ufStr ? `${cidStr}/${ufStr}` : cidStr) : (ufStr || '-');
+
+                      return (
+                        <tr key={item.codigo || idx}>
+                          <td><span className="item-code">#{item.codigo}</span></td>
+                          <td><strong>{item.nome || item.razao_social}</strong></td>
+                          <td>{item.fantasia || item.nome_fantasia || '-'}</td>
+                          <td>{item.cnpj || item.cnpj_cpf || item.cpf_cnpj || '-'}</td>
+                          <td>{item.telefone || item.fone || item.contato || '-'}</td>
+                          <td>{locStr}</td>
+                          <td className="actions-cell">
+                            <button className="crud-row-btn edit" onClick={() => handleOpenEdit(item)} title="Editar Fornecedor"><Edit size={14} /></button>
+                            <button className="crud-row-btn delete" onClick={() => handleDelete(item.codigo)} title="Excluir Fornecedor"><Trash2 size={14} /></button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                     {fornecedores.length === 0 && (
                       <tr>
                         <td colSpan="7" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
