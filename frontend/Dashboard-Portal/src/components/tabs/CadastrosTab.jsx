@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Package, Folder, Layers, Ruler, Plus, Edit, Trash2, Save, X, RefreshCw, Grid, AlertCircle, History, Search, FileCheck2 } from 'lucide-react';
+import { Package, Folder, Layers, Ruler, Plus, Edit, Trash2, Save, X, RefreshCw, Grid, AlertCircle, History, Search, FileCheck2, UserPlus, Users } from 'lucide-react';
 import { createApi } from '../../services/api';
 import { formatCurrency, formatDatehora } from '../../utils/formatters';
 import Pagination from '../Pagination';
@@ -129,6 +129,20 @@ export default function CadastrosTab() {
   const [subgrupoForm, setSubgrupoForm] = useState({ codigo: '', nome: '', g1: '', tr: '0' });
   const [gradeForm, setGradeForm] = useState({ codigo: '', pro: '', valor: '', valor_dinheiro: '', valor_prazo: '', tam: '', quantidade: '', codbarra: '', cor: '' });
   const [tamanhoForm, setTamanhoForm] = useState({ codigo: '', pro: '', tamanho: '', sigla: '', valor: '' });
+  const [fornForm, setFornForm] = useState({ 
+    codigo: '', 
+    nome: '', 
+    fantasia: '', 
+    cnpj: '', 
+    inscricao: '', 
+    telefone: '', 
+    email: '', 
+    endereco: '', 
+    bairro: '', 
+    cidade: '', 
+    uf: 'SP', 
+    contato: '' 
+  });
 
   const fetchLookups = async () => {
     try {
@@ -237,6 +251,8 @@ export default function CadastrosTab() {
         else if (tRes.data?.data) setTamanhos(tRes.data.data);
       } else if (activeSubTab === 'tamanhos') {
         setTamanhos(items);
+      } else if (activeSubTab === 'fornecedores') {
+        setFornecedores(items);
       }
 
       setMeta(metaData);
@@ -264,6 +280,9 @@ export default function CadastrosTab() {
       setShowGradesModal(true);
       return;
     }
+    if (activeSubTab === 'fornecedores') {
+      setFornForm({ codigo: '', nome: '', fantasia: '', cnpj: '', inscricao: '', telefone: '', email: '', endereco: '', bairro: '', cidade: '', uf: 'PR', contato: '' });
+    }
     setEditingItem(null);
     setShowForm(true);
   };
@@ -284,6 +303,22 @@ export default function CadastrosTab() {
       setShowGradesModal(true);
       return;
     }
+    if (activeSubTab === 'fornecedores') {
+      setFornForm({
+        codigo: item.codigo,
+        nome: item.nome || item.razao_social || '',
+        fantasia: item.fantasia || item.nome_fantasia || '',
+        cnpj: item.cnpj || item.cpf_cnpj || '',
+        inscricao: item.inscricao || item.ie || '',
+        telefone: item.telefone || item.fone || '',
+        email: item.email || '',
+        endereco: item.endereco || '',
+        bairro: item.bairro || '',
+        cidade: item.cidade || '',
+        uf: item.uf || 'PR',
+        contato: item.contato || ''
+      });
+    }
     setEditingItem(item);
     setShowForm(true);
   };
@@ -302,6 +337,8 @@ export default function CadastrosTab() {
         await api.delete(`/v1/grades/${id}`);
       } else if (activeSubTab === 'tamanhos') {
         await api.delete(`/v1/tamanhos/${id}`);
+      } else if (activeSubTab === 'fornecedores') {
+        await api.delete(`/v1/fornecedores/${id}`);
       }
       alert('Removido com sucesso!');
       fetchData();
@@ -345,7 +382,7 @@ export default function CadastrosTab() {
           ncm: prodForm.ncm || '6109.10.00',
           um: prodForm.um || 'UN',
           embalagem: prodForm.um || 'UN',
-          cadastrar: prodForm.cadastrar || 'S',
+          cadastrar: 'S',
           url_Imagem: prodForm.url_Imagem || ''
         };
         if (editingItem) {
@@ -413,6 +450,27 @@ export default function CadastrosTab() {
           await api.put('/v1/tamanhos', payload);
         } else {
           await api.post('/v1/tamanhos', payload);
+        }
+      } else if (activeSubTab === 'fornecedores') {
+        const payload = {
+          codigo: editingItem ? Number(fornForm.codigo) : Math.floor(Math.random() * 9000) + 1000,
+          nome: fornForm.nome,
+          razao_social: fornForm.nome,
+          fantasia: fornForm.fantasia,
+          cnpj: fornForm.cnpj,
+          inscricao: fornForm.inscricao,
+          telefone: fornForm.telefone,
+          email: fornForm.email,
+          endereco: fornForm.endereco,
+          bairro: fornForm.bairro,
+          cidade: fornForm.cidade,
+          uf: fornForm.uf,
+          contato: fornForm.contato
+        };
+        if (editingItem) {
+          await api.put('/v1/fornecedores', payload);
+        } else {
+          await api.post('/v1/fornecedores', payload);
         }
       }
 
@@ -595,6 +653,9 @@ export default function CadastrosTab() {
         </button>
         <button className={`crud-tab-btn ${activeSubTab === 'produtos' ? 'active' : ''}`} onClick={() => { setActiveSubTab('produtos'); setShowForm(false); }}>
           <Package size={18} /> Produtos
+        </button>
+        <button className={`crud-tab-btn ${activeSubTab === 'fornecedores' ? 'active' : ''}`} onClick={() => { setActiveSubTab('fornecedores'); setShowForm(false); }}>
+          <UserPlus size={18} /> Fornecedores
         </button>
         <button 
           className="crud-tab-btn" 
@@ -818,6 +879,56 @@ export default function CadastrosTab() {
               </div>
             )}
 
+            {/* FORM: FORNECEDORES */}
+            {activeSubTab === 'fornecedores' && (
+              <div className="grid-form">
+                <label className="crud-input">
+                  Razão Social / Nome do Fornecedor *
+                  <input type="text" required value={fornForm.nome} onChange={(e) => setFornForm({ ...fornForm, nome: e.target.value })} placeholder="Ex: DISTRIBUIDORA DE TECIDOS LTDA" />
+                </label>
+                <label className="crud-input">
+                  Nome Fantasia
+                  <input type="text" value={fornForm.fantasia} onChange={(e) => setFornForm({ ...fornForm, fantasia: e.target.value })} placeholder="Ex: TECIDOS BRASIL" />
+                </label>
+                <label className="crud-input">
+                  CNPJ / CPF
+                  <input type="text" value={fornForm.cnpj} onChange={(e) => setFornForm({ ...fornForm, cnpj: e.target.value })} placeholder="00.000.000/0001-00" />
+                </label>
+                <label className="crud-input">
+                  Inscrição Estadual (IE)
+                  <input type="text" value={fornForm.inscricao} onChange={(e) => setFornForm({ ...fornForm, inscricao: e.target.value })} placeholder="Isento ou Nº" />
+                </label>
+                <label className="crud-input">
+                  Telefone / WhatsApp
+                  <input type="text" value={fornForm.telefone} onChange={(e) => setFornForm({ ...fornForm, telefone: e.target.value })} placeholder="(00) 00000-0000" />
+                </label>
+                <label className="crud-input">
+                  E-mail
+                  <input type="email" value={fornForm.email} onChange={(e) => setFornForm({ ...fornForm, email: e.target.value })} placeholder="contato@fornecedor.com.br" />
+                </label>
+                <label className="crud-input" style={{ gridColumn: 'span 2' }}>
+                  Endereço
+                  <input type="text" value={fornForm.endereco} onChange={(e) => setFornForm({ ...fornForm, endereco: e.target.value })} placeholder="Rua, Av, Número" />
+                </label>
+                <label className="crud-input">
+                  Bairro
+                  <input type="text" value={fornForm.bairro} onChange={(e) => setFornForm({ ...fornForm, bairro: e.target.value })} placeholder="Centro" />
+                </label>
+                <label className="crud-input">
+                  Cidade
+                  <input type="text" value={fornForm.cidade} onChange={(e) => setFornForm({ ...fornForm, cidade: e.target.value })} placeholder="Cidade" />
+                </label>
+                <label className="crud-input">
+                  UF
+                  <input type="text" maxLength={2} value={fornForm.uf} onChange={(e) => setFornForm({ ...fornForm, uf: e.target.value.toUpperCase() })} placeholder="PR" />
+                </label>
+                <label className="crud-input">
+                  Contato / Vendedor
+                  <input type="text" value={fornForm.contato} onChange={(e) => setFornForm({ ...fornForm, contato: e.target.value })} placeholder="Nome do representante" />
+                </label>
+              </div>
+            )}
+
             <div className="crud-form-actions">
               <button type="button" className="btn-secondary" onClick={() => setShowForm(false)}>Cancelar</button>
               <button type="submit" className="btn-primary"><Save size={16} /> Salvar Registro</button>
@@ -835,6 +946,7 @@ export default function CadastrosTab() {
             {activeSubTab === 'subgrupos' && 'Subgrupos de Produtos'}
             {activeSubTab === 'grades' && 'Grades e Variações por Tamanho/Cor'}
             {activeSubTab === 'tamanhos' && 'Tamanhos de Produtos'}
+            {activeSubTab === 'fornecedores' && 'Cadastro de Fornecedores'}
           </h3>
 
           <div className="crud-controls">
@@ -1058,6 +1170,46 @@ export default function CadastrosTab() {
                         </td>
                       </tr>
                     ))}
+                  </tbody>
+                </>
+              )}
+
+              {/* LIST: FORNECEDORES */}
+              {activeSubTab === 'fornecedores' && (
+                <>
+                  <thead>
+                    <tr>
+                      <th style={{ width: '90px' }}>Código</th>
+                      <th>Razão Social / Nome</th>
+                      <th>Nome Fantasia</th>
+                      <th>CNPJ / CPF</th>
+                      <th>Telefone / Contato</th>
+                      <th>Cidade / UF</th>
+                      <th style={{ textAlign: 'center', width: '120px' }}>Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {fornecedores.map((item, idx) => (
+                      <tr key={item.codigo || idx}>
+                        <td><span className="item-code">#{item.codigo}</span></td>
+                        <td><strong>{item.nome || item.razao_social}</strong></td>
+                        <td>{item.fantasia || item.nome_fantasia || '-'}</td>
+                        <td>{item.cnpj || item.cpf_cnpj || '-'}</td>
+                        <td>{item.telefone || item.contato || '-'}</td>
+                        <td>{item.cidade ? `${item.cidade}/${item.uf || ''}` : (item.uf || '-')}</td>
+                        <td className="actions-cell">
+                          <button className="crud-row-btn edit" onClick={() => handleOpenEdit(item)} title="Editar Fornecedor"><Edit size={14} /></button>
+                          <button className="crud-row-btn delete" onClick={() => handleDelete(item.codigo)} title="Excluir Fornecedor"><Trash2 size={14} /></button>
+                        </td>
+                      </tr>
+                    ))}
+                    {fornecedores.length === 0 && (
+                      <tr>
+                        <td colSpan="7" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+                          Nenhum fornecedor cadastrado.
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </>
               )}
