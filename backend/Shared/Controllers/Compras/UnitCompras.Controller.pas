@@ -1,4 +1,4 @@
-﻿unit UnitCompras.Controller;
+unit UnitCompras.Controller;
 
 interface
 
@@ -131,11 +131,27 @@ begin
       else
         LTotalPages := 1;
 
-      QueryData.Open(Format('SELECT FIRST %d SKIP %d ID, FORNECEDOR_ID, FORNECEDOR_NOME, NUMERO_NF, CHAVE_NFE, DATA_EMISSAO, DATA_ENTRADA, VALOR_TOTAL, VALOR_FRETE, VALOR_OUTROS, OBSERVACAO FROM COMPRAS ORDER BY ID DESC', [LLimit, LOffset]));
+      QueryData.Open(Format(
+        'SELECT FIRST %d SKIP %d ' +
+        '  C.COM_CODIGO AS ID, ' +
+        '  C.COM_FOR AS FORNECEDOR_ID, ' +
+        '  F.FOR_NOME AS FORNECEDOR_NOME, ' +
+        '  C.COM_NF AS NUMERO_NF, ' +
+        '  C.COM_DATA AS DATA_ENTRADA, ' +
+        '  C.COM_VALOR AS VALOR_TOTAL, ' +
+        '  C.COM_FRETE AS VALOR_FRETE, ' +
+        '  C.COM_OUTROS AS VALOR_OUTROS, ' +
+        '  C.COM_OBS AS OBSERVACAO, ' +
+        '  C.COM_FAT2 AS FATURAMENTO_ID ' +
+        'FROM COMPRAS C ' +
+        'LEFT JOIN FORNECEDORES F ON (F.FOR_CODIGO = C.COM_FOR) ' +
+        'ORDER BY C.COM_CODIGO DESC',
+        [LLimit, LOffset]
+      ));
     end
     else
     begin
-      QueryCount.Open(Format('SELECT COUNT(*) AS TOTAL FROM COMPRAS WHERE FORNECEDOR_ID = %d', [LEmpresaId]));
+      QueryCount.Open(Format('SELECT COUNT(*) AS TOTAL FROM COMPRAS WHERE COM_FOR = %d', [LEmpresaId]));
       LTotalRecords := QueryCount.Dataset.FieldByName('TOTAL').AsInteger;
 
       if LLimit > 0 then
@@ -143,7 +159,24 @@ begin
       else
         LTotalPages := 1;
 
-      QueryData.Open(Format('SELECT FIRST %d SKIP %d ID, FORNECEDOR_ID, FORNECEDOR_NOME, NUMERO_NF, CHAVE_NFE, DATA_EMISSAO, DATA_ENTRADA, VALOR_TOTAL, VALOR_FRETE, VALOR_OUTROS, OBSERVACAO FROM COMPRAS WHERE FORNECEDOR_ID = %d ORDER BY ID DESC', [LLimit, LOffset, LEmpresaId]));
+      QueryData.Open(Format(
+        'SELECT FIRST %d SKIP %d ' +
+        '  C.COM_CODIGO AS ID, ' +
+        '  C.COM_FOR AS FORNECEDOR_ID, ' +
+        '  F.FOR_NOME AS FORNECEDOR_NOME, ' +
+        '  C.COM_NF AS NUMERO_NF, ' +
+        '  C.COM_DATA AS DATA_ENTRADA, ' +
+        '  C.COM_VALOR AS VALOR_TOTAL, ' +
+        '  C.COM_FRETE AS VALOR_FRETE, ' +
+        '  C.COM_OUTROS AS VALOR_OUTROS, ' +
+        '  C.COM_OBS AS OBSERVACAO, ' +
+        '  C.COM_FAT2 AS FATURAMENTO_ID ' +
+        'FROM COMPRAS C ' +
+        'LEFT JOIN FORNECEDORES F ON (F.FOR_CODIGO = C.COM_FOR) ' +
+        'WHERE C.COM_FOR = %d ' +
+        'ORDER BY C.COM_CODIGO DESC',
+        [LLimit, LOffset, LEmpresaId]
+      ));
     end;
     QueryData.Dataset.First;
 
@@ -154,8 +187,8 @@ begin
       LObj.AddPair('fornecedor_id', TJSONNumber.Create(QueryData.Dataset.FieldByName('FORNECEDOR_ID').AsInteger));
       LObj.AddPair('fornecedor_nome', QueryData.Dataset.FieldByName('FORNECEDOR_NOME').AsString);
       LObj.AddPair('numero_nf', QueryData.Dataset.FieldByName('NUMERO_NF').AsString);
-      LObj.AddPair('chave_nfe', QueryData.Dataset.FieldByName('CHAVE_NFE').AsString);
-      LObj.AddPair('data_emissao', FormatDateTime('yyyy-mm-dd', QueryData.Dataset.FieldByName('DATA_EMISSAO').AsDateTime));
+      LObj.AddPair('chave_nfe', '');
+      LObj.AddPair('data_emissao', FormatDateTime('yyyy-mm-dd', QueryData.Dataset.FieldByName('DATA_ENTRADA').AsDateTime));
       LObj.AddPair('data_entrada', FormatDateTime('yyyy-mm-dd', QueryData.Dataset.FieldByName('DATA_ENTRADA').AsDateTime));
       LObj.AddPair('valor_total', TJSONNumber.Create(QueryData.Dataset.FieldByName('VALOR_TOTAL').AsFloat));
       LObj.AddPair('valor_frete', TJSONNumber.Create(QueryData.Dataset.FieldByName('VALOR_FRETE').AsFloat));
@@ -206,7 +239,23 @@ begin
   QueryItens := TDatabase.Query;
   QueryParc := TDatabase.Query;
 
-  QueryHeader.Open(Format('SELECT ID, FORNECEDOR_ID, FORNECEDOR_NOME, NUMERO_NF, CHAVE_NFE, DATA_EMISSAO, DATA_ENTRADA, VALOR_TOTAL, VALOR_FRETE, VALOR_OUTROS, OBSERVACAO FROM COMPRAS WHERE ID = %d', [LId]));
+  QueryHeader.Open(Format(
+    'SELECT ' +
+    '  C.COM_CODIGO AS ID, ' +
+    '  C.COM_FOR AS FORNECEDOR_ID, ' +
+    '  F.FOR_NOME AS FORNECEDOR_NOME, ' +
+    '  C.COM_NF AS NUMERO_NF, ' +
+    '  C.COM_DATA AS DATA_ENTRADA, ' +
+    '  C.COM_VALOR AS VALOR_TOTAL, ' +
+    '  C.COM_FRETE AS VALOR_FRETE, ' +
+    '  C.COM_OUTROS AS VALOR_OUTROS, ' +
+    '  C.COM_OBS AS OBSERVACAO, ' +
+    '  C.COM_FAT2 AS FATURAMENTO_ID ' +
+    'FROM COMPRAS C ' +
+    'LEFT JOIN FORNECEDORES F ON (F.FOR_CODIGO = C.COM_FOR) ' +
+    'WHERE C.COM_CODIGO = %d',
+    [LId]
+  ));
   if QueryHeader.Dataset.IsEmpty then
   begin
     Res.Status(THTTPStatus.NotFound).Send('{"error": "Compra nao encontrada"}');
@@ -218,8 +267,8 @@ begin
   LResponseObj.AddPair('fornecedor_id', TJSONNumber.Create(QueryHeader.Dataset.FieldByName('FORNECEDOR_ID').AsInteger));
   LResponseObj.AddPair('fornecedor_nome', QueryHeader.Dataset.FieldByName('FORNECEDOR_NOME').AsString);
   LResponseObj.AddPair('numero_nf', QueryHeader.Dataset.FieldByName('NUMERO_NF').AsString);
-  LResponseObj.AddPair('chave_nfe', QueryHeader.Dataset.FieldByName('CHAVE_NFE').AsString);
-  LResponseObj.AddPair('data_emissao', FormatDateTime('yyyy-mm-dd', QueryHeader.Dataset.FieldByName('DATA_EMISSAO').AsDateTime));
+  LResponseObj.AddPair('chave_nfe', '');
+  LResponseObj.AddPair('data_emissao', FormatDateTime('yyyy-mm-dd', QueryHeader.Dataset.FieldByName('DATA_ENTRADA').AsDateTime));
   LResponseObj.AddPair('data_entrada', FormatDateTime('yyyy-mm-dd', QueryHeader.Dataset.FieldByName('DATA_ENTRADA').AsDateTime));
   LResponseObj.AddPair('valor_total', TJSONNumber.Create(QueryHeader.Dataset.FieldByName('VALOR_TOTAL').AsFloat));
   LResponseObj.AddPair('valor_frete', TJSONNumber.Create(QueryHeader.Dataset.FieldByName('VALOR_FRETE').AsFloat));
@@ -312,7 +361,7 @@ begin
 
     LCompraId := LBody.GetValue<Integer>('id', 0);
     if LCompraId <= 0 then
-      LCompraId := GeraCodigo('COMPRAS', 'ID');
+      LCompraId := GeraCodigo('COMPRAS', 'COM_CODIGO');
 
     LNumDoc := LBody.GetValue<string>('numero_nf', '');
     LFornNome := LBody.GetValue<string>('fornecedor_nome', '');
@@ -320,16 +369,13 @@ begin
     LTotalCompra := LBody.GetValue<Double>('valor_total', 0);
 
     LQuery.Clear;
-    LQuery.Add('UPDATE OR INSERT INTO COMPRAS (ID, FORNECEDOR_ID, FORNECEDOR_NOME, NUMERO_NF, CHAVE_NFE, DATA_EMISSAO, DATA_ENTRADA, VALOR_TOTAL, VALOR_FRETE, VALOR_OUTROS, OBSERVACAO)');
-    LQuery.Add('VALUES (:ID, :FOR_ID, :FOR_NOME, :NUM_NF, :CHAVE, :D_EMIS, :D_ENTR, :V_TOT, :V_FRETE, :V_OUTROS, :OBS)');
-    LQuery.Add('MATCHING (ID)');
+    LQuery.Add('UPDATE OR INSERT INTO COMPRAS (COM_CODIGO, COM_FOR, COM_NF, COM_DATA, COM_VALOR, COM_FRETE, COM_OUTROS, COM_OBS, COM_TIPO)');
+    LQuery.Add('VALUES (:ID, :FOR_ID, :NUM_NF, :D_ENTR, :V_TOT, :V_FRETE, :V_OUTROS, :OBS, ''VC'')');
+    LQuery.Add('MATCHING (COM_CODIGO)');
 
     LQuery.AddParam('ID', LCompraId);
     LQuery.AddParam('FOR_ID', LFornId);
-    LQuery.AddParam('FOR_NOME', LFornNome);
     LQuery.AddParam('NUM_NF', LNumDoc);
-    LQuery.AddParam('CHAVE', LBody.GetValue<string>('chave_nfe', ''));
-    LQuery.AddParam('D_EMIS', FormatDateTime('yyyy-mm-dd', Date));
     LQuery.AddParam('D_ENTR', FormatDateTime('yyyy-mm-dd', Date));
     LQuery.AddParam('V_TOT', LTotalCompra);
     LQuery.AddParam('V_FRETE', LBody.GetValue<Double>('valor_frete', 0));
@@ -568,9 +614,21 @@ begin
   QueryItens := TDatabase.Query;
 
   QueryHeader.Open(Format(
-    'SELECT FIRST 1 ID, FORNECEDOR_ID, FORNECEDOR_NOME, NUMERO_NF, CHAVE_NFE, DATA_EMISSAO, DATA_ENTRADA, VALOR_TOTAL, VALOR_FRETE, VALOR_OUTROS, OBSERVACAO ' +
-    'FROM COMPRAS WHERE CHAVE_NFE = %s OR NUMERO_NF = %s OR ID = %s',
-    [QuotedStr(LTermo), QuotedStr(LTermo), QuotedStr(LTermo)]
+    'SELECT FIRST 1 ' +
+    '  C.COM_CODIGO AS ID, ' +
+    '  C.COM_FOR AS FORNECEDOR_ID, ' +
+    '  F.FOR_NOME AS FORNECEDOR_NOME, ' +
+    '  C.COM_NF AS NUMERO_NF, ' +
+    '  C.COM_DATA AS DATA_ENTRADA, ' +
+    '  C.COM_VALOR AS VALOR_TOTAL, ' +
+    '  C.COM_FRETE AS VALOR_FRETE, ' +
+    '  C.COM_OUTROS AS VALOR_OUTROS, ' +
+    '  C.COM_OBS AS OBSERVACAO, ' +
+    '  C.COM_FAT2 AS FATURAMENTO_ID ' +
+    'FROM COMPRAS C ' +
+    'LEFT JOIN FORNECEDORES F ON (F.FOR_CODIGO = C.COM_FOR) ' +
+    'WHERE C.COM_NF = %s OR C.COM_CODIGO = %s',
+    [QuotedStr(LTermo), QuotedStr(LTermo)]
   ));
 
   if QueryHeader.Dataset.IsEmpty then
@@ -586,8 +644,8 @@ begin
   LResponseObj.AddPair('fornecedor_id', TJSONNumber.Create(QueryHeader.Dataset.FieldByName('FORNECEDOR_ID').AsInteger));
   LResponseObj.AddPair('fornecedor_nome', QueryHeader.Dataset.FieldByName('FORNECEDOR_NOME').AsString);
   LResponseObj.AddPair('numero_nf', QueryHeader.Dataset.FieldByName('NUMERO_NF').AsString);
-  LResponseObj.AddPair('chave_nfe', QueryHeader.Dataset.FieldByName('CHAVE_NFE').AsString);
-  LResponseObj.AddPair('data_emissao', FormatDateTime('yyyy-mm-dd', QueryHeader.Dataset.FieldByName('DATA_EMISSAO').AsDateTime));
+  LResponseObj.AddPair('chave_nfe', '');
+  LResponseObj.AddPair('data_emissao', FormatDateTime('yyyy-mm-dd', QueryHeader.Dataset.FieldByName('DATA_ENTRADA').AsDateTime));
   LResponseObj.AddPair('data_entrada', FormatDateTime('yyyy-mm-dd', QueryHeader.Dataset.FieldByName('DATA_ENTRADA').AsDateTime));
   LResponseObj.AddPair('valor_total', TJSONNumber.Create(QueryHeader.Dataset.FieldByName('VALOR_TOTAL').AsFloat));
   LResponseObj.AddPair('valor_frete', TJSONNumber.Create(QueryHeader.Dataset.FieldByName('VALOR_FRETE').AsFloat));

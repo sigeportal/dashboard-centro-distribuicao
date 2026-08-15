@@ -2,7 +2,7 @@ import axios from 'axios';
 import { getAccessToken, setAccessToken, getRefreshToken, getBaseUrl } from './auth';
 
 export const AUTH_API_BASE = import.meta.env.VITE_AUTH_API_BASE || 'https://servidor-auth-dash-fboxwqyjfq-rj.a.run.app';
-export const CD_API_BASE = import.meta.env.VITE_CD_API_BASE || 'http://127.0.0.1:9000';
+export const CD_API_BASE = import.meta.env.VITE_CD_API_BASE || 'http://127.0.0.1:8080';
 
 const normalizeBaseUrl = (baseUrl) => {
   if (!baseUrl) return '';
@@ -15,7 +15,8 @@ let refreshPromise = null;
 export const isUnauthorizedError = (error) => error.response?.status === 401 || error.isAuthRefreshFailure;
 
 export function createApi(useCdApi = false) {
-  const baseUrl = useCdApi ? CD_API_BASE : normalizeBaseUrl(getBaseUrl());
+  const dynamicBase = normalizeBaseUrl(getBaseUrl());
+  const baseUrl = useCdApi ? (dynamicBase || CD_API_BASE) : dynamicBase;
   const token = getAccessToken();
 
   const headers = {

@@ -165,6 +165,7 @@ type
     [TRelacionamento('GRUPOS', 'GRU_CODIGO', 'PRO_GRU', TSubGrupos, UmPraUm)]
     property SubGrupo: TSubGrupos read FSubGrupo write FSubGrupo;
     [TRelacionamento('FORNECEDORES', 'FOR_CODIGO', 'PRO_FOR', TFornecedores, UmPraUm)]
+    property Fornecedor: TFornecedores read FFornecedor write FFornecedor;
     [TCampo('PRO_URL_IMAGEM', 'VARCHAR(1000)')]
     property URL_Imagem: string read FURL_Imagem write FURL_Imagem;
     [TCampo('PRO_CADASTRAR', 'CHAR(1) DEFAULT ''N''')]
