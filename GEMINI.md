@@ -46,3 +46,31 @@
 - **Sincronização Cloud Central (`/v1/sync/dashboard`)**:
   - Toda estrutura do Dashboard (`DASHBOARD_DIARIO`, `DASHBOARD_PAGAMENTOS`, `DASHBOARD_VENDAS_GRUPO`, `DASHBOARD_CLIENTES_CIDADE`, `DASHBOARD_VENDAS_HORA`) preserva e filtra por `DATA_REF` (DATE).
   - No envio do sync, o servidor central apaga e substitui pontualmente apenas os registros pertencentes àquela `EMPRESA_ID` e `DATA_REF` específica de cada lançamento real, garantindo a fidelidade dos filtros por período (`De` / `Até`) no portal.
+
+## 6. Diretrizes do Agente Especialista em Backend Delphi & PortalORM
+- **Especialidade**: O agente backend Delphi é especialista em **PortalORM** (`G:\PROJETOS\CENTRO-DISTRIBUICAO\backend\ServidorConsole\modules\portalorm` ou `https://github.com/cachopaweb/PortalORM`).
+- **Mapeamento de Entidades**:
+  - Toda nova entidade ou tabela deve ser mapeada como classe herdando de `TTabela` (`UnitPortalORM.Model.pas`).
+  - Usar os atributos:
+    * `[TRecursoServidor('/recurso')]`
+    * `[TNomeTabela('NOME_TABELA', 'CHAVE_PK')]`
+    * `[TCampo('CAMPO_BD', 'TIPO_SQL')]`
+    * `[TRelacionamento('TABELA_REL', 'PK_REL', 'FK_LOCAL', TClasseRel, TTipoRelacionamento.UmPraUm / UmPraMuitos)]`
+- **Uso Máximo do PortalORM**:
+  - Sempre priorizar métodos nativos: `CriaTabela`, `BuscaDadosTabela(id)`, `SalvaNoBanco(1)`, `Apagar(id)`, `ToJson`, `SetJson`.
+  - **Regra de SQL Raw**: Somente utilizar SQL manual (`iQuery` / `TDatabase.Query`) caso o PortalORM não forneça a funcionalidade necessária (consultas analíticas agregadas complexas, joins analíticos customizados ou bulk updates de alta performance).
+  - Ao usar `iQuery`, respeitar estritamente a execução sem parâmetros no `ExecSQL` (`LQuery.Clear; LQuery.Add('...'); LQuery.ExecSQL;`).
+
+## 7. Diretrizes do Agente Especialista em Frontend React & Design System
+- **Padrão Visual Unificado**:
+  - Todas as telas e modais devem seguir estritamente o Design System da aplicação:
+    * Containers e cards: `.crud-container`, `.glass`, `.list-card`, `border-radius: 1rem a 1.25rem`, bordas suaves e sombras refinadas.
+    * Cores: Laranja institucional (`linear-gradient(135deg, #f97316 0%, #ea580c 100%)`) e Azul (`#2563eb`), fundo `#f8fafc` / `#ffffff`, tipografia Inter/Outfit.
+    * Formulários & Ações: `.crud-input` e `.form-group` estruturados, botões com ícones da biblioteca `lucide-react`, espaçamento adequado (`.crud-form-actions` com `gap: 1rem` e `padding-top: 1.25rem`).
+    * Listagens e Tabelas: `.data-table` responsiva, badges de status (`.badge-info`, `.badge-warning`, `.badge-success`), botões de ação (`.crud-row-btn edit/delete`).
+- **Regra de Tradução de Telas e Imagens Legadas**:
+  - Mesmo quando o usuário fornecer imagens, formulários Delphi (.dfm), relatórios ou telas de sistemas antigos (Madenorte, Confecções, PDV Desktop), o agente frontend **NUNCA deve reproduzir o visual retrô ou desatualizado**.
+  - **SEMPRE traduzir os campos, regras de negócio e fluxos para o padrão visual moderno do React Dashboard Portal**.
+- **Segurança de Dados**:
+  - Tratar retornos relacionais (ex: objetos de cidades, fornecedores) para extrair strings limpas, evitando `[object Object]`.
+
