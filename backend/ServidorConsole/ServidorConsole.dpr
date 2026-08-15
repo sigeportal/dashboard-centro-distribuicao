@@ -67,6 +67,14 @@ uses
   UnitClientes.Controller in '..\Shared\Controllers\Clientes\UnitClientes.Controller.pas',
   UnitPedidosCompra.Model in '..\Shared\Models\PedidosCompra\UnitPedidosCompra.Model.pas',
   UnitPedidosCompra.Controller in '..\Shared\Controllers\PedidosCompra\UnitPedidosCompra.Controller.pas',
+  UnitFaturamento2.Model in '..\..\..\FormsComuns\Classes\Faturamento2\UnitFaturamento2.Model.pas',
+  UnitFaturamento2.Controller in '..\..\..\FormsComuns\Classes\Faturamento2\UnitFaturamento2.Controller.pas',
+  UnitPagamentos.Model in '..\..\..\FormsComuns\Classes\Pagamentos\UnitPagamentos.Model.pas',
+  UnitPagamentos.Controller in '..\..\..\FormsComuns\Classes\Pagamentos\UnitPagamentos.Controller.pas',
+  UnitPagPgm.Model in '..\..\..\FormsComuns\Classes\PagPgm\UnitPagPgm.Model.pas',
+  UnitPagPgm.Controller in '..\..\..\FormsComuns\Classes\PagPgm\UnitPagPgm.Controller.pas',
+  UnitMovimentacoes.Model in '..\..\..\FormsComuns\Classes\Movimentacoes\UnitMovimentacoes.Model.pas',
+  UnitMovimentacoes.Controller in '..\..\..\FormsComuns\Classes\Movimentacoes\UnitMovimentacoes.Controller.pas',
   ConciliacaoFiscal.Controller in '..\Shared\Controllers\ConciliacaoFiscal.Controller.pas';
 
 var
@@ -109,6 +117,10 @@ begin
     THisProController.Router;
     TNfeController.Router;
     TPedidosCompraController.Router;
+    TFaturamento2Controller.Router;
+    TPagamentosController.Router;
+    TPagPgmController.Router;
+    TMovimentacoesController.Router;
     
     //inicializa classes
     TInicializarClasses.Iniciar;  

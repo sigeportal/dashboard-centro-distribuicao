@@ -17,7 +17,6 @@ type
     class procedure GetForID(Req: THorseRequest; Res: THorseResponse; Next: TProc);
     class procedure BuscarPorNfOuChave(Req: THorseRequest; Res: THorseResponse);
     class procedure Post(Req: THorseRequest; Res: THorseResponse; Next: TProc);
-    class procedure GetContasPagar(Req: THorseRequest; Res: THorseResponse);
     class procedure EnsureComprasTables;
     class function ObterEmpresaId(Req: THorseRequest): Integer;
   end;
@@ -29,6 +28,10 @@ uses
   UnitDatabase,
   UnitFunctions,
   UnitCompras.Model,
+  UnitFaturamento2.Model,
+  UnitPagamentos.Model,
+  UnitPagPgm.Model,
+  UnitMovimentacoes.Model,
   UnitHisPro.Controller;
 
 class function TComprasController.ObterEmpresaId(Req: THorseRequest): Integer;
@@ -48,9 +51,12 @@ class procedure TComprasController.EnsureComprasTables;
 var
   LCompras: TCompras;
   LItens: TComprasItens;
-  LQuery: iQuery;
+  LFat2: TFaturamento2;
+  LPag: TPagamentos;
+  LPagPgm: TPagPgm;
 begin
   try
+    // O PortalORM gerencia a verificacao e criacao das tabelas estruturais
     LCompras := TCompras.Create(TDatabase.Connection);
     try
       LCompras.CriaTabela;
@@ -65,32 +71,29 @@ begin
       LItens.DisposeOf;
     end;
 
-    // Garante tabela CONTAS_PAGAR
+    LFat2 := TFaturamento2.Create(TDatabase.Connection);
     try
-      LQuery := TDatabase.Query;
-      LQuery.ExecSQL(
-        'CREATE TABLE CONTAS_PAGAR (' +
-        '  ID INTEGER NOT NULL PRIMARY KEY, ' +
-        '  COMPRA_ID INTEGER, ' +
-        '  FORNECEDOR_ID INTEGER, ' +
-        '  FORNECEDOR_NOME VARCHAR(200), ' +
-        '  NUMERO_DOCUMENTO VARCHAR(50), ' +
-        '  PARCELA VARCHAR(20), ' +
-        '  DATA_EMISSAO DATE, ' +
-        '  DATA_VENCIMENTO DATE, ' +
-        '  VALOR_PARCELA NUMERIC(15,2), ' +
-        '  VALOR_PAGO NUMERIC(15,2) DEFAULT 0, ' +
-        '  FORMA_PAGAMENTO VARCHAR(50), ' +
-        '  STATUS VARCHAR(20) DEFAULT ''ABERTO'', ' +
-        '  OBSERVACAO VARCHAR(500)' +
-        ')'
-      );
-    except
-      // Tabela ja existe
+      LFat2.CriaTabela;
+    finally
+      LFat2.DisposeOf;
+    end;
+
+    LPag := TPagamentos.Create(TDatabase.Connection);
+    try
+      LPag.CriaTabela;
+    finally
+      LPag.DisposeOf;
+    end;
+
+    LPagPgm := TPagPgm.Create(TDatabase.Connection);
+    try
+      LPagPgm.CriaTabela;
+    finally
+      LPagPgm.DisposeOf;
     end;
   except
     on E: Exception do
-      Writeln('-> Erro ao verificar/criar tabelas de compras: ' + E.Message);
+      Writeln('-> Verificacao tabelas ORM: ' + E.Message);
   end;
 end;
 
@@ -184,7 +187,7 @@ end;
 
 class procedure TComprasController.GetForID(Req: THorseRequest; Res: THorseResponse; Next: TProc);
 var
-  LId: Integer;
+  LId, LFaturaId: Integer;
   LResponseObj, LItemObj, LParcObj: TJSONObject;
   LItensArr, LParcArr: TJSONArray;
   QueryHeader, QueryItens, QueryParc: iQuery;
@@ -245,27 +248,32 @@ begin
   end;
   LResponseObj.AddPair('itens', LItensArr);
 
-  // Parcelas do Contas a Pagar
+  // Busca parcelas do Faturamento em PAGAMENTOS via FATURAMENTO2
   LParcArr := TJSONArray.Create;
   try
-    QueryParc.Open(Format('SELECT ID, PARCELA, DATA_VENCIMENTO, VALOR_PARCELA, VALOR_PAGO, FORMA_PAGAMENTO, STATUS FROM CONTAS_PAGAR WHERE COMPRA_ID = %d ORDER BY ID ASC', [LId]));
+    QueryParc.Open(Format(
+      'SELECT P.PAG_CODIGO, P.PAG_VALOR, P.PAG_VENCIMENTO, P.PAG_DUPLICATA, P.PAG_ESTADO, P.PAG_TIPO ' +
+      'FROM PAGAMENTOS P ' +
+      'INNER JOIN FATURAMENTO2 F ON (F.FAT2_CODIGO = P.PAG_FAT2) ' +
+      'WHERE F.FAT2_DESCRICAO = %d ORDER BY P.PAG_CODIGO ASC',
+      [LId]
+    ));
     QueryParc.Dataset.First;
     while not QueryParc.Dataset.Eof do
     begin
       LParcObj := TJSONObject.Create;
-      LParcObj.AddPair('id', TJSONNumber.Create(QueryParc.Dataset.FieldByName('ID').AsInteger));
-      LParcObj.AddPair('parcela', QueryParc.Dataset.FieldByName('PARCELA').AsString);
-      LParcObj.AddPair('data_vencimento', FormatDateTime('yyyy-mm-dd', QueryParc.Dataset.FieldByName('DATA_VENCIMENTO').AsDateTime));
-      LParcObj.AddPair('valor_parcela', TJSONNumber.Create(QueryParc.Dataset.FieldByName('VALOR_PARCELA').AsFloat));
-      LParcObj.AddPair('valor_pago', TJSONNumber.Create(QueryParc.Dataset.FieldByName('VALOR_PAGO').AsFloat));
-      LParcObj.AddPair('forma_pagamento', QueryParc.Dataset.FieldByName('FORMA_PAGAMENTO').AsString);
-      LParcObj.AddPair('status', QueryParc.Dataset.FieldByName('STATUS').AsString);
+      LParcObj.AddPair('id', TJSONNumber.Create(QueryParc.Dataset.FieldByName('PAG_CODIGO').AsInteger));
+      LParcObj.AddPair('parcela', QueryParc.Dataset.FieldByName('PAG_DUPLICATA').AsString);
+      LParcObj.AddPair('data_vencimento', FormatDateTime('yyyy-mm-dd', QueryParc.Dataset.FieldByName('PAG_VENCIMENTO').AsDateTime));
+      LParcObj.AddPair('valor_parcela', TJSONNumber.Create(QueryParc.Dataset.FieldByName('PAG_VALOR').AsFloat));
+      LParcObj.AddPair('forma_pagamento', QueryParc.Dataset.FieldByName('PAG_TIPO').AsString);
+      LParcObj.AddPair('status', IfThen(QueryParc.Dataset.FieldByName('PAG_ESTADO').AsInteger = 3, 'PAGO', 'ABERTO'));
 
       LParcArr.AddElement(LParcObj);
       QueryParc.Dataset.Next;
     end;
   except
-    // Se a tabela ainda nao tiver parcelas
+    // Caso ainda nao tenha faturamento associado
   end;
   LResponseObj.AddPair('parcelas', LParcArr);
 
@@ -276,13 +284,18 @@ class procedure TComprasController.Post(Req: THorseRequest; Res: THorseResponse;
 var
   LBody, LItemObj, LParcObj, LResObj: TJSONObject;
   LItensArr, LParcArr: TJSONArray;
-  LCompraId, I, LProCodigo, LNewItemId, LNewParcId: Integer;
+  LCompraId, I, LProCodigo, LNewItemId, LFornId: Integer;
   LQuery, LQueryPro: iQuery;
   LQtd, LValUnit, LValFrete, LValIpi, LValSt, LValOutros: Double;
   LCustoEntrada, LRateio, LCustoMercadoria, LCustoOperacional, LCustoMedio: Double;
   LQtdAtual, LCustoMedioAtual: Double;
-  LVendaDinheiro, LVendaVista, LVendaPrazo: Double;
+  LVendaDinheiro, LVendaVista, LVendaPrazo, LTotalCompra: Double;
   LNumDoc, LFornNome: string;
+  // Models oficiais do sistema para Faturamento
+  LFaturamento2: TFaturamento2;
+  LPagamento: TPagamentos;
+  LCodFat2, LCodPag: Integer;
+  LDataVencStr: string;
 begin
   EnsureComprasTables;
   LBody := Req.Body<TJSONObject>;
@@ -301,6 +314,8 @@ begin
 
     LNumDoc := LBody.GetValue<string>('numero_nf', '');
     LFornNome := LBody.GetValue<string>('fornecedor_nome', '');
+    LFornId := LBody.GetValue<Integer>('fornecedor_id', 0);
+    LTotalCompra := LBody.GetValue<Double>('valor_total', 0);
 
     LQuery.Clear;
     LQuery.Add('UPDATE OR INSERT INTO COMPRAS (ID, FORNECEDOR_ID, FORNECEDOR_NOME, NUMERO_NF, CHAVE_NFE, DATA_EMISSAO, DATA_ENTRADA, VALOR_TOTAL, VALOR_FRETE, VALOR_OUTROS, OBSERVACAO)');
@@ -308,13 +323,13 @@ begin
     LQuery.Add('MATCHING (ID)');
 
     LQuery.AddParam('ID', LCompraId);
-    LQuery.AddParam('FOR_ID', LBody.GetValue<Integer>('fornecedor_id', 0));
+    LQuery.AddParam('FOR_ID', LFornId);
     LQuery.AddParam('FOR_NOME', LFornNome);
     LQuery.AddParam('NUM_NF', LNumDoc);
     LQuery.AddParam('CHAVE', LBody.GetValue<string>('chave_nfe', ''));
     LQuery.AddParam('D_EMIS', FormatDateTime('yyyy-mm-dd', Date));
     LQuery.AddParam('D_ENTR', FormatDateTime('yyyy-mm-dd', Date));
-    LQuery.AddParam('V_TOT', LBody.GetValue<Double>('valor_total', 0));
+    LQuery.AddParam('V_TOT', LTotalCompra);
     LQuery.AddParam('V_FRETE', LBody.GetValue<Double>('valor_frete', 0));
     LQuery.AddParam('V_OUTROS', LBody.GetValue<Double>('valor_outros', 0));
     LQuery.AddParam('OBS', LBody.GetValue<string>('observacao', ''));
@@ -362,7 +377,7 @@ begin
         else
           LCustoMedio := LCustoMercadoria;
 
-        // Precos de Venda Atualizados (se informados da Analise de Custos F5)
+        // Precos de Venda Atualizados (da Analise de Custos F5)
         LVendaDinheiro := LItemObj.GetValue<Double>('valor_dinheiro', 0);
         LVendaVista := LItemObj.GetValue<Double>('valor_vista', 0);
         LVendaPrazo := LItemObj.GetValue<Double>('valor_prazo', 0);
@@ -443,39 +458,53 @@ begin
       end;
     end;
 
-    // Processa Parcelas do Faturamento / Contas a Pagar
+    // Faturamento Oficial via FATURAMENTO2 e PAGAMENTOS (FormsComuns)
     LParcArr := LBody.GetValue<TJSONArray>('parcelas', nil);
     if Assigned(LParcArr) and (LParcArr.Count > 0) then
     begin
-      // Limpa parcelas anteriores desta compra se estiver atualizando
-      LQuery.Clear;
-      LQuery.Add('DELETE FROM CONTAS_PAGAR WHERE COMPRA_ID = :CID');
-      LQuery.AddParam('CID', LCompraId);
-      LQuery.ExecSQL;
+      // Cria/Atualiza Registro em FATURAMENTO2
+      LCodFat2 := GeraCodigo('FATURAMENTO2', 'FAT2_CODIGO');
+      LFaturamento2 := TFaturamento2.Create(TDatabase.Connection);
+      try
+        LFaturamento2.Codigo := LCodFat2;
+        LFaturamento2.Tipo := 1; // Compra = 1
+        LFaturamento2.Valor := LTotalCompra;
+        LFaturamento2.Descricao := LCompraId; // Vinculo com ID da Compra
+        LFaturamento2.TipoPgm := IfThen(LParcArr.Count = 1, 1, 2); // 1 = A Vista, 2 = A Prazo
+        LFaturamento2.Parcelas := LParcArr.Count;
+        LFaturamento2.Juros := 0;
+        LFaturamento2.Data := Date;
+        LFaturamento2.Cod_FDTF := LFornId;
+        LFaturamento2.SalvaNoBanco(0);
+      finally
+        LFaturamento2.DisposeOf;
+      end;
 
+      // Cria os registros individuais de parcelas em PAGAMENTOS
       for I := 0 to LParcArr.Count - 1 do
       begin
         LParcObj := TJSONObject(LParcArr.Items[I]);
-        LNewParcId := GeraCodigo('CONTAS_PAGAR', 'ID');
+        LCodPag := GeraCodigo('PAGAMENTOS', 'PAG_CODIGO');
+        LDataVencStr := LParcObj.GetValue<string>('data_vencimento', FormatDateTime('yyyy-mm-dd', Date + (30 * (I + 1))));
 
-        LQuery.Clear;
-        LQuery.Add('INSERT INTO CONTAS_PAGAR (ID, COMPRA_ID, FORNECEDOR_ID, FORNECEDOR_NOME, NUMERO_DOCUMENTO, PARCELA, DATA_EMISSAO, DATA_VENCIMENTO, VALOR_PARCELA, VALOR_PAGO, FORMA_PAGAMENTO, STATUS, OBSERVACAO)');
-        LQuery.Add('VALUES (:ID, :CID, :FID, :FNOME, :NDOC, :PARC, :DEMIS, :DVENC, :VPARC, :VPAGO, :FPAG, :STAT, :OBS)');
-
-        LQuery.AddParam('ID', LNewParcId);
-        LQuery.AddParam('CID', LCompraId);
-        LQuery.AddParam('FID', LBody.GetValue<Integer>('fornecedor_id', 0));
-        LQuery.AddParam('FNOME', LFornNome);
-        LQuery.AddParam('NDOC', LNumDoc);
-        LQuery.AddParam('PARC', LParcObj.GetValue<string>('parcela', Format('%d/%d', [I + 1, LParcArr.Count])));
-        LQuery.AddParam('DEMIS', FormatDateTime('yyyy-mm-dd', Date));
-        LQuery.AddParam('DVENC', LParcObj.GetValue<string>('data_vencimento', FormatDateTime('yyyy-mm-dd', Date + (30 * (I + 1)))));
-        LQuery.AddParam('VPARC', LParcObj.GetValue<Double>('valor_parcela', 0));
-        LQuery.AddParam('VPAGO', 0);
-        LQuery.AddParam('FPAG', LParcObj.GetValue<string>('forma_pagamento', 'BOLETO'));
-        LQuery.AddParam('STAT', 'ABERTO');
-        LQuery.AddParam('OBS', Format('Compra #%d - NF %s', [LCompraId, LNumDoc]));
-        LQuery.ExecSQL;
+        LPagamento := TPagamentos.Create(TDatabase.Connection);
+        try
+          LPagamento.Codigo := LCodPag;
+          LPagamento.Valor := LParcObj.GetValue<Double>('valor_parcela', 0);
+          LPagamento.Vencimento := StrToDateDef(LDataVencStr, Date + (30 * (I + 1)));
+          LPagamento.Juros := 0;
+          LPagamento.Estado := 1; // 1 = Aberto / A Pagar, 3 = Quitado
+          LPagamento.Duplicata := Format('%d-%d/%d', [LCodFat2, I + 1, LParcArr.Count]);
+          LPagamento.Fpg := 1;
+          LPagamento.Fat2 := LCodFat2;
+          LPagamento.Descontos := 0;
+          LPagamento.Tipo := LParcObj.GetValue<string>('forma_pagamento', 'BOLETO');
+          LPagamento.Situacao := 0;
+          LPagamento.Datac := Date;
+          LPagamento.SalvaNoBanco(0);
+        finally
+          LPagamento.DisposeOf;
+        end;
       end;
     end;
 
@@ -491,45 +520,6 @@ begin
       LResObj.AddPair('error', E.Message);
       Res.Status(THTTPStatus.InternalServerError).Send(LResObj);
     end;
-  end;
-end;
-
-class procedure TComprasController.GetContasPagar(Req: THorseRequest; Res: THorseResponse);
-var
-  LDataArr: TJSONArray;
-  LObj: TJSONObject;
-  LQuery: iQuery;
-begin
-  EnsureComprasTables;
-  LDataArr := TJSONArray.Create;
-  LQuery := TDatabase.Query;
-  try
-    LQuery.Open('SELECT FIRST 100 ID, COMPRA_ID, FORNECEDOR_ID, FORNECEDOR_NOME, NUMERO_DOCUMENTO, PARCELA, DATA_EMISSAO, DATA_VENCIMENTO, VALOR_PARCELA, VALOR_PAGO, FORMA_PAGAMENTO, STATUS, OBSERVACAO FROM CONTAS_PAGAR ORDER BY DATA_VENCIMENTO ASC, ID ASC');
-    LQuery.Dataset.First;
-    while not LQuery.Dataset.Eof do
-    begin
-      LObj := TJSONObject.Create;
-      LObj.AddPair('id', TJSONNumber.Create(LQuery.Dataset.FieldByName('ID').AsInteger));
-      LObj.AddPair('compra_id', TJSONNumber.Create(LQuery.Dataset.FieldByName('COMPRA_ID').AsInteger));
-      LObj.AddPair('fornecedor_id', TJSONNumber.Create(LQuery.Dataset.FieldByName('FORNECEDOR_ID').AsInteger));
-      LObj.AddPair('fornecedor_nome', LQuery.Dataset.FieldByName('FORNECEDOR_NOME').AsString);
-      LObj.AddPair('numero_documento', LQuery.Dataset.FieldByName('NUMERO_DOCUMENTO').AsString);
-      LObj.AddPair('parcela', LQuery.Dataset.FieldByName('PARCELA').AsString);
-      LObj.AddPair('data_emissao', FormatDateTime('yyyy-mm-dd', LQuery.Dataset.FieldByName('DATA_EMISSAO').AsDateTime));
-      LObj.AddPair('data_vencimento', FormatDateTime('yyyy-mm-dd', LQuery.Dataset.FieldByName('DATA_VENCIMENTO').AsDateTime));
-      LObj.AddPair('valor_parcela', TJSONNumber.Create(LQuery.Dataset.FieldByName('VALOR_PARCELA').AsFloat));
-      LObj.AddPair('valor_pago', TJSONNumber.Create(LQuery.Dataset.FieldByName('VALOR_PAGO').AsFloat));
-      LObj.AddPair('forma_pagamento', LQuery.Dataset.FieldByName('FORMA_PAGAMENTO').AsString);
-      LObj.AddPair('status', LQuery.Dataset.FieldByName('STATUS').AsString);
-      LObj.AddPair('observacao', LQuery.Dataset.FieldByName('OBSERVACAO').AsString);
-
-      LDataArr.AddElement(LObj);
-      LQuery.Dataset.Next;
-    end;
-    Res.Send<TJSONArray>(LDataArr);
-  except
-    on E: Exception do
-      Res.Status(THTTPStatus.InternalServerError).Send('{"error": "' + E.Message + '"}');
   end;
 end;
 
@@ -549,11 +539,6 @@ begin
   THorse.Group.Prefix('/v1')
     .Route('/compras/:id')
       .Get(GetForID)
-    .&End;
-
-  THorse.Group.Prefix('/v1')
-    .Route('/contas-pagar')
-      .Get(GetContasPagar)
     .&End;
 end;
 
