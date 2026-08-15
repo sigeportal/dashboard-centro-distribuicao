@@ -9,6 +9,7 @@ import {
 import { createApi } from '../services/api';
 import GradesModal from './GradesModal';
 import GruposSubgruposModal from './GruposSubgruposModal';
+import LookupSelect from './LookupSelect';
 import { formatCurrency } from '../utils/formatters';
 import './ProductFormModal.css';
 
@@ -670,14 +671,42 @@ export default function ProductFormModal({
 
                   <div className="form-group">
                     <label>Fornecedor Principal *</label>
-                    <select 
+                    <LookupSelect
                       value={form.pro_for}
-                      onChange={(e) => setForm(prev => ({ ...prev, pro_for: Number(e.target.value) }))}
-                    >
-                      {fornecedores.map(f => (
-                        <option key={f.codigo} value={f.codigo}>#{f.codigo} - {f.nome || f.razao_social}</option>
-                      ))}
-                    </select>
+                      displayValue={
+                        form.pro_for 
+                          ? `#${form.pro_for} - ${fornecedores.find(f => Number(f.codigo) === Number(form.pro_for))?.nome || 'Fornecedor'}`
+                          : ''
+                      }
+                      placeholder="Buscar Fornecedor..."
+                      title="Selecionar Fornecedor Principal"
+                      subtitle="Busca paginada por Razão Social, Fantasia, CNPJ ou Código"
+                      icon={Package}
+                      searchPlaceholder="Digite o nome, razão social, CNPJ ou código..."
+                      fetchData={async (termo, targetPage, limit) => {
+                        let url = `/v1/fornecedores?page=${targetPage}&limit=${limit}`;
+                        if (termo) url += `&busca=${encodeURIComponent(termo)}`;
+                        const res = await api.get(url);
+                        return res.data;
+                      }}
+                      columns={[
+                        { key: 'codigo', label: 'Código', width: '90px', render: (f) => <span className="item-code">#{f.codigo}</span> },
+                        { key: 'nome', label: 'Razão Social / Nome', render: (f) => <strong>{f.nome || f.razao_social || '-'}</strong> },
+                        { key: 'fantasia', label: 'Nome Fantasia' },
+                        { key: 'cnpj', label: 'CNPJ / CPF', render: (f) => <code>{f.cnpj || f.cpf || '-'}</code> },
+                        { key: 'cidade', label: 'Cidade / UF', render: (f) => `${f.cidade || ''} - ${f.uf || ''}` }
+                      ]}
+                      onSelect={(forn) => {
+                        setForm(prev => ({
+                          ...prev,
+                          pro_for: Number(forn.codigo),
+                          fabricante: prev.fabricante || forn.nome || forn.razao_social || ''
+                        }));
+                      }}
+                      onClear={() => {
+                        setForm(prev => ({ ...prev, pro_for: 1 }));
+                      }}
+                    />
                   </div>
                 </div>
               </div>

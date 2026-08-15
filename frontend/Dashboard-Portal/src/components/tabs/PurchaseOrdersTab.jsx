@@ -9,6 +9,7 @@ import {
 import { createApi } from '../../services/api';
 import SearchBar from '../SearchBar';
 import Pagination from '../Pagination';
+import LookupSelect from '../LookupSelect';
 import { formatCurrency } from '../../utils/formatters';
 import './PurchaseOrdersTab.css';
 
@@ -611,11 +612,37 @@ export default function PurchaseOrdersTab() {
 
                   <div className="form-group">
                     <label>Marca / Fabricante *</label>
-                    <input 
-                      type="text" 
-                      value={orderForm.marca} 
-                      onChange={(e) => setOrderForm({ ...orderForm, marca: e.target.value })} 
-                      placeholder="Ex: MOONCITY" 
+                    <LookupSelect
+                      value={orderForm.fornecedor_id || orderForm.marca}
+                      displayValue={orderForm.marca || (orderForm.fornecedor_id ? `#${orderForm.fornecedor_id} - ${orderForm.fornecedor_nome}` : '')}
+                      placeholder="Buscar Fornecedor..."
+                      title="Selecionar Marca / Fornecedor"
+                      subtitle="Busca paginada por Razão Social, Fantasia ou Código"
+                      icon={Building2}
+                      searchPlaceholder="Digite o nome, marca, CNPJ ou código..."
+                      fetchData={async (termo, targetPage, limit) => {
+                        let url = `/v1/fornecedores?page=${targetPage}&limit=${limit}`;
+                        if (termo) url += `&busca=${encodeURIComponent(termo)}`;
+                        const res = await api.get(url);
+                        return res.data;
+                      }}
+                      columns={[
+                        { key: 'codigo', label: 'Código', width: '90px', render: (f) => <span className="item-code">#{f.codigo}</span> },
+                        { key: 'nome', label: 'Razão Social / Nome', render: (f) => <strong>{f.nome || f.razao_social || '-'}</strong> },
+                        { key: 'fantasia', label: 'Nome Fantasia' },
+                        { key: 'cidade', label: 'Cidade / UF', render: (f) => `${f.cidade || ''} - ${f.uf || ''}` }
+                      ]}
+                      onSelect={(forn) => {
+                        setOrderForm(prev => ({
+                          ...prev,
+                          fornecedor_id: forn.codigo,
+                          fornecedor_nome: forn.nome || forn.razao_social,
+                          marca: forn.fantasia || forn.nome || forn.razao_social
+                        }));
+                      }}
+                      onClear={() => {
+                        setOrderForm(prev => ({ ...prev, fornecedor_id: '', fornecedor_nome: '', marca: '' }));
+                      }}
                     />
                   </div>
 
@@ -739,11 +766,50 @@ export default function PurchaseOrdersTab() {
                 <div className="grade-quick-form" style={{ gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr auto' }}>
                   <div className="form-group">
                     <label>Descrição do Produto *</label>
-                    <input 
-                      type="text" 
-                      value={itemLinhaForm.produto_nome} 
-                      onChange={(e) => setItemLinhaForm({ ...itemLinhaForm, produto_nome: e.target.value })} 
-                      placeholder="Ex: BOTA CANO ALTO" 
+                    <LookupSelect
+                      value={itemLinhaForm.produto_id || itemLinhaForm.produto_nome}
+                      displayValue={itemLinhaForm.produto_nome}
+                      placeholder="Buscar do catálogo ou digitar..."
+                      title="Selecionar Produto do Catálogo"
+                      subtitle="Busca paginada por Descrição, Código ou Referência"
+                      icon={Package}
+                      searchPlaceholder="Digite a descrição, código ou referência..."
+                      fetchData={async (termo, targetPage, limit) => {
+                        let url = `/v1/produtos?page=${targetPage}&limit=${limit}`;
+                        if (termo) url += `&busca=${encodeURIComponent(termo)}&termo=${encodeURIComponent(termo)}`;
+                        const res = await api.get(url);
+                        return res.data;
+                      }}
+                      columns={[
+                        { key: 'codigo', label: 'Código', width: '90px', render: (p) => <span className="item-code">#{p.codigo || p.PRO_CODIGO}</span> },
+                        { key: 'nome', label: 'Descrição do Produto', render: (p) => <strong>{p.nome || p.PRO_NOME || p.descricao}</strong> },
+                        { key: 'referencia', label: 'Referência', render: (p) => p.referencia || p.PRO_REFERENCIA || '-' },
+                        { key: 'cor', label: 'Cor', render: (p) => p.cor || p.PRO_COR || '-' },
+                        { key: 'custo', label: 'Custo', align: 'right', render: (p) => formatCurrency(p.custo || p.PRO_VALORC || 0) },
+                        { key: 'valorv', label: 'Preço Venda', align: 'right', render: (p) => <strong style={{ color: 'var(--success)' }}>{formatCurrency(p.valorv || p.PRO_VALORV || 0)}</strong> }
+                      ]}
+                      onSelect={(prod) => {
+                        const vu = Number(prod.custo || prod.PRO_VALORC || prod.valorc || 0);
+                        const vv = Number(prod.valorv || prod.PRO_VALORV || (vu * 2));
+                        const vd = Number(prod.pro_valor_dinheiro || prod.valor_dinheiro || vv);
+                        const vp = Number(prod.pro_valorv_prazo || prod.valor_prazo || (vu * 2.2));
+
+                        setItemLinhaForm(prev => ({
+                          ...prev,
+                          produto_id: prod.codigo || prod.PRO_CODIGO,
+                          produto_nome: prod.nome || prod.PRO_NOME || prod.descricao,
+                          cor: prod.cor || prod.PRO_COR || prev.cor || 'UNICA',
+                          referencia: prod.referencia || prod.PRO_REFERENCIA || prev.referencia || '',
+                          valor_unitario: vu,
+                          valor_imposto: vu * 1.07,
+                          valor_vista: vv,
+                          valor_dinheiro: vd,
+                          valor_prazo: vp
+                        }));
+                      }}
+                      onClear={() => {
+                        setItemLinhaForm(prev => ({ ...prev, produto_id: 0, produto_nome: '' }));
+                      }}
                     />
                   </div>
 

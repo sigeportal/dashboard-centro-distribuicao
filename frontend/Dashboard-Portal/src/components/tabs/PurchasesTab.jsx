@@ -9,6 +9,7 @@ import {
 import { createApi } from '../../services/api';
 import Pagination from '../Pagination';
 import SearchBar from '../SearchBar';
+import LookupSelect from '../LookupSelect';
 import { formatCurrency } from '../../utils/formatters';
 import './PurchasesTab.css';
 
@@ -815,15 +816,42 @@ export default function PurchasesTab() {
                 <div className="product-grid-4">
                   <div className="form-group" style={{ gridColumn: 'span 2' }}>
                     <label>Fornecedor *</label>
-                    <select 
-                      value={purchaseForm.fornecedor_id} 
-                      onChange={(e) => setPurchaseForm({ ...purchaseForm, fornecedor_id: e.target.value })}
-                    >
-                      <option value="">Selecione o Fornecedor...</option>
-                      {fornecedores.map(f => (
-                        <option key={f.codigo} value={f.codigo}>#{f.codigo} - {f.nome || f.razao_social || f.fantasia}</option>
-                      ))}
-                    </select>
+                    <LookupSelect
+                      value={purchaseForm.fornecedor_id}
+                      displayValue={
+                        purchaseForm.fornecedor_id 
+                          ? `#${purchaseForm.fornecedor_id} - ${purchaseForm.fornecedor_nome || fornecedores.find(f => Number(f.codigo) === Number(purchaseForm.fornecedor_id))?.nome || 'Fornecedor'}`
+                          : ''
+                      }
+                      placeholder="Buscar Fornecedor..."
+                      title="Selecionar Fornecedor"
+                      subtitle="Busca paginada por Razão Social, Fantasia, CNPJ ou Código"
+                      icon={Building2}
+                      searchPlaceholder="Digite o nome, razão social, CNPJ ou código..."
+                      fetchData={async (termo, targetPage, limit) => {
+                        let url = `/v1/fornecedores?page=${targetPage}&limit=${limit}`;
+                        if (termo) url += `&busca=${encodeURIComponent(termo)}`;
+                        const res = await api.get(url);
+                        return res.data;
+                      }}
+                      columns={[
+                        { key: 'codigo', label: 'Código', width: '90px', render: (f) => <span className="item-code">#{f.codigo}</span> },
+                        { key: 'nome', label: 'Razão Social / Nome', render: (f) => <strong>{f.nome || f.razao_social || '-'}</strong> },
+                        { key: 'fantasia', label: 'Nome Fantasia' },
+                        { key: 'cnpj', label: 'CNPJ / CPF', render: (f) => <code>{f.cnpj || f.cpf || '-'}</code> },
+                        { key: 'cidade', label: 'Cidade / UF', render: (f) => `${f.cidade || ''} - ${f.uf || ''}` }
+                      ]}
+                      onSelect={(forn) => {
+                        setPurchaseForm(prev => ({
+                          ...prev,
+                          fornecedor_id: forn.codigo,
+                          fornecedor_nome: forn.nome || forn.razao_social || forn.fantasia
+                        }));
+                      }}
+                      onClear={() => {
+                        setPurchaseForm(prev => ({ ...prev, fornecedor_id: '', fornecedor_nome: '' }));
+                      }}
+                    />
                   </div>
 
                   <div className="form-group">
@@ -886,24 +914,47 @@ export default function PurchasesTab() {
                 <div className="grade-quick-form" style={{ gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr auto' }}>
                   <div className="form-group">
                     <label>Produto *</label>
-                    <select 
+                    <LookupSelect
                       value={itemForm.produto_codigo}
-                      onChange={(e) => {
-                        const pId = e.target.value;
-                        const matchP = produtos.find(p => Number(p.codigo) === Number(pId));
-                        setItemForm({
-                          ...itemForm,
-                          produto_codigo: pId,
-                          produto_nome: matchP ? matchP.nome : '',
-                          valor_unitario: matchP ? (matchP.custo || matchP.valorc || 0) : 0
-                        });
+                      displayValue={
+                        itemForm.produto_codigo
+                          ? `#${itemForm.produto_codigo} - ${itemForm.produto_nome || produtos.find(p => Number(p.codigo) === Number(itemForm.produto_codigo))?.nome || 'Produto'}`
+                          : ''
+                      }
+                      placeholder="Buscar Produto..."
+                      title="Selecionar Produto"
+                      subtitle="Busca paginada por Descrição, Código, Referência ou Código de Barras"
+                      icon={Package}
+                      searchPlaceholder="Digite o nome, código, referência ou código de barras..."
+                      fetchData={async (termo, targetPage, limit) => {
+                        let url = `/v1/produtos?page=${targetPage}&limit=${limit}`;
+                        if (termo) url += `&busca=${encodeURIComponent(termo)}&termo=${encodeURIComponent(termo)}`;
+                        const res = await api.get(url);
+                        return res.data;
                       }}
-                    >
-                      <option value="">Selecione o Produto...</option>
-                      {produtos.map(p => (
-                        <option key={p.codigo} value={p.codigo}>#{p.codigo} - {p.nome}</option>
-                      ))}
-                    </select>
+                      columns={[
+                        { key: 'codigo', label: 'Código', width: '90px', render: (p) => <span className="item-code">#{p.codigo || p.PRO_CODIGO}</span> },
+                        { key: 'nome', label: 'Descrição do Produto', render: (p) => <strong>{p.nome || p.PRO_NOME || p.descricao}</strong> },
+                        { key: 'codbarra', label: 'Cód. Barras', render: (p) => <code>{p.codbarra || p.PRO_CODBARRA || '-'}</code> },
+                        { key: 'um', label: 'UM', width: '60px', align: 'center', render: (p) => p.um || p.PRO_UM || 'UN' },
+                        { key: 'custo', label: 'Custo Atual', align: 'right', render: (p) => formatCurrency(p.custo || p.PRO_VALORC || p.valorc || 0) },
+                        { key: 'valorv', label: 'Preço Venda', align: 'right', render: (p) => <strong style={{ color: 'var(--success)' }}>{formatCurrency(p.valorv || p.PRO_VALORV || 0)}</strong> }
+                      ]}
+                      onSelect={(prod) => {
+                        const pId = prod.codigo || prod.PRO_CODIGO;
+                        const pNome = prod.nome || prod.PRO_NOME || prod.descricao;
+                        const pCusto = Number(prod.custo || prod.PRO_VALORC || prod.valorc || 0);
+                        setItemForm(prev => ({
+                          ...prev,
+                          produto_codigo: pId,
+                          produto_nome: pNome,
+                          valor_unitario: pCusto
+                        }));
+                      }}
+                      onClear={() => {
+                        setItemForm(prev => ({ ...prev, produto_codigo: '', produto_nome: '', valor_unitario: 0 }));
+                      }}
+                    />
                   </div>
 
                   <div className="form-group">
