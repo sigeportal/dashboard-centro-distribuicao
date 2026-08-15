@@ -3,7 +3,8 @@ import { createPortal } from 'react-dom';
 import { 
   ShoppingCart, Upload, Plus, Eye, FileText, UserPlus, PackagePlus, 
   X, Save, AlertCircle, Building2, CheckCircle2, DollarSign, Calendar,
-  TrendingUp, Search, Filter, AlertTriangle, RefreshCw, Trash2, ArrowRight, Package
+  TrendingUp, Search, Filter, AlertTriangle, RefreshCw, Trash2, ArrowRight, 
+  Package, Calculator, CreditCard, Sparkles, Check, ChevronRight
 } from 'lucide-react';
 import { createApi } from '../../services/api';
 import Pagination from '../Pagination';
@@ -24,15 +25,16 @@ export default function PurchasesTab() {
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState({ page: 1, limit: 10, total: 0, pages: 1 });
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterType, setFilterType] = useState('todas'); // 'todas', 'xml', 'manual'
 
   // Listas auxiliares
   const [fornecedores, setFornecedores] = useState([]);
   const [produtos, setProdutos] = useState([]);
 
-  // Modais de Visualização e Compra
+  // Modais de Controle
   const [showPurchaseForm, setShowPurchaseForm] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(null);
+  const [showCostAnalysisModal, setShowCostAnalysisModal] = useState(false);
+  const [showBillingModal, setShowBillingModal] = useState(false);
   const [showQuickVendorModal, setShowQuickVendorModal] = useState(false);
   const [showQuickProductModal, setShowQuickProductModal] = useState(false);
   const [quickProductTargetIndex, setQuickProductTargetIndex] = useState(null);
@@ -48,7 +50,8 @@ export default function PurchasesTab() {
     valor_frete: 0,
     valor_outros: 0,
     observacao: '',
-    itens: []
+    itens: [],
+    parcelas: []
   });
 
   // Estado de Item de Compra Atual no Form Manual
@@ -60,8 +63,27 @@ export default function PurchasesTab() {
     valor_frete: 0,
     valor_ipi: 0,
     valor_st: 0,
-    valor_outros: 0
+    valor_outros: 0,
+    // Custos e Preços para F5
+    margem_lucro: 100,
+    valor_dinheiro: 0,
+    valor_vista: 0,
+    valor_prazo: 0,
+    atualizar_precos: true
   });
+
+  // Estado da Análise de Custos F5
+  const [analiseItens, setAnaliseItens] = useState([]);
+  const [custoOperacionalPerc, setCustoOperacionalPerc] = useState(10); // 10% padrão
+
+  // Estado do Faturamento / Contas a Pagar
+  const [condicaoPagamento, setCondicaoPagamento] = useState('30_60_90'); // 'a_vista', '30d', '30_60', '30_60_90', '60_90_120_150_180', 'custom'
+  const [customNumParcelas, setCustomNumParcelas] = useState(3);
+  const [customIntervaloDias, setCustomIntervaloDias] = useState(30);
+  const [dataPrimeiroVencimento, setDataPrimeiroVencimento] = useState(
+    new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+  );
+  const [formaPagamentoPadrao, setFormaPagamentoPadrao] = useState('BOLETO');
 
   // Quick form states
   const [quickVendorForm, setQuickVendorForm] = useState({ nome: '', fantasia: '', cnpj: '', telefone: '', uf: 'PR' });
@@ -71,6 +93,18 @@ export default function PurchasesTab() {
     fetchCompras('last');
     fetchAuxiliaryData();
   }, []);
+
+  // Atalho de Teclado F5 para abrir Análise de Custos
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'F5' && showPurchaseForm) {
+        e.preventDefault();
+        handleOpenCostAnalysis();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showPurchaseForm, purchaseForm]);
 
   const fetchCompras = async (targetPage = 'last') => {
     setLoading(true);
@@ -118,17 +152,20 @@ export default function PurchasesTab() {
     try {
       const [fRes, pRes] = await Promise.all([
         api.get('/v1/fornecedores?limit=500').catch(() => ({ data: [] })),
-        api.get('/v1/produtos?limit=500').catch(() => ({ data: [] }))
+        api.get('/v1/produtos?limit=1000').catch(() => ({ data: [] }))
       ]);
 
-      setFornecedores(Array.isArray(fRes.data) ? fRes.data : fRes.data?.data || []);
-      setProdutos(Array.isArray(pRes.data) ? pRes.data : pRes.data?.data || []);
+      const fData = Array.isArray(fRes.data) ? fRes.data : (fRes.data?.data || []);
+      const pData = Array.isArray(pRes.data) ? pRes.data : (pRes.data?.data || []);
+
+      setFornecedores(fData);
+      setProdutos(pData);
     } catch (err) {
-      console.error('Erro ao carregar listas auxiliares:', err);
+      console.error('Erro ao buscar dados auxiliares:', err);
     }
   };
 
-  const handleOpenNewPurchase = () => {
+  const handleOpenCreatePurchase = () => {
     setPurchaseForm({
       id: 0,
       fornecedor_id: fornecedores[0]?.codigo || '',
@@ -138,8 +175,9 @@ export default function PurchasesTab() {
       data_entrada: new Date().toISOString().split('T')[0],
       valor_frete: 0,
       valor_outros: 0,
-      observacao: 'Lançamento Manual de Compra',
-      itens: []
+      observacao: '',
+      itens: [],
+      parcelas: []
     });
     setItemForm({
       produto_codigo: '',
@@ -149,28 +187,61 @@ export default function PurchasesTab() {
       valor_frete: 0,
       valor_ipi: 0,
       valor_st: 0,
-      valor_outros: 0
+      valor_outros: 0,
+      margem_lucro: 100,
+      valor_dinheiro: 0,
+      valor_vista: 0,
+      valor_prazo: 0,
+      atualizar_precos: true
     });
     setShowPurchaseForm(true);
   };
 
+  // Cálculo do Total da Compra
+  const calcularTotalItens = () => {
+    return purchaseForm.itens.reduce((acc, item) => acc + (Number(item.quantidade) * Number(item.valor_unitario)), 0);
+  };
+
+  const calcularTotalForm = () => {
+    const subtotal = calcularTotalItens();
+    const frete = Number(purchaseForm.valor_frete) || 0;
+    const outros = Number(purchaseForm.valor_outros) || 0;
+    return subtotal + frete + outros;
+  };
+
+  // Inclusão de Item no Formulário de Compra
   const handleAddItemToPurchase = () => {
     if (!itemForm.produto_codigo) {
-      alert('Selecione um produto.');
+      alert('Por favor, selecione um produto.');
       return;
     }
-    const selectedProd = produtos.find(p => p.codigo === Number(itemForm.produto_codigo));
+    const q = parseFloat(itemForm.quantidade) || 0;
+    const vu = parseFloat(itemForm.valor_unitario) || 0;
+    if (q <= 0 || vu <= 0) {
+      alert('Quantidade e Valor Unitário devem ser maiores que zero.');
+      return;
+    }
+
+    const matchedProd = produtos.find(p => Number(p.codigo) === Number(itemForm.produto_codigo));
+    const prodNome = matchedProd ? matchedProd.nome : itemForm.produto_nome;
+    const precoAtualVista = matchedProd ? Number(matchedProd.valorv || matchedProd.valor || 0) : 0;
+
+    // Rateio inicial
+    const rateioUnit = (Number(itemForm.valor_frete || 0) + Number(itemForm.valor_ipi || 0) + Number(itemForm.valor_st || 0) + Number(itemForm.valor_outros || 0)) / (q || 1);
+    const custoMerc = vu + rateioUnit;
+    const custoOp = custoMerc * (1 + (custoOperacionalPerc / 100));
+    const margem = Number(itemForm.margem_lucro) || 100;
+    const vVistaSugerido = custoOp * (1 + (margem / 100));
+
     const newItem = {
       ...itemForm,
-      produto_codigo: Number(itemForm.produto_codigo),
-      produto_nome: selectedProd ? selectedProd.nome : (itemForm.produto_nome || `Produto #${itemForm.produto_codigo}`),
-      quantidade: Number(itemForm.quantidade) || 1,
-      valor_unitario: Number(itemForm.valor_unitario) || 0,
-      valor_frete: Number(itemForm.valor_frete) || 0,
-      valor_ipi: Number(itemForm.valor_ipi) || 0,
-      valor_st: Number(itemForm.valor_st) || 0,
-      valor_outros: Number(itemForm.valor_outros) || 0,
-      matched: true
+      produto_nome: prodNome,
+      preco_atual_vista: precoAtualVista,
+      custo_mercadoria: custoMerc,
+      custo_operacional: custoOp,
+      valor_vista: itemForm.valor_vista > 0 ? Number(itemForm.valor_vista) : vVistaSugerido,
+      valor_dinheiro: itemForm.valor_dinheiro > 0 ? Number(itemForm.valor_dinheiro) : vVistaSugerido,
+      valor_prazo: itemForm.valor_prazo > 0 ? Number(itemForm.valor_prazo) : (vVistaSugerido * 1.1)
     };
 
     setPurchaseForm(prev => ({
@@ -178,6 +249,7 @@ export default function PurchasesTab() {
       itens: [...prev.itens, newItem]
     }));
 
+    // Reset Item Form
     setItemForm({
       produto_codigo: '',
       produto_nome: '',
@@ -186,7 +258,12 @@ export default function PurchasesTab() {
       valor_frete: 0,
       valor_ipi: 0,
       valor_st: 0,
-      valor_outros: 0
+      valor_outros: 0,
+      margem_lucro: 100,
+      valor_dinheiro: 0,
+      valor_vista: 0,
+      valor_prazo: 0,
+      atualizar_precos: true
     });
   };
 
@@ -197,13 +274,189 @@ export default function PurchasesTab() {
     }));
   };
 
-  const calcularTotalForm = () => {
-    const subtotal = purchaseForm.itens.reduce((acc, item) => acc + (item.quantidade * item.valor_unitario), 0);
-    const frete = Number(purchaseForm.valor_frete) || 0;
-    const outros = Number(purchaseForm.valor_outros) || 0;
-    return subtotal + frete + outros;
+  // =========================================================================
+  // F5 - ANÁLISE DE CUSTOS (INSPIRADO EM UnitCompra.pas E UnitAnaliseCustos)
+  // =========================================================================
+  const handleOpenCostAnalysis = () => {
+    if (purchaseForm.itens.length === 0) {
+      alert('Adicione itens à compra antes de abrir a Análise de Custos.');
+      return;
+    }
+
+    const totalQtdCompra = purchaseForm.itens.reduce((acc, it) => acc + Number(it.quantidade || 0), 0) || 1;
+    const freteTotal = Number(purchaseForm.valor_frete) || 0;
+    const outrosTotal = Number(purchaseForm.valor_outros) || 0;
+
+    const itensCalculados = purchaseForm.itens.map((it, idx) => {
+      const q = Number(it.quantidade) || 1;
+      const vu = Number(it.valor_unitario) || 0;
+
+      // Rateio proporcional do frete e outras despesas da nota
+      const freteRateadoItem = freteTotal > 0 ? (freteTotal * (q / totalQtdCompra)) : (Number(it.valor_frete) || 0);
+      const outrosRateadoItem = outrosTotal > 0 ? (outrosTotal * (q / totalQtdCompra)) : (Number(it.valor_outros) || 0);
+      const ipi = Number(it.valor_ipi) || 0;
+      const st = Number(it.valor_st) || 0;
+
+      const rateioTotalItem = (freteRateadoItem + outrosRateadoItem + ipi + st) / q;
+      const custoMercadoria = vu + rateioTotalItem; // Custo Final de Entrada da Mercadoria
+      const custoOperacional = custoMercadoria * (1 + (custoOperacionalPerc / 100)); // +10% custo operacional
+
+      const matchedProd = produtos.find(p => Number(p.codigo) === Number(it.produto_codigo));
+      const precoAtual = matchedProd ? Number(matchedProd.valorv || matchedProd.valor || 0) : 0;
+      const precoAtualDin = matchedProd ? Number(matchedProd.pro_valor_dinheiro || matchedProd.valor_dinheiro || precoAtual) : 0;
+      const precoAtualPrazo = matchedProd ? Number(matchedProd.pro_valorv_prazo || matchedProd.valorv_prazo || precoAtual) : 0;
+
+      const margem = Number(it.margem_lucro) || 100;
+      const vVistaSugerido = custoOperacional * (1 + (margem / 100));
+      const vDinheiroSugerido = vVistaSugerido;
+      const vPrazoSugerido = vVistaSugerido * 1.10; // +10% a prazo
+
+      return {
+        ...it,
+        index: idx,
+        custo_entrada: vu,
+        rateio_unit: rateioTotalItem,
+        custo_mercadoria: custoMercadoria,
+        custo_operacional: custoOperacional,
+        preco_atual_vista: precoAtual,
+        preco_atual_din: precoAtualDin,
+        preco_atual_prazo: precoAtualPrazo,
+        margem_lucro: margem,
+        valor_vista: it.valor_vista > 0 ? it.valor_vista : vVistaSugerido,
+        valor_dinheiro: it.valor_dinheiro > 0 ? it.valor_dinheiro : vDinheiroSugerido,
+        valor_prazo: it.valor_prazo > 0 ? it.valor_prazo : vPrazoSugerido,
+        atualizar_precos: it.atualizar_precos !== false
+      };
+    });
+
+    setAnaliseItens(itensCalculados);
+    setShowCostAnalysisModal(true);
   };
 
+  const handleUpdateAnaliseItem = (idx, field, val) => {
+    setAnaliseItens(prev => {
+      const updated = [...prev];
+      const it = { ...updated[idx], [field]: val };
+
+      if (field === 'margem_lucro') {
+        const m = parseFloat(val) || 0;
+        const vVista = it.custo_operacional * (1 + (m / 100));
+        it.valor_vista = vVista;
+        it.valor_dinheiro = vVista;
+        it.valor_prazo = vVista * 1.10;
+      } else if (field === 'valor_vista') {
+        const v = parseFloat(val) || 0;
+        if (it.custo_operacional > 0) {
+          it.margem_lucro = ((v - it.custo_operacional) / it.custo_operacional) * 100;
+        }
+      }
+
+      updated[idx] = it;
+      return updated;
+    });
+  };
+
+  const handleApplyMarginToAll = (margem) => {
+    setAnaliseItens(prev => prev.map(it => {
+      const vVista = it.custo_operacional * (1 + (margem / 100));
+      return {
+        ...it,
+        margem_lucro: margem,
+        valor_vista: vVista,
+        valor_dinheiro: vVista,
+        valor_prazo: vVista * 1.10
+      };
+    }));
+  };
+
+  const handleConfirmCostAnalysis = () => {
+    // Atualiza itens do purchaseForm com os dados refinados da Análise de Custos
+    const updatedItens = purchaseForm.itens.map((it, idx) => {
+      const matchAnalise = analiseItens.find(a => a.index === idx);
+      if (matchAnalise) {
+        return {
+          ...it,
+          custo_mercadoria: matchAnalise.custo_mercadoria,
+          custo_operacional: matchAnalise.custo_operacional,
+          margem_lucro: matchAnalise.margem_lucro,
+          valor_vista: matchAnalise.valor_vista,
+          valor_dinheiro: matchAnalise.valor_dinheiro,
+          valor_prazo: matchAnalise.valor_prazo,
+          atualizar_precos: matchAnalise.atualizar_precos
+        };
+      }
+      return it;
+    });
+
+    setPurchaseForm(prev => ({ ...prev, itens: updatedItens }));
+    setShowCostAnalysisModal(false);
+    setSuccessMsg('Análise de Custos (F5) aplicada aos itens da compra!');
+    setTimeout(() => setSuccessMsg(''), 4000);
+  };
+
+  // =========================================================================
+  // FATURAMENTO & CONTAS A PAGAR (INSPIRADO EM UnitLancamentoEntradas.pas)
+  // =========================================================================
+  const handleOpenBilling = () => {
+    const total = calcularTotalForm();
+    if (total <= 0) {
+      alert('O valor total da compra deve ser maior que zero para gerar o faturamento.');
+      return;
+    }
+    if (purchaseForm.parcelas.length === 0) {
+      gerarGradeParcelas(condicaoPagamento);
+    }
+    setShowBillingModal(true);
+  };
+
+  const gerarGradeParcelas = (tipoCondicao) => {
+    const totalCompra = calcularTotalForm();
+    let prazos = [];
+
+    if (tipoCondicao === 'a_vista') prazos = [0];
+    else if (tipoCondicao === '30d') prazos = [30];
+    else if (tipoCondicao === '30_60') prazos = [30, 60];
+    else if (tipoCondicao === '30_60_90') prazos = [30, 60, 90];
+    else if (tipoCondicao === '60_90_120_150_180') prazos = [60, 90, 120, 150, 180];
+    else if (tipoCondicao === 'custom') {
+      prazos = Array.from({ length: customNumParcelas }, (_, i) => (i + 1) * customIntervaloDias);
+    }
+
+    const numParc = prazos.length;
+    const vlrParcBase = Math.floor((totalCompra / numParc) * 100) / 100;
+    const centavosRestantes = Math.round((totalCompra - (vlrParcBase * numParc)) * 100) / 100;
+
+    const baseDate = new Date(dataPrimeiroVencimento || Date.now());
+
+    const novasParcelas = prazos.map((dias, idx) => {
+      const vDate = new Date(baseDate);
+      if (idx > 0) vDate.setDate(vDate.getDate() + (dias - prazos[0]));
+      
+      const vlrParcFinal = idx === 0 ? (vlrParcBase + centavosRestantes) : vlrParcBase;
+
+      return {
+        parcela: `${idx + 1}/${numParc}`,
+        data_vencimento: vDate.toISOString().split('T')[0],
+        valor_parcela: Number(vlrParcFinal.toFixed(2)),
+        forma_pagamento: formaPagamentoPadrao,
+        status: 'ABERTO'
+      };
+    });
+
+    setPurchaseForm(prev => ({ ...prev, parcelas: novasParcelas }));
+  };
+
+  const handleUpdateParcela = (idx, field, val) => {
+    setPurchaseForm(prev => {
+      const updated = [...prev.parcelas];
+      updated[idx] = { ...updated[idx], [field]: val };
+      return { ...prev, parcelas: updated };
+    });
+  };
+
+  // =========================================================================
+  // SALVAR COMPRA FINALIZADA (COMPRAS + ITENS + CUSTOS + CONTAS_PAGAR)
+  // =========================================================================
   const handleSavePurchase = async () => {
     if (!purchaseForm.fornecedor_id && !purchaseForm.fornecedor_nome) {
       alert('Por favor, selecione ou cadastre um Fornecedor antes de finalizar a compra.');
@@ -225,20 +478,37 @@ export default function PurchasesTab() {
     setError('');
     try {
       const selectedForn = fornecedores.find(f => f.codigo === Number(purchaseForm.fornecedor_id));
+      const totalCompra = calcularTotalForm();
+
       const payload = {
         ...purchaseForm,
         fornecedor_id: Number(purchaseForm.fornecedor_id) || 0,
         fornecedor_nome: selectedForn ? (selectedForn.nome || selectedForn.razao_social) : purchaseForm.fornecedor_nome,
         numero_nf: purchaseForm.numero_nf || 'MANUAL',
-        chave_nfe: purchaseForm.chave_nfe || '', // Opcional sem validação de 44 dígitos
-        valor_total: calcularTotalForm(),
+        chave_nfe: purchaseForm.chave_nfe || '',
+        valor_total: totalCompra,
         valor_frete: Number(purchaseForm.valor_frete) || 0,
-        valor_outros: Number(purchaseForm.valor_outros) || 0
+        valor_outros: Number(purchaseForm.valor_outros) || 0,
+        itens: purchaseForm.itens.map(it => ({
+          produto_codigo: Number(it.produto_codigo),
+          produto_nome: it.produto_nome,
+          quantidade: Number(it.quantidade),
+          valor_unitario: Number(it.valor_unitario),
+          valor_frete: Number(it.valor_frete || 0),
+          valor_ipi: Number(it.valor_ipi || 0),
+          valor_st: Number(it.valor_st || 0),
+          valor_outros: Number(it.valor_outros || 0),
+          // 3 Preços de Venda Atualizados
+          valor_dinheiro: Number(it.valor_dinheiro || it.valor_vista || 0),
+          valor_vista: Number(it.valor_vista || 0),
+          valor_prazo: Number(it.valor_prazo || it.valor_vista || 0)
+        })),
+        parcelas: purchaseForm.parcelas
       };
 
       await api.post('/v1/compras', payload);
-      alert('Compra lançada com sucesso! Os custos e estoques dos produtos foram atualizados no banco de dados.');
-      setSuccessMsg('Compra lançada com sucesso! Os custos e estoques foram atualizados.');
+      alert('Compra lançada com sucesso! Os custos, estoques, preços e parcelas do Contas a Pagar foram gravados.');
+      setSuccessMsg('Compra lançada com sucesso!');
       setShowPurchaseForm(false);
       fetchCompras(1);
       fetchAuxiliaryData();
@@ -253,14 +523,13 @@ export default function PurchasesTab() {
     }
   };
 
-  // Helper de leitura seguro de XML
+  // Helper de leitura de XML NF-e
   const getXmlText = (parent, tagName) => {
     if (!parent) return '';
     const el = parent.getElementsByTagName(tagName)[0] || parent.getElementsByTagNameNS('*', tagName)[0];
     return el ? (el.textContent || '').trim() : '';
   };
 
-  // Parser de XML NF-e Client-Side
   const handleFileUpload = (event) => {
     const file = event.target.files[0];
     if (!file) return;
@@ -276,10 +545,8 @@ export default function PurchasesTab() {
         const infNFe = xmlDoc.getElementsByTagName('infNFe')[0] || xmlDoc.getElementsByTagNameNS('*', 'infNFe')[0];
         const chNFe = getXmlText(xmlDoc, 'chNFe') || (infNFe ? infNFe.getAttribute('Id')?.replace('NFe', '') : '');
 
-        // Emitente (Fornecedor)
         const emitNode = xmlDoc.getElementsByTagName('emit')[0] || xmlDoc.getElementsByTagNameNS('*', 'emit')[0];
         const emitNome = getXmlText(emitNode, 'xNome');
-        const emitFantasia = getXmlText(emitNode, 'xFant') || emitNome;
         const emitCnpj = getXmlText(emitNode, 'CNPJ') || getXmlText(emitNode, 'CPF');
 
         const cleanCnpj = emitCnpj.replace(/\D/g, '');
@@ -288,7 +555,6 @@ export default function PurchasesTab() {
           return fCnpj && cleanCnpj && fCnpj === cleanCnpj;
         });
 
-        // Itens (det)
         const detNodes = Array.from(xmlDoc.getElementsByTagName('det')).concat(Array.from(xmlDoc.getElementsByTagNameNS('*', 'det')));
         const uniqueDets = detNodes.filter((v, i, a) => a.indexOf(v) === i);
 
@@ -327,6 +593,11 @@ export default function PurchasesTab() {
             valor_ipi: vIPI,
             valor_st: vICMSST,
             valor_outros: vOutro,
+            margem_lucro: 100,
+            valor_vista: 0,
+            valor_dinheiro: 0,
+            valor_prazo: 0,
+            atualizar_precos: true,
             matched: !!matchedProd
           });
         }
@@ -341,667 +612,806 @@ export default function PurchasesTab() {
           valor_frete: parsedItens.reduce((a, b) => a + b.valor_frete, 0),
           valor_outros: parsedItens.reduce((a, b) => a + b.valor_outros, 0),
           observacao: `Importado de XML NFe #${nNF}`,
-          itens: parsedItens
+          itens: parsedItens,
+          parcelas: []
         });
 
         setShowPurchaseForm(true);
         setSuccessMsg(`XML NFe #${nNF} de ${emitNome} importado com ${parsedItens.length} itens!`);
         setTimeout(() => setSuccessMsg(''), 5000);
       } catch (err) {
-        console.error('Erro ao ler XML NFe:', err);
-        alert('Erro ao processar arquivo XML NFe.');
+        console.error('Erro ao processar XML:', err);
+        alert('Erro ao interpretar o arquivo XML da NF-e.');
       }
     };
     reader.readAsText(file);
-    event.target.value = '';
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const handleOpenDetailModal = async (compraId) => {
+  const handleOpenDetailModal = async (compra) => {
     setLoading(true);
     try {
-      const res = await api.get(`/v1/compras/${compraId}`);
+      const res = await api.get(`/v1/compras/${compra.id}`);
       setShowDetailModal(res.data);
     } catch (err) {
-      alert('Erro ao carregar detalhes da compra.');
+      console.error(err);
+      setShowDetailModal(compra);
     } finally {
       setLoading(false);
     }
-  };
-
-  // Quick Vendor Save
-  const handleSaveQuickVendor = async (e) => {
-    e.preventDefault();
-    if (!quickVendorForm.nome.trim()) return;
-    setLoading(true);
-    try {
-      const newCode = Math.floor(Math.random() * 9000) + 1000;
-      await api.post('/v1/fornecedores', {
-        codigo: newCode,
-        nome: quickVendorForm.nome,
-        razao_social: quickVendorForm.nome,
-        fantasia: quickVendorForm.fantasia || quickVendorForm.nome,
-        cnpj: quickVendorForm.cnpj,
-        telefone: quickVendorForm.telefone,
-        uf: quickVendorForm.uf || 'PR'
-      });
-      alert(`Fornecedor "${quickVendorForm.nome}" cadastrado com sucesso!`);
-      setShowQuickVendorModal(false);
-      setPurchaseForm(prev => ({ ...prev, fornecedor_id: newCode, fornecedor_nome: quickVendorForm.nome }));
-      setQuickVendorForm({ nome: '', fantasia: '', cnpj: '', telefone: '', uf: 'PR' });
-      fetchAuxiliaryData();
-    } catch (err) {
-      alert('Erro ao cadastrar fornecedor.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Quick Product Save
-  const handleSaveQuickProduct = async (e) => {
-    e.preventDefault();
-    if (!quickProductForm.nome.trim()) return;
-    setLoading(true);
-    try {
-      const newCode = Math.floor(Math.random() * 90000) + 10000;
-      await api.post('/v1/produtos', {
-        codigo: newCode,
-        nome: quickProductForm.nome,
-        codbarra: quickProductForm.codbarra,
-        valorv: Number(quickProductForm.valorv) || 0,
-        ncm: quickProductForm.ncm || '6109.10.00',
-        um: quickProductForm.um || 'UN',
-        embalagem: quickProductForm.um || 'UN',
-        cadastrar: 'S'
-      });
-      alert(`Produto "${quickProductForm.nome}" (#${newCode}) cadastrado com sucesso!`);
-      if (quickProductTargetIndex !== null && quickProductTargetIndex !== undefined) {
-        setPurchaseForm(prev => {
-          const updated = [...prev.itens];
-          updated[quickProductTargetIndex] = {
-            ...updated[quickProductTargetIndex],
-            produto_codigo: newCode,
-            matched: true
-          };
-          return { ...prev, itens: updated };
-        });
-      } else {
-        setItemForm(prev => ({ ...prev, produto_codigo: newCode, produto_nome: quickProductForm.nome }));
-      }
-      setShowQuickProductModal(false);
-      setQuickProductForm({ nome: '', codbarra: '', valorv: 0, ncm: '6109.10.00', um: 'UN' });
-      setQuickProductTargetIndex(null);
-      fetchAuxiliaryData();
-    } catch (err) {
-      alert('Erro ao cadastrar produto.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Métricas
-  const comprasList = Array.isArray(compras) ? compras : [];
-
-  // Filtro
-  const getFilteredCompras = () => {
-    return comprasList.filter(c => {
-      if (!c) return false;
-      const matchesSearch = !searchTerm || (
-        (c.numero_nf && String(c.numero_nf).toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (c.fornecedor_nome && String(c.fornecedor_nome).toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (c.chave_nfe && String(c.chave_nfe).toLowerCase().includes(searchTerm.toLowerCase()))
-      );
-      const matchesType = filterType === 'todas' ? true :
-        filterType === 'xml' ? (c.chave_nfe && c.chave_nfe.length > 0) :
-        (!c.chave_nfe || c.chave_nfe.length === 0);
-
-      return matchesSearch && matchesType;
-    });
   };
 
   return (
-    <div className="crud-container full-width">
-
-      {successMsg && (
-        <div className="glass" style={{ padding: '0.8rem 1.2rem', backgroundColor: 'rgba(34, 197, 94, 0.12)', borderColor: '#22c55e', color: '#15803d', borderRadius: '0.75rem', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem' }}>
-          <CheckCircle2 size={18} /> {successMsg}
+    <div className="tab-container">
+      
+      {/* CABEÇALHO DA ABA COMPRAS */}
+      <div className="tab-header glass">
+        <div>
+          <h2>Entrada de Compras & Gestão de Fornecedores</h2>
+          <p className="tab-subtitle">Lançamento de NF-e, Análise de Custos (F5), Rateio de Despesas e Faturamento Contas a Pagar</p>
         </div>
-      )}
-      {error && <div className="crud-error-bar"><AlertCircle size={20} /> {error}</div>}
 
-      {/* FORMULÁRIO DE COMPRA OU LISTAGEM (GERENCIAMENTO DE COMPRAS) */}
-      {showPurchaseForm ? (
-        <div className="glass" style={{ padding: '1.5rem', borderRadius: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
+        <div className="tab-header-actions" style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+          <button className="btn-secondary" onClick={() => fetchCompras(page)}>
+            <RefreshCw size={16} /> Atualizar
+          </button>
           
-          {/* Header do Form */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem' }}>
-            <h4 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-              <FileText size={22} style={{ color: 'var(--accent-primary)' }} /> Entrada de Nota Fiscal / Compra Manual
-            </h4>
-            <button className="btn-close" onClick={() => setShowPurchaseForm(false)} title="Fechar"><X size={18} /></button>
-          </div>
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            onChange={handleFileUpload} 
+            accept=".xml" 
+            style={{ display: 'none' }} 
+          />
+          <button className="btn-secondary" onClick={() => fileInputRef.current?.click()} style={{ background: '#f8fafc' }}>
+            <Upload size={16} color="#2563eb" /> Importar XML (NF-e)
+          </button>
 
-          {/* DADOS DO DOCUMENTO */}
-          <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '0.85rem', padding: '1.25rem' }}>
-            <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Building2 size={16} /> Dados do Documento de Entrada
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-              
-              {/* Fornecedor */}
-              <div className="form-group" style={{ gridColumn: 'span 2' }}>
-                <label style={{ fontWeight: 700 }}>Fornecedor *</label>
-                <div style={{ display: 'flex', gap: '6px' }}>
-                  <select 
-                    value={purchaseForm.fornecedor_id} 
-                    onChange={(e) => {
-                      const id = e.target.value;
-                      const f = fornecedores.find(item => item.codigo === Number(id));
-                      setPurchaseForm(prev => ({ ...prev, fornecedor_id: id, fornecedor_nome: f ? f.nome : prev.fornecedor_nome }));
-                    }}
-                    style={{ flex: 1, height: '40px', borderRadius: '0.5rem', border: '1px solid #cbd5e1' }}
-                  >
-                    <option value="">Selecione um Fornecedor...</option>
-                    {fornecedores.map(f => (
-                      <option key={f.codigo} value={f.codigo}>#{f.codigo} - {f.nome || f.razao_social || f.fantasia}</option>
-                    ))}
-                  </select>
-                  <button 
-                    type="button" 
-                    className="btn-secondary" 
-                    onClick={() => setShowQuickVendorModal(true)} 
-                    title="Cadastrar Novo Fornecedor"
-                    style={{ height: '40px', display: 'flex', alignItems: 'center', gap: '4px', padding: '0 12px' }}
-                  >
-                    <UserPlus size={16} />
-                  </button>
-                </div>
-              </div>
-
-              {/* Número NF */}
-              <div className="form-group">
-                <label style={{ fontWeight: 700 }}>Número da NF / Doc</label>
-                <input 
-                  type="text" 
-                  value={purchaseForm.numero_nf} 
-                  onChange={(e) => setPurchaseForm(prev => ({ ...prev, numero_nf: e.target.value }))} 
-                  placeholder="Ex: 001234 ou Recibo"
-                  style={{ height: '40px', borderRadius: '0.5rem', border: '1px solid #cbd5e1' }}
-                />
-              </div>
-
-              {/* Data Entrada */}
-              <div className="form-group">
-                <label style={{ fontWeight: 700 }}>Data de Entrada</label>
-                <input 
-                  type="date" 
-                  value={purchaseForm.data_entrada} 
-                  onChange={(e) => setPurchaseForm(prev => ({ ...prev, data_entrada: e.target.value }))} 
-                  style={{ height: '40px', borderRadius: '0.5rem', border: '1px solid #cbd5e1' }}
-                />
-              </div>
-
-              {/* Chave NFe (Opcional) */}
-              <div className="form-group" style={{ gridColumn: 'span 2' }}>
-                <label style={{ fontWeight: 700 }}>
-                  Chave NFe <span style={{ fontWeight: 400, color: '#64748b', fontSize: '0.78rem' }}>(Opcional para compras manuais)</span>
-                </label>
-                <input 
-                  type="text" 
-                  value={purchaseForm.chave_nfe} 
-                  onChange={(e) => setPurchaseForm(prev => ({ ...prev, chave_nfe: e.target.value }))} 
-                  placeholder="Opcional - Chave de 44 dígitos da NF-e" 
-                  style={{ height: '40px', borderRadius: '0.5rem', border: '1px solid #cbd5e1' }}
-                />
-              </div>
-
-              {/* Frete */}
-              <div className="form-group">
-                <label style={{ fontWeight: 700 }}>Rateio Frete Total (R$)</label>
-                <input 
-                  type="number" 
-                  step="0.01" 
-                  value={purchaseForm.valor_frete} 
-                  onChange={(e) => setPurchaseForm(prev => ({ ...prev, valor_frete: parseFloat(e.target.value) || 0 }))} 
-                  style={{ height: '40px', borderRadius: '0.5rem', border: '1px solid #cbd5e1' }}
-                />
-              </div>
-
-              {/* Outras Despesas */}
-              <div className="form-group">
-                <label style={{ fontWeight: 700 }}>Outras Despesas (R$)</label>
-                <input 
-                  type="number" 
-                  step="0.01" 
-                  value={purchaseForm.valor_outros} 
-                  onChange={(e) => setPurchaseForm(prev => ({ ...prev, valor_outros: parseFloat(e.target.value) || 0 }))} 
-                  style={{ height: '40px', borderRadius: '0.5rem', border: '1px solid #cbd5e1' }}
-                />
-              </div>
-
-            </div>
-          </div>
-
-          {/* BOX DE INCLUSÃO DE ITENS */}
-          <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '0.85rem', padding: '1.25rem', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h5 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Package size={18} color="#2563eb" /> Adicionar Item à Nota
-              </h5>
-              <button 
-                type="button" 
-                className="btn-link" 
-                onClick={() => {
-                  setQuickProductTargetIndex(null);
-                  setShowQuickProductModal(true);
-                }} 
-                style={{ fontSize: '0.82rem', color: '#2563eb', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}
-              >
-                <Plus size={14} /> Novo Produto em Modal
-              </button>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.8rem', alignItems: 'end' }}>
-              
-              <div className="form-group" style={{ gridColumn: 'span 2', minWidth: '220px' }}>
-                <label style={{ fontSize: '0.8rem', fontWeight: 700 }}>Produto</label>
-                <select 
-                  value={itemForm.produto_codigo} 
-                  onChange={(e) => {
-                    const cod = e.target.value;
-                    const p = produtos.find(item => item.codigo === Number(cod));
-                    setItemForm(prev => ({
-                      ...prev,
-                      produto_codigo: cod,
-                      produto_nome: p ? p.nome : '',
-                      valor_unitario: p ? (Number(p.valorf || p.valorc) || 0) : prev.valor_unitario
-                    }));
-                  }}
-                  style={{ height: '38px', borderRadius: '0.5rem', border: '1px solid #cbd5e1' }}
-                >
-                  <option value="">Selecione o Produto...</option>
-                  {produtos.map(p => (
-                    <option key={p.codigo} value={p.codigo}>#{p.codigo} - {p.nome} (Venda: R$ {p.valorv})</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label style={{ fontSize: '0.8rem', fontWeight: 700 }}>Quantidade</label>
-                <input 
-                  type="number" 
-                  step="1" 
-                  min="1" 
-                  value={itemForm.quantidade} 
-                  onChange={(e) => setItemForm(prev => ({ ...prev, quantidade: parseFloat(e.target.value) || 0 }))} 
-                  style={{ height: '38px', borderRadius: '0.5rem', border: '1px solid #cbd5e1' }}
-                />
-              </div>
-
-              <div className="form-group">
-                <label style={{ fontSize: '0.8rem', fontWeight: 700 }}>Custo Unitário (R$)</label>
-                <input 
-                  type="number" 
-                  step="0.01" 
-                  value={itemForm.valor_unitario} 
-                  onChange={(e) => setItemForm(prev => ({ ...prev, valor_unitario: parseFloat(e.target.value) || 0 }))} 
-                  style={{ height: '38px', borderRadius: '0.5rem', border: '1px solid #cbd5e1' }}
-                />
-              </div>
-
-              <div className="form-group">
-                <label style={{ fontSize: '0.8rem', fontWeight: 700 }}>IPI (Item)</label>
-                <input 
-                  type="number" 
-                  step="0.01" 
-                  value={itemForm.valor_ipi} 
-                  onChange={(e) => setItemForm(prev => ({ ...prev, valor_ipi: parseFloat(e.target.value) || 0 }))} 
-                  style={{ height: '38px', borderRadius: '0.5rem', border: '1px solid #cbd5e1' }}
-                />
-              </div>
-
-              <div className="form-group">
-                <label style={{ fontSize: '0.8rem', fontWeight: 700 }}>ST (Item)</label>
-                <input 
-                  type="number" 
-                  step="0.01" 
-                  value={itemForm.valor_st} 
-                  onChange={(e) => setItemForm(prev => ({ ...prev, valor_st: parseFloat(e.target.value) || 0 }))} 
-                  style={{ height: '38px', borderRadius: '0.5rem', border: '1px solid #cbd5e1' }}
-                />
-              </div>
-
-              <div>
-                <button 
-                  type="button" 
-                  className="btn-primary" 
-                  onClick={handleAddItemToPurchase} 
-                  style={{ width: '100%', height: '38px', borderRadius: '0.5rem', fontWeight: 700, fontSize: '0.85rem' }}
-                >
-                  + Incluir Item
-                </button>
-              </div>
-
-            </div>
-          </div>
-
-          {/* TABELA DE ITENS DA COMPRA */}
-          <div className="table-responsive" style={{ border: '1px solid #e2e8f0', borderRadius: '0.75rem', overflow: 'hidden' }}>
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th style={{ width: '80px' }}>Cód</th>
-                  <th>Produto</th>
-                  <th style={{ textAlign: 'center', width: '90px' }}>Qtd</th>
-                  <th style={{ textAlign: 'right' }}>Custo Unit.</th>
-                  <th style={{ textAlign: 'right' }}>Custo Mercadoria (Rateado)</th>
-                  <th style={{ textAlign: 'right' }}>Custo Operacional (+10%)</th>
-                  <th style={{ textAlign: 'right' }}>Total Item</th>
-                  <th style={{ textAlign: 'center', width: '70px' }}>Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {purchaseForm.itens.length === 0 ? (
-                  <tr>
-                    <td colSpan="8" style={{ textAlign: 'center', padding: '2rem', color: '#64748b' }}>
-                      Nenhum item adicionado à compra ainda.
-                    </td>
-                  </tr>
-                ) : (
-                  purchaseForm.itens.map((item, idx) => {
-                    const rateio = item.quantidade > 0 ? (item.valor_frete + item.valor_ipi + item.valor_st + item.valor_outros) / item.quantidade : 0;
-                    const custoMercadoria = item.valor_unitario + rateio;
-                    const custoOperacional = custoMercadoria * 1.10;
-                    const totalItem = item.quantidade * item.valor_unitario;
-
-                    return (
-                      <tr key={idx} className={item.matched === false ? 'row-warning' : ''}>
-                        <td>
-                          {item.produto_codigo ? (
-                            <span className="item-code">#{item.produto_codigo}</span>
-                          ) : (
-                            <span className="badge badge-warning" style={{ fontSize: '0.75rem' }}>Pendente</span>
-                          )}
-                        </td>
-                        <td>
-                          <strong>{item.produto_nome}</strong>
-                          {!item.produto_codigo && (
-                            <div style={{ marginTop: '4px' }}>
-                              <button 
-                                type="button" 
-                                className="btn-link" 
-                                onClick={() => {
-                                  setQuickProductForm({
-                                    nome: item.produto_nome,
-                                    codbarra: item.codbarra || '',
-                                    valorv: item.valor_unitario * 1.5,
-                                    ncm: '6109.10.00',
-                                    um: 'UN'
-                                  });
-                                  setQuickProductTargetIndex(idx);
-                                  setShowQuickProductModal(true);
-                                }}
-                                style={{ fontSize: '0.8rem', color: '#f59e0b', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                              >
-                                <Plus size={12} /> Cadastrar produto no Modal
-                              </button>
-                            </div>
-                          )}
-                        </td>
-                        <td style={{ textAlign: 'center' }}><strong>{item.quantidade}</strong></td>
-                        <td style={{ textAlign: 'right' }}>{formatCurrency(item.valor_unitario)}</td>
-                        <td style={{ textAlign: 'right' }}><span className="badge badge-info">{formatCurrency(custoMercadoria)}</span></td>
-                        <td style={{ textAlign: 'right' }}>{formatCurrency(custoOperacional)}</td>
-                        <td style={{ textAlign: 'right' }}><strong>{formatCurrency(totalItem)}</strong></td>
-                        <td style={{ textAlign: 'center' }}>
-                          <button className="crud-row-btn delete" onClick={() => handleRemoveItem(idx)} title="Remover Item"><Trash2 size={14} /></button>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* RODAPÉ DO FORMULÁRIO */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #e2e8f0', paddingTop: '1.25rem', flexWrap: 'wrap', gap: '1rem' }}>
-            <div>
-              <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Total Geral da Compra:</span>
-              <h2 style={{ margin: 0, color: '#2563eb', fontWeight: 800 }}>{formatCurrency(calcularTotalForm())}</h2>
-            </div>
-
-            <div style={{ display: 'flex', gap: '0.8rem' }}>
-              <button className="btn-secondary" onClick={() => setShowPurchaseForm(false)}>Cancelar</button>
-              <button className="btn-primary" onClick={handleSavePurchase} disabled={loading} style={{ padding: '0.75rem 1.75rem', fontWeight: 700 }}>
-                <Save size={18} /> Salvar & Dar Entrada no Estoque
-              </button>
-            </div>
-          </div>
-
+          <button className="btn-primary" onClick={handleOpenCreatePurchase} style={{ background: 'linear-gradient(135deg, #ea580c, #c2410c)' }}>
+            <Plus size={16} /> + Lançar Compra Manual
+          </button>
         </div>
-      ) : (
-        /* GERENCIAMENTO DE COMPRAS (SCREENSHOT 1) */
-        <div className="glass" style={{ padding: '1.5rem', borderRadius: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
-          
-          <div className="crud-title-row">
-            <h3 style={{ margin: 0, fontSize: '1.3rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-              Gerenciamento de COMPRAS
-            </h3>
+      </div>
 
-            <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center' }}>
-              <button className="crud-tab-btn" onClick={() => fetchCompras(1)} style={{ border: '1px solid rgba(0,0,0,0.1)', background: '#fff', gap: '6px' }}>
-                <RefreshCw size={16} /> Atualizar
-              </button>
+      {successMsg && <div className="feedback-banner success"><CheckCircle2 size={18} /> {successMsg}</div>}
+      {error && <div className="feedback-banner error"><AlertCircle size={18} /> {error}</div>}
 
-              <label className="crud-tab-btn" style={{ cursor: 'pointer', border: '1px solid rgba(0,0,0,0.1)', background: '#fff', margin: 0, gap: '6px' }}>
-                <Upload size={16} /> Importar XML (NFe)
-                <input type="file" ref={fileInputRef} accept=".xml" onChange={handleFileUpload} style={{ display: 'none' }} />
-              </label>
-
-              <button className="crud-add-btn" onClick={handleOpenNewPurchase} style={{ gap: '6px' }}>
-                <Plus size={16} /> Adicionar Novo
-              </button>
-            </div>
-          </div>
-
+      {/* LISTAGEM DE COMPRAS */}
+      <div className="list-card glass">
+        <div className="crud-table-header">
+          <h3>Histórico de Compras Realizadas</h3>
           <SearchBar
             value={searchTerm}
             onChange={(val) => setSearchTerm(val)}
             onSearch={() => fetchCompras(1)}
-            onClear={() => setSearchTerm('')}
-            placeholder="Buscar por fornecedor, número NF ou chave NFe..."
+            onClear={() => { setSearchTerm(''); fetchCompras(1); }}
+            placeholder="Buscar por NF, Fornecedor ou Chave..."
           />
+        </div>
 
-          <div className="table-responsive">
-            <table className="data-table">
-              <thead>
+        <div className="table-responsive">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Fornecedor</th>
+                <th>Nº Documento / NF</th>
+                <th>Data Entrada</th>
+                <th style={{ textAlign: 'right' }}>Total Frete</th>
+                <th style={{ textAlign: 'right' }}>Valor Total Compra</th>
+                <th style={{ textAlign: 'center' }}>Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {compras.length === 0 ? (
                 <tr>
-                  <th style={{ width: '110px' }}>Código Compra</th>
-                  <th style={{ width: '120px' }}>NF-e</th>
-                  <th>Fornecedor</th>
-                  <th style={{ width: '130px' }}>Data Entrada</th>
-                  <th style={{ width: '130px', textAlign: 'right' }}>Valor Total</th>
-                  <th style={{ textAlign: 'center', width: '80px' }}>Ações</th>
+                  <td colSpan="7" style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
+                    Nenhuma compra registrada. Clique em "+ Lançar Compra Manual" ou "Importar XML".
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {getFilteredCompras().length === 0 ? (
-                  <tr>
-                    <td colSpan="6" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
-                      Nenhuma compra encontrada.
+              ) : (
+                compras.map(c => (
+                  <tr key={c.id}>
+                    <td><span className="item-code">#{c.id}</span></td>
+                    <td><strong>{c.fornecedor_nome || `Fornecedor #${c.fornecedor_id}`}</strong></td>
+                    <td>{c.numero_nf || 'MANUAL'}</td>
+                    <td>{c.data_entrada ? new Date(c.data_entrada).toLocaleDateString('pt-BR') : '-'}</td>
+                    <td style={{ textAlign: 'right' }}>{formatCurrency(c.valor_frete || 0)}</td>
+                    <td style={{ textAlign: 'right', fontWeight: 800, color: '#16a34a' }}>{formatCurrency(c.valor_total || 0)}</td>
+                    <td style={{ textAlign: 'center' }}>
+                      <button className="crud-row-btn" onClick={() => handleOpenDetailModal(c)} title="Ver Detalhes / Custos">
+                        <Eye size={14} /> Detalhes
+                      </button>
                     </td>
                   </tr>
-                ) : (
-                  getFilteredCompras().map((compra) => (
-                    <tr key={compra.id}>
-                      <td><span className="item-code">#{compra.id}</span></td>
-                      <td><strong>{compra.numero_nf ? `NF #${compra.numero_nf}` : 'Manual'}</strong></td>
-                      <td>{compra.fornecedor_nome || `Fornecedor #${compra.fornecedor_id}`}</td>
-                      <td>{compra.data_entrada || '-'}</td>
-                      <td style={{ textAlign: 'right' }}><strong style={{ color: 'var(--accent-primary)' }}>{formatCurrency(compra.valor_total)}</strong></td>
-                      <td className="actions-cell">
-                        <button className="crud-row-btn edit" onClick={() => handleOpenDetailModal(compra.id)} title="Ver Detalhes">
-                          <Eye size={16} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
 
-          <Pagination
-            currentPage={meta.page || page}
-            totalPages={meta.pages || 1}
-            onPageChange={(p) => fetchCompras(p)}
-          />
+        <Pagination 
+          page={page}
+          pages={meta.pages}
+          total={meta.total}
+          limit={meta.limit}
+          onPageChange={(p) => fetchCompras(p)}
+        />
+      </div>
+
+      {/* ========================================================================= */}
+      {/* MODAL DE LANÇAMENTO / EDIÇÃO DE COMPRA                                   */}
+      {/* ========================================================================= */}
+      {showPurchaseForm && (
+        <div className="product-form-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowPurchaseForm(false); }}>
+          <div className="product-form-modal-container glass" style={{ maxWidth: '1150px' }}>
+            
+            <div className="product-modal-header">
+              <div className="product-modal-title-group">
+                <div className="product-modal-icon-badge" style={{ background: 'linear-gradient(135deg, #2563eb, #1d4ed8)' }}>
+                  <ShoppingCart size={22} color="#ffffff" />
+                </div>
+                <div>
+                  <h3>Lançamento de Entrada de Mercadorias (Compra)</h3>
+                  <span className="product-modal-subtitle">Rateio de Custos • Análise F5 • Estoque & Contas a Pagar</span>
+                </div>
+              </div>
+              <button className="btn-close" onClick={() => setShowPurchaseForm(false)}><X size={20} /></button>
+            </div>
+
+            <div className="product-modal-body">
+              
+              {/* DADOS DO CABEÇALHO */}
+              <div className="product-section-card">
+                <div className="product-section-title">
+                  <Building2 size={16} color="#2563eb" /> Dados da Nota / Fornecedor
+                </div>
+
+                <div className="product-grid-4">
+                  <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                    <label>Fornecedor *</label>
+                    <select 
+                      value={purchaseForm.fornecedor_id} 
+                      onChange={(e) => setPurchaseForm({ ...purchaseForm, fornecedor_id: e.target.value })}
+                    >
+                      <option value="">Selecione o Fornecedor...</option>
+                      {fornecedores.map(f => (
+                        <option key={f.codigo} value={f.codigo}>#{f.codigo} - {f.nome || f.razao_social || f.fantasia}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label>Nº Nota Fiscal / Doc *</label>
+                    <input 
+                      type="text" 
+                      value={purchaseForm.numero_nf} 
+                      onChange={(e) => setPurchaseForm({ ...purchaseForm, numero_nf: e.target.value })} 
+                      placeholder="Ex: 12450" 
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Data de Entrada</label>
+                    <input 
+                      type="date" 
+                      value={purchaseForm.data_entrada} 
+                      onChange={(e) => setPurchaseForm({ ...purchaseForm, data_entrada: e.target.value })} 
+                    />
+                  </div>
+
+                  <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                    <label>Chave de Acesso NF-e (Opcional)</label>
+                    <input 
+                      type="text" 
+                      value={purchaseForm.chave_nfe} 
+                      onChange={(e) => setPurchaseForm({ ...purchaseForm, chave_nfe: e.target.value })} 
+                      placeholder="44 dígitos (opcional)" 
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Valor Frete Total (R$)</label>
+                    <input 
+                      type="number" 
+                      step="0.01" 
+                      value={purchaseForm.valor_frete} 
+                      onChange={(e) => setPurchaseForm({ ...purchaseForm, valor_frete: parseFloat(e.target.value) || 0 })} 
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Outras Despesas (R$)</label>
+                    <input 
+                      type="number" 
+                      step="0.01" 
+                      value={purchaseForm.valor_outros} 
+                      onChange={(e) => setPurchaseForm({ ...purchaseForm, valor_outros: parseFloat(e.target.value) || 0 })} 
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* INCLUSÃO RÁPIDA DE ITENS */}
+              <div className="product-section-card">
+                <div className="product-section-title">
+                  <PackagePlus size={16} color="#059669" /> Inclusão de Itens da Compra
+                </div>
+
+                <div className="grade-quick-form" style={{ gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr auto' }}>
+                  <div className="form-group">
+                    <label>Produto *</label>
+                    <select 
+                      value={itemForm.produto_codigo}
+                      onChange={(e) => {
+                        const pId = e.target.value;
+                        const matchP = produtos.find(p => Number(p.codigo) === Number(pId));
+                        setItemForm({
+                          ...itemForm,
+                          produto_codigo: pId,
+                          produto_nome: matchP ? matchP.nome : '',
+                          valor_unitario: matchP ? (matchP.custo || matchP.valorc || 0) : 0
+                        });
+                      }}
+                    >
+                      <option value="">Selecione o Produto...</option>
+                      {produtos.map(p => (
+                        <option key={p.codigo} value={p.codigo}>#{p.codigo} - {p.nome}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label>Quantidade *</label>
+                    <input 
+                      type="number" 
+                      step="1" 
+                      value={itemForm.quantidade} 
+                      onChange={(e) => setItemForm({ ...itemForm, quantidade: parseFloat(e.target.value) || 0 })} 
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Valor Unit. (R$) *</label>
+                    <input 
+                      type="number" 
+                      step="0.01" 
+                      value={itemForm.valor_unitario} 
+                      onChange={(e) => setItemForm({ ...itemForm, valor_unitario: parseFloat(e.target.value) || 0 })} 
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Frete Item (R$)</label>
+                    <input 
+                      type="number" 
+                      step="0.01" 
+                      value={itemForm.valor_frete} 
+                      onChange={(e) => setItemForm({ ...itemForm, valor_frete: parseFloat(e.target.value) || 0 })} 
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>IPI / ST (R$)</label>
+                    <input 
+                      type="number" 
+                      step="0.01" 
+                      value={itemForm.valor_ipi} 
+                      onChange={(e) => setItemForm({ ...itemForm, valor_ipi: parseFloat(e.target.value) || 0 })} 
+                    />
+                  </div>
+
+                  <div>
+                    <button type="button" className="btn-primary" onClick={handleAddItemToPurchase} style={{ height: '38px', padding: '0 1rem' }}>
+                      + Adicionar Item
+                    </button>
+                  </div>
+                </div>
+
+                {/* TABELA DE ITENS DA COMPRA */}
+                <div className="table-responsive" style={{ maxHeight: '240px', overflowY: 'auto' }}>
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Código</th>
+                        <th>Descrição do Produto</th>
+                        <th style={{ textAlign: 'center' }}>Qtd</th>
+                        <th style={{ textAlign: 'right' }}>Vlr Unitário</th>
+                        <th style={{ textAlign: 'right' }}>Subtotal</th>
+                        <th style={{ textAlign: 'center' }}>Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {purchaseForm.itens.length === 0 ? (
+                        <tr>
+                          <td colSpan="6" style={{ textAlign: 'center', padding: '1.5rem', color: '#94a3b8' }}>
+                            Nenhum item adicionado à compra ainda.
+                          </td>
+                        </tr>
+                      ) : (
+                        purchaseForm.itens.map((it, idx) => (
+                          <tr key={idx}>
+                            <td><span className="item-code">#{it.produto_codigo || 'NOVO'}</span></td>
+                            <td><strong>{it.produto_nome}</strong></td>
+                            <td style={{ textAlign: 'center' }}>{it.quantidade}</td>
+                            <td style={{ textAlign: 'right' }}>{formatCurrency(it.valor_unitario)}</td>
+                            <td style={{ textAlign: 'right', fontWeight: 700 }}>{formatCurrency(it.quantidade * it.valor_unitario)}</td>
+                            <td style={{ textAlign: 'center' }}>
+                              <button className="crud-row-btn delete" onClick={() => handleRemoveItem(idx)} title="Remover Item">
+                                <Trash2 size={14} />
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+              </div>
+
+            </div>
+
+            {/* RODAPÉ DO FORMULÁRIO DE COMPRA COM OS BOTÕES F5 E FATURAMENTO */}
+            <div className="product-modal-footer">
+              <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                <button 
+                  type="button" 
+                  className="btn-secondary" 
+                  onClick={handleOpenCostAnalysis}
+                  style={{ background: '#fff7ed', borderColor: '#fed7aa', color: '#ea580c', fontWeight: 700 }}
+                  title="Atalho F5: Analisar Custos, Margens e Preços de Venda"
+                >
+                  <Calculator size={16} /> 🔍 F5 - Análise de Custos
+                </button>
+
+                <button 
+                  type="button" 
+                  className="btn-secondary" 
+                  onClick={handleOpenBilling}
+                  style={{ background: '#eff6ff', borderColor: '#bfdbfe', color: '#2563eb', fontWeight: 700 }}
+                  title="Gerar Parcelas do Contas a Pagar"
+                >
+                  <CreditCard size={16} /> 💳 Faturamento ({purchaseForm.parcelas.length}x Parcelas)
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+                <div style={{ textAlign: 'right' }}>
+                  <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block' }}>TOTAL DA COMPRA:</span>
+                  <strong style={{ fontSize: '1.3rem', color: '#16a34a' }}>{formatCurrency(calcularTotalForm())}</strong>
+                </div>
+
+                <button type="button" className="btn-primary" onClick={handleSavePurchase} disabled={loading} style={{ minWidth: '160px' }}>
+                  {loading ? <RefreshCw size={18} className="spinner" /> : <Save size={18} />} Finalizar Compra
+                </button>
+              </div>
+            </div>
+
+          </div>
         </div>
       )}
 
-      {/* MODAL POPUP DE DETALHES DA COMPRA */}
-      {showDetailModal && createPortal(
-        <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowDetailModal(null); }}>
-          <div className="modal-content glass" style={{ maxWidth: '850px' }}>
-            <div className="modal-header">
-              <h4><FileText size={20} style={{ color: 'var(--accent-primary)' }} /> Detalhes da Compra #{showDetailModal.id}</h4>
-              <button className="btn-close" onClick={() => setShowDetailModal(null)}><X size={18} /></button>
+      {/* ========================================================================= */}
+      {/* MODAL F5 - ANÁLISE DE CUSTOS & PREÇOS DE VENDA                           */}
+      {/* ========================================================================= */}
+      {showCostAnalysisModal && (
+        <div className="product-form-modal-overlay" style={{ zIndex: 1000000 }}>
+          <div className="product-form-modal-container glass" style={{ maxWidth: '1200px', maxHeight: '90vh' }}>
+            
+            <div className="product-modal-header" style={{ background: 'linear-gradient(135deg, #ea580c, #c2410c)', color: '#ffffff' }}>
+              <div className="product-modal-title-group">
+                <div className="product-modal-icon-badge" style={{ background: 'rgba(255, 255, 255, 0.2)' }}>
+                  <Calculator size={22} color="#ffffff" />
+                </div>
+                <div>
+                  <h3 style={{ color: '#ffffff' }}>F5 - Painel de Análise de Custos & Formação de Preço de Venda</h3>
+                  <span className="product-modal-subtitle" style={{ color: '#fed7aa' }}>Inspirado no UnitCompra.pas • Rateio Automático • Margens e 3 Preços de Venda</span>
+                </div>
+              </div>
+              <button className="btn-close" onClick={() => setShowCostAnalysisModal(false)} style={{ color: '#ffffff' }}><X size={20} /></button>
             </div>
 
-            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1rem 0' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.8rem', background: '#f8fafc', padding: '1rem', borderRadius: '0.75rem', border: '1px solid #e2e8f0' }}>
-                <div>
-                  <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700 }}>FORNECEDOR:</span>
-                  <div><strong>{showDetailModal.fornecedor_nome || `Cód: #${showDetailModal.fornecedor_id}`}</strong></div>
+            <div className="product-modal-body">
+              
+              {/* FERRAMENTAS DE MARGEM RÁPIDA */}
+              <div className="product-section-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+                  <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>Custo Operacional Adicional (%):</span>
+                  <input 
+                    type="number" 
+                    value={custoOperacionalPerc} 
+                    onChange={(e) => setCustoOperacionalPerc(parseFloat(e.target.value) || 0)} 
+                    style={{ width: '80px', textAlign: 'center', fontWeight: 800 }} 
+                  />
+                  <small style={{ color: '#64748b' }}>(Padrão: +10% sobre o custo da mercadoria)</small>
                 </div>
-                <div>
-                  <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700 }}>NÚMERO DA NOTA:</span>
-                  <div><strong>{showDetailModal.numero_nf || 'Sem Número'}</strong></div>
+
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.85rem', color: '#64748b' }}>Aplicar Margem a Todos:</span>
+                  <button type="button" className="btn-secondary small" onClick={() => handleApplyMarginToAll(80)}>80%</button>
+                  <button type="button" className="btn-secondary small" onClick={() => handleApplyMarginToAll(100)}>100%</button>
+                  <button type="button" className="btn-secondary small" onClick={() => handleApplyMarginToAll(120)}>120%</button>
+                  <button type="button" className="btn-secondary small" onClick={() => handleApplyMarginToAll(150)}>150%</button>
                 </div>
-                <div>
-                  <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700 }}>DATA DE ENTRADA:</span>
-                  <div>{showDetailModal.data_entrada || '-'}</div>
-                </div>
-                <div>
-                  <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700 }}>VALOR TOTAL:</span>
-                  <div style={{ color: '#16a34a', fontWeight: 800 }}>{formatCurrency(showDetailModal.valor_total)}</div>
-                </div>
-                {showDetailModal.chave_nfe && (
-                  <div style={{ gridColumn: '1 / -1' }}>
-                    <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700 }}>CHAVE DA NFE:</span>
-                    <div style={{ fontFamily: 'monospace', fontSize: '0.8rem', wordBreak: 'break-all' }}>{showDetailModal.chave_nfe}</div>
-                  </div>
-                )}
               </div>
 
-              <h5 style={{ margin: '0.5rem 0 0 0', fontWeight: 800 }}>Itens da Compra ({showDetailModal.itens?.length || 0})</h5>
-              <div className="table-responsive" style={{ maxHeight: '300px', overflowY: 'auto' }}>
-                <table className="data-table">
+              {/* TABELA DETALHADA DE FORMAÇÃO DE CUSTO */}
+              <div className="table-responsive" style={{ maxHeight: '420px', overflowY: 'auto' }}>
+                <table className="data-table" style={{ fontSize: '0.85rem' }}>
                   <thead>
                     <tr>
-                      <th>Cód</th>
                       <th>Produto</th>
-                      <th style={{ textAlign: 'center' }}>Qtd</th>
                       <th style={{ textAlign: 'right' }}>Custo Entrada</th>
-                      <th style={{ textAlign: 'right' }}>Custo Mercadoria</th>
-                      <th style={{ textAlign: 'right' }}>Custo Operacional</th>
-                      <th style={{ textAlign: 'right' }}>Total</th>
+                      <th style={{ textAlign: 'right' }}>Rateio Desp.</th>
+                      <th style={{ textAlign: 'right' }}>Custo Merc.</th>
+                      <th style={{ textAlign: 'right' }}>Custo Oper.</th>
+                      <th style={{ width: '90px', textAlign: 'center' }}>Margem %</th>
+                      <th style={{ textAlign: 'right', color: '#16a34a' }}>Vlr Dinheiro</th>
+                      <th style={{ textAlign: 'right', color: '#ea580c' }}>Vlr Vista (Pad)</th>
+                      <th style={{ textAlign: 'right', color: '#2563eb' }}>Vlr Prazo</th>
+                      <th style={{ textAlign: 'right' }}>Preço Atual</th>
+                      <th style={{ textAlign: 'center' }}>Atualizar?</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {(showDetailModal.itens || []).map((it, idx) => (
+                    {analiseItens.map((it, idx) => (
                       <tr key={idx}>
-                        <td><span className="item-code">#{it.produto_codigo}</span></td>
-                        <td><strong>{it.produto_nome}</strong></td>
-                        <td style={{ textAlign: 'center' }}>{it.quantidade}</td>
-                        <td style={{ textAlign: 'right' }}>{formatCurrency(it.valor_unitario)}</td>
-                        <td style={{ textAlign: 'right' }}>{formatCurrency(it.custo_mercadoria || it.valor_unitario)}</td>
-                        <td style={{ textAlign: 'right' }}>{formatCurrency(it.custo_operacional || (it.valor_unitario * 1.1))}</td>
-                        <td style={{ textAlign: 'right' }}><strong>{formatCurrency(it.quantidade * it.valor_unitario)}</strong></td>
+                        <td>
+                          <strong>{it.produto_nome}</strong>
+                          <span style={{ display: 'block', fontSize: '0.72rem', color: '#64748b' }}>Cód: #{it.produto_codigo}</span>
+                        </td>
+                        <td style={{ textAlign: 'right' }}>{formatCurrency(it.custo_entrada)}</td>
+                        <td style={{ textAlign: 'right', color: '#64748b' }}>+{formatCurrency(it.rateio_unit)}</td>
+                        <td style={{ textAlign: 'right', fontWeight: 700 }}>{formatCurrency(it.custo_mercadoria)}</td>
+                        <td style={{ textAlign: 'right', color: '#b45309' }}>{formatCurrency(it.custo_operacional)}</td>
+                        
+                        <td style={{ textAlign: 'center' }}>
+                          <input 
+                            type="number" 
+                            value={Math.round(it.margem_lucro)} 
+                            onChange={(e) => handleUpdateAnaliseItem(idx, 'margem_lucro', e.target.value)} 
+                            style={{ width: '65px', textAlign: 'center', padding: '2px', fontWeight: 700 }}
+                          />%
+                        </td>
+
+                        <td style={{ textAlign: 'right' }}>
+                          <input 
+                            type="number" 
+                            step="0.01" 
+                            value={Number(it.valor_dinheiro).toFixed(2)} 
+                            onChange={(e) => handleUpdateAnaliseItem(idx, 'valor_dinheiro', e.target.value)} 
+                            style={{ width: '80px', textAlign: 'right', padding: '2px', color: '#16a34a', fontWeight: 700 }}
+                          />
+                        </td>
+
+                        <td style={{ textAlign: 'right' }}>
+                          <input 
+                            type="number" 
+                            step="0.01" 
+                            value={Number(it.valor_vista).toFixed(2)} 
+                            onChange={(e) => handleUpdateAnaliseItem(idx, 'valor_vista', e.target.value)} 
+                            style={{ width: '80px', textAlign: 'right', padding: '2px', color: '#ea580c', fontWeight: 800 }}
+                          />
+                        </td>
+
+                        <td style={{ textAlign: 'right' }}>
+                          <input 
+                            type="number" 
+                            step="0.01" 
+                            value={Number(it.valor_prazo).toFixed(2)} 
+                            onChange={(e) => handleUpdateAnaliseItem(idx, 'valor_prazo', e.target.value)} 
+                            style={{ width: '80px', textAlign: 'right', padding: '2px', color: '#2563eb', fontWeight: 700 }}
+                          />
+                        </td>
+
+                        <td style={{ textAlign: 'right', color: '#94a3b8' }}>
+                          {formatCurrency(it.preco_atual_vista)}
+                        </td>
+
+                        <td style={{ textAlign: 'center' }}>
+                          <input 
+                            type="checkbox" 
+                            checked={it.atualizar_precos} 
+                            onChange={(e) => handleUpdateAnaliseItem(idx, 'atualizar_precos', e.target.checked)} 
+                          />
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
+
             </div>
 
-            <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
+            <div className="product-modal-footer">
+              <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                Os valores aprovados aqui serão salvos diretamente como os 3 preços de venda dos produtos no banco.
+              </span>
+
+              <div style={{ display: 'flex', gap: '0.8rem' }}>
+                <button type="button" className="btn-secondary" onClick={() => setShowCostAnalysisModal(false)}>Cancelar</button>
+                <button type="button" className="btn-primary" onClick={handleConfirmCostAnalysis}>
+                  <Check size={18} /> Confirmar Preços de Venda
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL DE FATURAMENTO & CONTAS A PAGAR                                    */}
+      {/* ========================================================================= */}
+      {showBillingModal && (
+        <div className="product-form-modal-overlay" style={{ zIndex: 1000000 }}>
+          <div className="product-form-modal-container glass" style={{ maxWidth: '900px' }}>
+            
+            <div className="product-modal-header" style={{ background: 'linear-gradient(135deg, #2563eb, #1d4ed8)', color: '#ffffff' }}>
+              <div className="product-modal-title-group">
+                <div className="product-modal-icon-badge" style={{ background: 'rgba(255, 255, 255, 0.2)' }}>
+                  <CreditCard size={22} color="#ffffff" />
+                </div>
+                <div>
+                  <h3 style={{ color: '#ffffff' }}>Faturamento da Compra & Contas a Pagar</h3>
+                  <span className="product-modal-subtitle" style={{ color: '#bfdbfe' }}>Geração de Grade de Parcelas e Vencimentos (UnitLancamentoEntradas)</span>
+                </div>
+              </div>
+              <button className="btn-close" onClick={() => setShowBillingModal(false)} style={{ color: '#ffffff' }}><X size={20} /></button>
+            </div>
+
+            <div className="product-modal-body">
+              
+              {/* CONFIGURAÇÃO DE PARCELAMENTO */}
+              <div className="product-section-card">
+                <div className="product-section-title">
+                  <Calendar size={16} color="#2563eb" /> Condição de Pagamento
+                </div>
+
+                <div className="product-grid-3">
+                  <div className="form-group">
+                    <label>Condição de Pagamento *</label>
+                    <select 
+                      value={condicaoPagamento}
+                      onChange={(e) => {
+                        setCondicaoPagamento(e.target.value);
+                        gerarGradeParcelas(e.target.value);
+                      }}
+                    >
+                      <option value="a_vista">À Vista (Vencimento Hoje)</option>
+                      <option value="30d">30 Dias (1 Parcela)</option>
+                      <option value="30_60">30 / 60 Dias (2 Parcelas)</option>
+                      <option value="30_60_90">30 / 60 / 90 Dias (3 Parcelas)</option>
+                      <option value="60_90_120_150_180">60 / 90 / 120 / 150 / 180 Dias (5 Parcelas)</option>
+                      <option value="custom">Personalizado (Livre)</option>
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label>1º Vencimento</label>
+                    <input 
+                      type="date" 
+                      value={dataPrimeiroVencimento} 
+                      onChange={(e) => {
+                        setDataPrimeiroVencimento(e.target.value);
+                        setTimeout(() => gerarGradeParcelas(condicaoPagamento), 100);
+                      }} 
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Forma de Pagamento</label>
+                    <select 
+                      value={formaPagamentoPadrao}
+                      onChange={(e) => {
+                        setFormaPagamentoPadrao(e.target.value);
+                        setTimeout(() => gerarGradeParcelas(condicaoPagamento), 100);
+                      }}
+                    >
+                      <option value="BOLETO">Boleto Bancário</option>
+                      <option value="PIX">PIX / Transferência</option>
+                      <option value="DUPLICATA">Duplicata Mercantil</option>
+                      <option value="CHEQUE">Cheque Pré-datado</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* TABELA DE PARCELAS GERADAS */}
+              <div className="product-section-card">
+                <div className="product-section-title">
+                  <DollarSign size={16} color="#16a34a" /> Grade de Vencimentos do Contas a Pagar
+                </div>
+
+                <div className="table-responsive" style={{ maxHeight: '250px', overflowY: 'auto' }}>
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Parcela</th>
+                        <th>Data de Vencimento</th>
+                        <th>Forma de Pagamento</th>
+                        <th style={{ textAlign: 'right' }}>Valor Parcela (R$)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {purchaseForm.parcelas.map((p, idx) => (
+                        <tr key={idx}>
+                          <td><strong>{p.parcela}</strong></td>
+                          <td>
+                            <input 
+                              type="date" 
+                              value={p.data_vencimento} 
+                              onChange={(e) => handleUpdateParcela(idx, 'data_vencimento', e.target.value)} 
+                              style={{ width: '150px' }}
+                            />
+                          </td>
+                          <td>
+                            <select 
+                              value={p.forma_pagamento}
+                              onChange={(e) => handleUpdateParcela(idx, 'forma_pagamento', e.target.value)}
+                            >
+                              <option value="BOLETO">Boleto Bancário</option>
+                              <option value="PIX">PIX</option>
+                              <option value="DUPLICATA">Duplicata</option>
+                              <option value="CHEQUE">Cheque</option>
+                            </select>
+                          </td>
+                          <td style={{ textAlign: 'right' }}>
+                            <input 
+                              type="number" 
+                              step="0.01" 
+                              value={p.valor_parcela} 
+                              onChange={(e) => handleUpdateParcela(idx, 'valor_parcela', parseFloat(e.target.value) || 0)} 
+                              style={{ width: '120px', textAlign: 'right', fontWeight: 700 }}
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* VALIDAÇÃO DE SOMA */}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1.5rem', marginTop: '1rem', alignItems: 'center' }}>
+                  <div>
+                    <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Soma das Parcelas: </span>
+                    <strong>{formatCurrency(purchaseForm.parcelas.reduce((a, b) => a + Number(b.valor_parcela || 0), 0))}</strong>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Total da Compra: </span>
+                    <strong style={{ color: '#16a34a' }}>{formatCurrency(calcularTotalForm())}</strong>
+                  </div>
+                </div>
+
+              </div>
+
+            </div>
+
+            <div className="product-modal-footer">
+              <button type="button" className="btn-secondary" onClick={() => setShowBillingModal(false)}>Fechar</button>
+              <button type="button" className="btn-primary" onClick={() => setShowBillingModal(false)}>
+                <Check size={18} /> Confirmar Faturamento
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL DE DETALHES DA COMPRA REALIZADA                                     */}
+      {/* ========================================================================= */}
+      {showDetailModal && (
+        <div className="product-form-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowDetailModal(null); }}>
+          <div className="product-form-modal-container glass" style={{ maxWidth: '900px' }}>
+            
+            <div className="product-modal-header">
+              <div className="product-modal-title-group">
+                <div className="product-modal-icon-badge" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
+                  <FileText size={22} color="#ffffff" />
+                </div>
+                <div>
+                  <h3>Detalhes da Compra #{showDetailModal.id}</h3>
+                  <span className="product-modal-subtitle">{showDetailModal.fornecedor_nome} • NF {showDetailModal.numero_nf || 'MANUAL'}</span>
+                </div>
+              </div>
+              <button className="btn-close" onClick={() => setShowDetailModal(null)}><X size={20} /></button>
+            </div>
+
+            <div className="product-modal-body">
+              
+              <div className="product-section-card">
+                <div className="product-grid-4">
+                  <div>
+                    <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Data de Entrada</span>
+                    <div style={{ fontWeight: 700 }}>{showDetailModal.data_entrada ? new Date(showDetailModal.data_entrada).toLocaleDateString('pt-BR') : '-'}</div>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Valor Frete</span>
+                    <div style={{ fontWeight: 700 }}>{formatCurrency(showDetailModal.valor_frete || 0)}</div>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Outras Despesas</span>
+                    <div style={{ fontWeight: 700 }}>{formatCurrency(showDetailModal.valor_outros || 0)}</div>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Valor Total</span>
+                    <div style={{ fontWeight: 800, color: '#16a34a', fontSize: '1.1rem' }}>{formatCurrency(showDetailModal.valor_total || 0)}</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* ITENS */}
+              <div className="product-section-card">
+                <div className="product-section-title"><Package size={16} /> Itens da Compra</div>
+                <div className="table-responsive">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Produto</th>
+                        <th style={{ textAlign: 'center' }}>Qtd</th>
+                        <th style={{ textAlign: 'right' }}>Vlr Unitário</th>
+                        <th style={{ textAlign: 'right' }}>Custo Merc.</th>
+                        <th style={{ textAlign: 'right' }}>Custo Oper.</th>
+                        <th style={{ textAlign: 'right' }}>Subtotal</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(showDetailModal.itens || []).map((it, idx) => (
+                        <tr key={idx}>
+                          <td><strong>{it.produto_nome}</strong> (Cód: #{it.produto_codigo})</td>
+                          <td style={{ textAlign: 'center' }}>{it.quantidade}</td>
+                          <td style={{ textAlign: 'right' }}>{formatCurrency(it.valor_unitario)}</td>
+                          <td style={{ textAlign: 'right', fontWeight: 600 }}>{formatCurrency(it.custo_mercadoria)}</td>
+                          <td style={{ textAlign: 'right', color: '#b45309' }}>{formatCurrency(it.custo_operacional)}</td>
+                          <td style={{ textAlign: 'right', fontWeight: 700 }}>{formatCurrency(it.quantidade * it.valor_unitario)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* PARCELAS */}
+              {showDetailModal.parcelas && showDetailModal.parcelas.length > 0 && (
+                <div className="product-section-card">
+                  <div className="product-section-title"><CreditCard size={16} /> Contas a Pagar (Parcelas)</div>
+                  <div className="table-responsive">
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>Parcela</th>
+                          <th>Vencimento</th>
+                          <th>Forma de Pagamento</th>
+                          <th>Status</th>
+                          <th style={{ textAlign: 'right' }}>Valor Parcela</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {showDetailModal.parcelas.map((p, idx) => (
+                          <tr key={idx}>
+                            <td><strong>{p.parcela}</strong></td>
+                            <td>{new Date(p.data_vencimento).toLocaleDateString('pt-BR')}</td>
+                            <td>{p.forma_pagamento}</td>
+                            <td><span className="badge badge-info">{p.status}</span></td>
+                            <td style={{ textAlign: 'right', fontWeight: 700 }}>{formatCurrency(p.valor_parcela)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+            </div>
+
+            <div className="product-modal-footer">
               <button type="button" className="btn-secondary" onClick={() => setShowDetailModal(null)}>Fechar</button>
             </div>
-          </div>
-        </div>,
-        document.body
-      )}
 
-      {/* QUICK VENDOR MODAL */}
-      {showQuickVendorModal && createPortal(
-        <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowQuickVendorModal(false); }}>
-          <div className="modal-content glass" style={{ maxWidth: '480px' }}>
-            <div className="modal-header">
-              <h4><UserPlus size={20} color="#2563eb" /> Cadastrar Fornecedor Rápido</h4>
-              <button className="btn-close" onClick={() => setShowQuickVendorModal(false)}><X size={18} /></button>
-            </div>
-            <form onSubmit={handleSaveQuickVendor}>
-              <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', padding: '1rem 0' }}>
-                <div className="form-group">
-                  <label>Razão Social / Nome *</label>
-                  <input type="text" required value={quickVendorForm.nome} onChange={(e) => setQuickVendorForm({ ...quickVendorForm, nome: e.target.value })} placeholder="Ex: DISTRIBUIDORA BRASIL" />
-                </div>
-                <div className="form-group">
-                  <label>Nome Fantasia</label>
-                  <input type="text" value={quickVendorForm.fantasia} onChange={(e) => setQuickVendorForm({ ...quickVendorForm, fantasia: e.target.value })} placeholder="Ex: TECIDOS BR" />
-                </div>
-                <div className="form-group">
-                  <label>CNPJ / CPF</label>
-                  <input type="text" value={quickVendorForm.cnpj} onChange={(e) => setQuickVendorForm({ ...quickVendorForm, cnpj: e.target.value })} placeholder="00.000.000/0001-00" />
-                </div>
-                <div className="form-group">
-                  <label>Telefone / WhatsApp</label>
-                  <input type="text" value={quickVendorForm.telefone} onChange={(e) => setQuickVendorForm({ ...quickVendorForm, telefone: e.target.value })} placeholder="(00) 00000-0000" />
-                </div>
-              </div>
-              <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem' }}>
-                <button type="button" className="btn-secondary" onClick={() => setShowQuickVendorModal(false)}>Cancelar</button>
-                <button type="submit" className="btn-primary" disabled={loading}>Salvar Fornecedor</button>
-              </div>
-            </form>
           </div>
-        </div>,
-        document.body
-      )}
-
-      {/* QUICK PRODUCT MODAL */}
-      {showQuickProductModal && createPortal(
-        <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowQuickProductModal(false); }}>
-          <div className="modal-content glass" style={{ maxWidth: '480px' }}>
-            <div className="modal-header">
-              <h4><PackagePlus size={20} color="#059669" /> Cadastrar Produto Rápido</h4>
-              <button className="btn-close" onClick={() => setShowQuickProductModal(false)}><X size={18} /></button>
-            </div>
-            <form onSubmit={handleSaveQuickProduct}>
-              <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', padding: '1rem 0' }}>
-                <div className="form-group">
-                  <label>Nome do Produto *</label>
-                  <input type="text" required value={quickProductForm.nome} onChange={(e) => setQuickProductForm({ ...quickProductForm, nome: e.target.value })} placeholder="Ex: CAMISETA POLO AZUL M" />
-                </div>
-                <div className="form-group">
-                  <label>Código de Barras (EAN)</label>
-                  <input type="text" value={quickProductForm.codbarra} onChange={(e) => setQuickProductForm({ ...quickProductForm, codbarra: e.target.value })} placeholder="789..." />
-                </div>
-                <div className="form-group">
-                  <label>Preço de Venda Sugerido (R$)</label>
-                  <input type="number" step="0.01" value={quickProductForm.valorv} onChange={(e) => setQuickProductForm({ ...quickProductForm, valorv: parseFloat(e.target.value) || 0 })} placeholder="59.90" />
-                </div>
-              </div>
-              <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem' }}>
-                <button type="button" className="btn-secondary" onClick={() => setShowQuickProductModal(false)}>Cancelar</button>
-                <button type="submit" className="btn-primary" disabled={loading}>Salvar Produto</button>
-              </div>
-            </form>
-          </div>
-        </div>,
-        document.body
+        </div>
       )}
 
     </div>

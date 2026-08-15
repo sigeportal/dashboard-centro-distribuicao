@@ -64,7 +64,6 @@ begin
 				.Route('/gera_codigo')
 					.Post(PostGeraCodigo)
 				.&End
-				.Group
 				.Prefix('/v1')
 				.Route('/incrementa_generator')
 					.Post(PostIncrementaGenerator)

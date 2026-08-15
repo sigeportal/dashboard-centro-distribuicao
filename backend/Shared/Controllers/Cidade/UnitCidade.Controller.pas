@@ -126,7 +126,6 @@ begin
           .Post(Post)
           .Put(Put)
         .&End
-        .Group
         .Prefix('/v1')
         .Route('/cidade/:id')
           .Get(GetForID)

@@ -17,6 +17,7 @@ type
     class procedure GetForID(Req: THorseRequest; Res: THorseResponse; Next: TProc);
     class procedure BuscarPorNfOuChave(Req: THorseRequest; Res: THorseResponse);
     class procedure Post(Req: THorseRequest; Res: THorseResponse; Next: TProc);
+    class procedure GetContasPagar(Req: THorseRequest; Res: THorseResponse);
     class procedure EnsureComprasTables;
     class function ObterEmpresaId(Req: THorseRequest): Integer;
   end;
@@ -47,6 +48,7 @@ class procedure TComprasController.EnsureComprasTables;
 var
   LCompras: TCompras;
   LItens: TComprasItens;
+  LQuery: iQuery;
 begin
   try
     LCompras := TCompras.Create(TDatabase.Connection);
@@ -61,6 +63,30 @@ begin
       LItens.CriaTabela;
     finally
       LItens.DisposeOf;
+    end;
+
+    // Garante tabela CONTAS_PAGAR
+    try
+      LQuery := TDatabase.Query;
+      LQuery.ExecSQL(
+        'CREATE TABLE CONTAS_PAGAR (' +
+        '  ID INTEGER NOT NULL PRIMARY KEY, ' +
+        '  COMPRA_ID INTEGER, ' +
+        '  FORNECEDOR_ID INTEGER, ' +
+        '  FORNECEDOR_NOME VARCHAR(200), ' +
+        '  NUMERO_DOCUMENTO VARCHAR(50), ' +
+        '  PARCELA VARCHAR(20), ' +
+        '  DATA_EMISSAO DATE, ' +
+        '  DATA_VENCIMENTO DATE, ' +
+        '  VALOR_PARCELA NUMERIC(15,2), ' +
+        '  VALOR_PAGO NUMERIC(15,2) DEFAULT 0, ' +
+        '  FORMA_PAGAMENTO VARCHAR(50), ' +
+        '  STATUS VARCHAR(20) DEFAULT ''ABERTO'', ' +
+        '  OBSERVACAO VARCHAR(500)' +
+        ')'
+      );
+    except
+      // Tabela ja existe
     end;
   except
     on E: Exception do
@@ -150,16 +176,8 @@ begin
   except
     on E: Exception do
     begin
-      LResponseObj := TJSONObject.Create;
-      LMetaObj := TJSONObject.Create;
-      LMetaObj.AddPair('page', TJSONNumber.Create(1));
-      LMetaObj.AddPair('limit', TJSONNumber.Create(10));
-      LMetaObj.AddPair('total', TJSONNumber.Create(0));
-      LMetaObj.AddPair('pages', TJSONNumber.Create(1));
-
-      LResponseObj.AddPair('data', TJSONArray.Create);
-      LResponseObj.AddPair('meta', LMetaObj);
-      Res.Send<TJSONObject>(LResponseObj);
+      Writeln('-> Erro ao buscar compras: ' + E.Message);
+      Res.Status(THTTPStatus.InternalServerError).Send('{"error": "' + E.Message + '"}');
     end;
   end;
 end;
@@ -167,9 +185,9 @@ end;
 class procedure TComprasController.GetForID(Req: THorseRequest; Res: THorseResponse; Next: TProc);
 var
   LId: Integer;
-  LResponseObj, LItemObj: TJSONObject;
-  LItensArr: TJSONArray;
-  QueryHeader, QueryItens: iQuery;
+  LResponseObj, LItemObj, LParcObj: TJSONObject;
+  LItensArr, LParcArr: TJSONArray;
+  QueryHeader, QueryItens, QueryParc: iQuery;
 begin
   EnsureComprasTables;
   LId := StrToIntDef(Req.Params.Items['id'], 0);
@@ -181,6 +199,7 @@ begin
 
   QueryHeader := TDatabase.Query;
   QueryItens := TDatabase.Query;
+  QueryParc := TDatabase.Query;
 
   QueryHeader.Open(Format('SELECT ID, FORNECEDOR_ID, FORNECEDOR_NOME, NUMERO_NF, CHAVE_NFE, DATA_EMISSAO, DATA_ENTRADA, VALOR_TOTAL, VALOR_FRETE, VALOR_OUTROS, OBSERVACAO FROM COMPRAS WHERE ID = %d', [LId]));
   if QueryHeader.Dataset.IsEmpty then
@@ -203,9 +222,8 @@ begin
   LResponseObj.AddPair('observacao', QueryHeader.Dataset.FieldByName('OBSERVACAO').AsString);
 
   LItensArr := TJSONArray.Create;
-  QueryItens.Open(Format('SELECT ID, COMPRA_ID, PRODUTO_CODIGO, PRODUTO_NOME, QUANTIDADE, VALOR_UNITARIO, VALOR_FRETE, VALOR_IPI, VALOR_ST, VALOR_OUTROS, CUSTO_MERCADORIA, CUSTO_MEDIO, CUSTO_OPERACIONAL FROM COMPRAS_ITENS WHERE COMPRA_ID = %d', [LId]));
+  QueryItens.Open(Format('SELECT ID, PRODUTO_CODIGO, PRODUTO_NOME, QUANTIDADE, VALOR_UNITARIO, VALOR_FRETE, VALOR_IPI, VALOR_ST, VALOR_OUTROS, CUSTO_MERCADORIA, CUSTO_MEDIO, CUSTO_OPERACIONAL FROM COMPRAS_ITENS WHERE COMPRA_ID = %d', [LId]));
   QueryItens.Dataset.First;
-
   while not QueryItens.Dataset.Eof do
   begin
     LItemObj := TJSONObject.Create;
@@ -225,20 +243,46 @@ begin
     LItensArr.AddElement(LItemObj);
     QueryItens.Dataset.Next;
   end;
-
   LResponseObj.AddPair('itens', LItensArr);
+
+  // Parcelas do Contas a Pagar
+  LParcArr := TJSONArray.Create;
+  try
+    QueryParc.Open(Format('SELECT ID, PARCELA, DATA_VENCIMENTO, VALOR_PARCELA, VALOR_PAGO, FORMA_PAGAMENTO, STATUS FROM CONTAS_PAGAR WHERE COMPRA_ID = %d ORDER BY ID ASC', [LId]));
+    QueryParc.Dataset.First;
+    while not QueryParc.Dataset.Eof do
+    begin
+      LParcObj := TJSONObject.Create;
+      LParcObj.AddPair('id', TJSONNumber.Create(QueryParc.Dataset.FieldByName('ID').AsInteger));
+      LParcObj.AddPair('parcela', QueryParc.Dataset.FieldByName('PARCELA').AsString);
+      LParcObj.AddPair('data_vencimento', FormatDateTime('yyyy-mm-dd', QueryParc.Dataset.FieldByName('DATA_VENCIMENTO').AsDateTime));
+      LParcObj.AddPair('valor_parcela', TJSONNumber.Create(QueryParc.Dataset.FieldByName('VALOR_PARCELA').AsFloat));
+      LParcObj.AddPair('valor_pago', TJSONNumber.Create(QueryParc.Dataset.FieldByName('VALOR_PAGO').AsFloat));
+      LParcObj.AddPair('forma_pagamento', QueryParc.Dataset.FieldByName('FORMA_PAGAMENTO').AsString);
+      LParcObj.AddPair('status', QueryParc.Dataset.FieldByName('STATUS').AsString);
+
+      LParcArr.AddElement(LParcObj);
+      QueryParc.Dataset.Next;
+    end;
+  except
+    // Se a tabela ainda nao tiver parcelas
+  end;
+  LResponseObj.AddPair('parcelas', LParcArr);
+
   Res.Send<TJSONObject>(LResponseObj);
 end;
 
 class procedure TComprasController.Post(Req: THorseRequest; Res: THorseResponse; Next: TProc);
 var
-  LBody, LItemObj, LResObj: TJSONObject;
-  LItensArr: TJSONArray;
-  LCompraId, I, LProCodigo, LNewItemId: Integer;
+  LBody, LItemObj, LParcObj, LResObj: TJSONObject;
+  LItensArr, LParcArr: TJSONArray;
+  LCompraId, I, LProCodigo, LNewItemId, LNewParcId: Integer;
   LQuery, LQueryPro: iQuery;
   LQtd, LValUnit, LValFrete, LValIpi, LValSt, LValOutros: Double;
   LCustoEntrada, LRateio, LCustoMercadoria, LCustoOperacional, LCustoMedio: Double;
   LQtdAtual, LCustoMedioAtual: Double;
+  LVendaDinheiro, LVendaVista, LVendaPrazo: Double;
+  LNumDoc, LFornNome: string;
 begin
   EnsureComprasTables;
   LBody := Req.Body<TJSONObject>;
@@ -255,6 +299,9 @@ begin
     if LCompraId <= 0 then
       LCompraId := GeraCodigo('COMPRAS', 'ID');
 
+    LNumDoc := LBody.GetValue<string>('numero_nf', '');
+    LFornNome := LBody.GetValue<string>('fornecedor_nome', '');
+
     LQuery.Clear;
     LQuery.Add('UPDATE OR INSERT INTO COMPRAS (ID, FORNECEDOR_ID, FORNECEDOR_NOME, NUMERO_NF, CHAVE_NFE, DATA_EMISSAO, DATA_ENTRADA, VALOR_TOTAL, VALOR_FRETE, VALOR_OUTROS, OBSERVACAO)');
     LQuery.Add('VALUES (:ID, :FOR_ID, :FOR_NOME, :NUM_NF, :CHAVE, :D_EMIS, :D_ENTR, :V_TOT, :V_FRETE, :V_OUTROS, :OBS)');
@@ -262,8 +309,8 @@ begin
 
     LQuery.AddParam('ID', LCompraId);
     LQuery.AddParam('FOR_ID', LBody.GetValue<Integer>('fornecedor_id', 0));
-    LQuery.AddParam('FOR_NOME', LBody.GetValue<string>('fornecedor_nome', ''));
-    LQuery.AddParam('NUM_NF', LBody.GetValue<string>('numero_nf', ''));
+    LQuery.AddParam('FOR_NOME', LFornNome);
+    LQuery.AddParam('NUM_NF', LNumDoc);
     LQuery.AddParam('CHAVE', LBody.GetValue<string>('chave_nfe', ''));
     LQuery.AddParam('D_EMIS', FormatDateTime('yyyy-mm-dd', Date));
     LQuery.AddParam('D_ENTR', FormatDateTime('yyyy-mm-dd', Date));
@@ -273,7 +320,7 @@ begin
     LQuery.AddParam('OBS', LBody.GetValue<string>('observacao', ''));
     LQuery.ExecSQL;
 
-    // Processa Itens e Recalcula Custos dos Produtos
+    // Processa Itens e Recalcula Custos e Precos dos Produtos
     LItensArr := LBody.GetValue<TJSONArray>('itens', nil);
     if Assigned(LItensArr) then
     begin
@@ -295,8 +342,8 @@ begin
         if LQtd > 0 then
           LRateio := (LValFrete + LValIpi + LValSt + LValOutros) / LQtd;
 
-        LCustoMercadoria := LCustoEntrada + LRateio; // PRO_VALORF
-        LCustoOperacional := LCustoMercadoria * 1.10; // PRO_VALORL (10% desp. operacional padrao)
+        LCustoMercadoria := LCustoEntrada + LRateio;
+        LCustoOperacional := LCustoMercadoria * 1.10;
 
         // Busca estoque e custo medio atual no produto
         LQueryPro := TDatabase.Query;
@@ -310,14 +357,17 @@ begin
           LCustoMedioAtual := LQueryPro.Dataset.FieldByName('PRO_VALORCM').AsFloat;
         end;
 
-        // Formula de Custo Medio Ponderado (UnitRegraCustoNF.Model.pas):
-        // CustoMedio = ((QtdAnterior * CustoMedioAnterior) + (QtdNova * CustoEntradaNovo)) / (QtdAnterior + QtdNova)
         if (LQtdAtual + LQtd) > 0 then
           LCustoMedio := ((LQtdAtual * LCustoMedioAtual) + (LQtd * LCustoMercadoria)) / (LQtdAtual + LQtd)
         else
           LCustoMedio := LCustoMercadoria;
 
-        // Grava os novos custos e estoque atualizado no produto
+        // Precos de Venda Atualizados (se informados da Analise de Custos F5)
+        LVendaDinheiro := LItemObj.GetValue<Double>('valor_dinheiro', 0);
+        LVendaVista := LItemObj.GetValue<Double>('valor_vista', 0);
+        LVendaPrazo := LItemObj.GetValue<Double>('valor_prazo', 0);
+
+        // Grava os novos custos, estoque e precos no produto
         LQuery.Clear;
         LQuery.Add('UPDATE PRODUTOS SET ');
         LQuery.Add('  PRO_QUANTIDADE = COALESCE(PRO_QUANTIDADE, 0) + :QTD,');
@@ -325,6 +375,16 @@ begin
         LQuery.Add('  PRO_VALORCM = :CUSTO_MEDIO,');
         LQuery.Add('  PRO_VALORF = :CUSTO_MERCADORIA,');
         LQuery.Add('  PRO_VALORL = :CUSTO_OPERACIONAL');
+
+        if LVendaVista > 0 then
+        begin
+          LQuery.Add('  , PRO_VALORV = :V_VISTA');
+          if LVendaDinheiro > 0 then
+            LQuery.Add('  , PRO_VALOR_DINHEIRO = :V_DIN');
+          if LVendaPrazo > 0 then
+            LQuery.Add('  , PRO_VALORV_PRAZO = :V_PRAZO');
+        end;
+
         LQuery.Add('WHERE PRO_CODIGO = :PRO_COD');
 
         LQuery.AddParam('QTD', LQtd);
@@ -332,6 +392,14 @@ begin
         LQuery.AddParam('CUSTO_MEDIO', LCustoMedio);
         LQuery.AddParam('CUSTO_MERCADORIA', LCustoMercadoria);
         LQuery.AddParam('CUSTO_OPERACIONAL', LCustoOperacional);
+        if LVendaVista > 0 then
+        begin
+          LQuery.AddParam('V_VISTA', LVendaVista);
+          if LVendaDinheiro > 0 then
+            LQuery.AddParam('V_DIN', LVendaDinheiro);
+          if LVendaPrazo > 0 then
+            LQuery.AddParam('V_PRAZO', LVendaPrazo);
+        end;
         LQuery.AddParam('PRO_COD', LProCodigo);
         LQuery.ExecSQL;
 
@@ -356,12 +424,12 @@ begin
         LQuery.AddParam('COPER', LCustoOperacional);
         LQuery.ExecSQL;
 
-        // Grava no Histórico de Estoque (HIS_PRO)
+        // Grava no Historico de Estoque (HIS_PRO)
         THisProController.RegistrarMovimentacao(
           LProCodigo,
           Date,
           'ENTRADA COMPRA/NF',
-          LBody.GetValue<string>('numero_nf', IntToStr(LCompraId)),
+          LNumDoc,
           LQtd,
           LCustoEntrada,
           LValUnit,
@@ -375,9 +443,45 @@ begin
       end;
     end;
 
+    // Processa Parcelas do Faturamento / Contas a Pagar
+    LParcArr := LBody.GetValue<TJSONArray>('parcelas', nil);
+    if Assigned(LParcArr) and (LParcArr.Count > 0) then
+    begin
+      // Limpa parcelas anteriores desta compra se estiver atualizando
+      LQuery.Clear;
+      LQuery.Add('DELETE FROM CONTAS_PAGAR WHERE COMPRA_ID = :CID');
+      LQuery.AddParam('CID', LCompraId);
+      LQuery.ExecSQL;
+
+      for I := 0 to LParcArr.Count - 1 do
+      begin
+        LParcObj := TJSONObject(LParcArr.Items[I]);
+        LNewParcId := GeraCodigo('CONTAS_PAGAR', 'ID');
+
+        LQuery.Clear;
+        LQuery.Add('INSERT INTO CONTAS_PAGAR (ID, COMPRA_ID, FORNECEDOR_ID, FORNECEDOR_NOME, NUMERO_DOCUMENTO, PARCELA, DATA_EMISSAO, DATA_VENCIMENTO, VALOR_PARCELA, VALOR_PAGO, FORMA_PAGAMENTO, STATUS, OBSERVACAO)');
+        LQuery.Add('VALUES (:ID, :CID, :FID, :FNOME, :NDOC, :PARC, :DEMIS, :DVENC, :VPARC, :VPAGO, :FPAG, :STAT, :OBS)');
+
+        LQuery.AddParam('ID', LNewParcId);
+        LQuery.AddParam('CID', LCompraId);
+        LQuery.AddParam('FID', LBody.GetValue<Integer>('fornecedor_id', 0));
+        LQuery.AddParam('FNOME', LFornNome);
+        LQuery.AddParam('NDOC', LNumDoc);
+        LQuery.AddParam('PARC', LParcObj.GetValue<string>('parcela', Format('%d/%d', [I + 1, LParcArr.Count])));
+        LQuery.AddParam('DEMIS', FormatDateTime('yyyy-mm-dd', Date));
+        LQuery.AddParam('DVENC', LParcObj.GetValue<string>('data_vencimento', FormatDateTime('yyyy-mm-dd', Date + (30 * (I + 1)))));
+        LQuery.AddParam('VPARC', LParcObj.GetValue<Double>('valor_parcela', 0));
+        LQuery.AddParam('VPAGO', 0);
+        LQuery.AddParam('FPAG', LParcObj.GetValue<string>('forma_pagamento', 'BOLETO'));
+        LQuery.AddParam('STAT', 'ABERTO');
+        LQuery.AddParam('OBS', Format('Compra #%d - NF %s', [LCompraId, LNumDoc]));
+        LQuery.ExecSQL;
+      end;
+    end;
+
     LResObj := TJSONObject.Create;
     LResObj.AddPair('id', TJSONNumber.Create(LCompraId));
-    LResObj.AddPair('msg', 'Compra lançada e custos atualizados com sucesso');
+    LResObj.AddPair('msg', 'Compra lançada, custos atualizados e faturamento gravado com sucesso');
     Res.Status(THTTPStatus.OK).Send(LResObj);
   except
     on E: Exception do
@@ -387,6 +491,45 @@ begin
       LResObj.AddPair('error', E.Message);
       Res.Status(THTTPStatus.InternalServerError).Send(LResObj);
     end;
+  end;
+end;
+
+class procedure TComprasController.GetContasPagar(Req: THorseRequest; Res: THorseResponse);
+var
+  LDataArr: TJSONArray;
+  LObj: TJSONObject;
+  LQuery: iQuery;
+begin
+  EnsureComprasTables;
+  LDataArr := TJSONArray.Create;
+  LQuery := TDatabase.Query;
+  try
+    LQuery.Open('SELECT FIRST 100 ID, COMPRA_ID, FORNECEDOR_ID, FORNECEDOR_NOME, NUMERO_DOCUMENTO, PARCELA, DATA_EMISSAO, DATA_VENCIMENTO, VALOR_PARCELA, VALOR_PAGO, FORMA_PAGAMENTO, STATUS, OBSERVACAO FROM CONTAS_PAGAR ORDER BY DATA_VENCIMENTO ASC, ID ASC');
+    LQuery.Dataset.First;
+    while not LQuery.Dataset.Eof do
+    begin
+      LObj := TJSONObject.Create;
+      LObj.AddPair('id', TJSONNumber.Create(LQuery.Dataset.FieldByName('ID').AsInteger));
+      LObj.AddPair('compra_id', TJSONNumber.Create(LQuery.Dataset.FieldByName('COMPRA_ID').AsInteger));
+      LObj.AddPair('fornecedor_id', TJSONNumber.Create(LQuery.Dataset.FieldByName('FORNECEDOR_ID').AsInteger));
+      LObj.AddPair('fornecedor_nome', LQuery.Dataset.FieldByName('FORNECEDOR_NOME').AsString);
+      LObj.AddPair('numero_documento', LQuery.Dataset.FieldByName('NUMERO_DOCUMENTO').AsString);
+      LObj.AddPair('parcela', LQuery.Dataset.FieldByName('PARCELA').AsString);
+      LObj.AddPair('data_emissao', FormatDateTime('yyyy-mm-dd', LQuery.Dataset.FieldByName('DATA_EMISSAO').AsDateTime));
+      LObj.AddPair('data_vencimento', FormatDateTime('yyyy-mm-dd', LQuery.Dataset.FieldByName('DATA_VENCIMENTO').AsDateTime));
+      LObj.AddPair('valor_parcela', TJSONNumber.Create(LQuery.Dataset.FieldByName('VALOR_PARCELA').AsFloat));
+      LObj.AddPair('valor_pago', TJSONNumber.Create(LQuery.Dataset.FieldByName('VALOR_PAGO').AsFloat));
+      LObj.AddPair('forma_pagamento', LQuery.Dataset.FieldByName('FORMA_PAGAMENTO').AsString);
+      LObj.AddPair('status', LQuery.Dataset.FieldByName('STATUS').AsString);
+      LObj.AddPair('observacao', LQuery.Dataset.FieldByName('OBSERVACAO').AsString);
+
+      LDataArr.AddElement(LObj);
+      LQuery.Dataset.Next;
+    end;
+    Res.Send<TJSONArray>(LDataArr);
+  except
+    on E: Exception do
+      Res.Status(THTTPStatus.InternalServerError).Send('{"error": "' + E.Message + '"}');
   end;
 end;
 
@@ -406,6 +549,11 @@ begin
   THorse.Group.Prefix('/v1')
     .Route('/compras/:id')
       .Get(GetForID)
+    .&End;
+
+  THorse.Group.Prefix('/v1')
+    .Route('/contas-pagar')
+      .Get(GetContasPagar)
     .&End;
 end;
 
@@ -455,15 +603,13 @@ begin
   LResponseObj.AddPair('data_emissao', FormatDateTime('yyyy-mm-dd', QueryHeader.Dataset.FieldByName('DATA_EMISSAO').AsDateTime));
   LResponseObj.AddPair('data_entrada', FormatDateTime('yyyy-mm-dd', QueryHeader.Dataset.FieldByName('DATA_ENTRADA').AsDateTime));
   LResponseObj.AddPair('valor_total', TJSONNumber.Create(QueryHeader.Dataset.FieldByName('VALOR_TOTAL').AsFloat));
+  LResponseObj.AddPair('valor_frete', TJSONNumber.Create(QueryHeader.Dataset.FieldByName('VALOR_FRETE').AsFloat));
+  LResponseObj.AddPair('valor_outros', TJSONNumber.Create(QueryHeader.Dataset.FieldByName('VALOR_OUTROS').AsFloat));
+  LResponseObj.AddPair('observacao', QueryHeader.Dataset.FieldByName('OBSERVACAO').AsString);
 
   LItensArr := TJSONArray.Create;
-  QueryItens.Open(Format(
-    'SELECT ID, COMPRA_ID, PRODUTO_CODIGO, PRODUTO_NOME, QUANTIDADE, VALOR_UNITARIO, CUSTO_MEDIO ' +
-    'FROM COMPRAS_ITENS WHERE COMPRA_ID = %d',
-    [LCompraId]
-  ));
+  QueryItens.Open(Format('SELECT ID, PRODUTO_CODIGO, PRODUTO_NOME, QUANTIDADE, VALOR_UNITARIO, VALOR_FRETE, VALOR_IPI, VALOR_ST, VALOR_OUTROS, CUSTO_MERCADORIA, CUSTO_MEDIO, CUSTO_OPERACIONAL FROM COMPRAS_ITENS WHERE COMPRA_ID = %d', [LCompraId]));
   QueryItens.Dataset.First;
-
   while not QueryItens.Dataset.Eof do
   begin
     LItemObj := TJSONObject.Create;
@@ -472,6 +618,13 @@ begin
     LItemObj.AddPair('produto_nome', QueryItens.Dataset.FieldByName('PRODUTO_NOME').AsString);
     LItemObj.AddPair('quantidade', TJSONNumber.Create(QueryItens.Dataset.FieldByName('QUANTIDADE').AsFloat));
     LItemObj.AddPair('valor_unitario', TJSONNumber.Create(QueryItens.Dataset.FieldByName('VALOR_UNITARIO').AsFloat));
+    LItemObj.AddPair('valor_frete', TJSONNumber.Create(QueryItens.Dataset.FieldByName('VALOR_FRETE').AsFloat));
+    LItemObj.AddPair('valor_ipi', TJSONNumber.Create(QueryItens.Dataset.FieldByName('VALOR_IPI').AsFloat));
+    LItemObj.AddPair('valor_st', TJSONNumber.Create(QueryItens.Dataset.FieldByName('VALOR_ST').AsFloat));
+    LItemObj.AddPair('valor_outros', TJSONNumber.Create(QueryItens.Dataset.FieldByName('VALOR_OUTROS').AsFloat));
+    LItemObj.AddPair('custo_mercadoria', TJSONNumber.Create(QueryItens.Dataset.FieldByName('CUSTO_MERCADORIA').AsFloat));
+    LItemObj.AddPair('custo_medio', TJSONNumber.Create(QueryItens.Dataset.FieldByName('CUSTO_MEDIO').AsFloat));
+    LItemObj.AddPair('custo_operacional', TJSONNumber.Create(QueryItens.Dataset.FieldByName('CUSTO_OPERACIONAL').AsFloat));
 
     LItensArr.AddElement(LItemObj);
     QueryItens.Dataset.Next;

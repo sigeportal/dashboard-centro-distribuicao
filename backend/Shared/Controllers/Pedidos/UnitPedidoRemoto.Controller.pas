@@ -132,7 +132,6 @@ begin
           .Post(Post)
           .Put(Put)
         .&End
-        .Group
         .Prefix('/v1')
         .Route('/pedidos/:id')
           .Get(GetForID)

@@ -1,4 +1,4 @@
-unit UnitSync.Controller;
+﻿unit UnitSync.Controller;
 
 interface
 
@@ -59,87 +59,70 @@ begin
     .Route('/sync/dashboard')
       .Post(SyncDashboard)
     .&End
-    .Group
     .Prefix('/v1')
     .Route('/sync/pending')
       .Get(SyncPending)
     .&End
-    .Group
     .Prefix('/v1')
     .Route('/sync/ack')
       .Post(SyncAck)
     .&End
-    .Group
     .Prefix('/v1')
     .Route('/dashboard/clientes-cidade')
       .Get(ClientesCidade)
     .&End
-    .Group
     .Prefix('/v1')
     .Route('/dashboard/despesas-tipo-pagamento')
       .Get(DespesasTipoPagamento)
     .&End
-    .Group
     .Prefix('/v1')
     .Route('/dashboard/vendas-margem-lucro')
       .Get(VendasMargemLucro)
     .&End
-    .Group
     .Prefix('/v1')
     .Route('/dashboard/os-margem-lucro')
       .Get(OsMargemLucro)
     .&End
-    .Group
     .Prefix('/v1')
     .Route('/dashboard/vendas-lucro-grupo')
       .Get(VendasLucroGrupo)
     .&End
-    .Group
     .Prefix('/v1')
     .Route('/dashboard/tipos-pagamentos-vendas')
       .Get(TiposPagamentosVendas)
     .&End
-    .Group
     .Prefix('/v1')
     .Route('/dashboard/tipos-pagamentos-compras')
       .Get(TiposPagamentosCompras)
     .&End
-    .Group
     .Prefix('/v1')
     .Route('/dashboard/tipos-pagamentos-recebimentos')
       .Get(TiposPagamentosRecebimentos)
     .&End
-    .Group
     .Prefix('/v1')
     .Route('/dashboard/tipos-pagamentos-pagamentos')
       .Get(TiposPagamentosPagamentos)
     .&End
-    .Group
     .Prefix('/v1')
     .Route('/dashboard/movimentacoes')
       .Get(Movimentacoes)
     .&End
-    .Group
     .Prefix('/v1')
     .Route('/dashboard/vendas-diarias')
       .Get(VendasDiarias)
     .&End
-    .Group
     .Prefix('/v1')
     .Route('/dashboard/vendas-diarias/hora')
       .Get(VendasDiariasHora)
     .&End
-    .Group
     .Prefix('/v1')
     .Route('/dashboard/os-diarias')
       .Get(OsDiarias)
     .&End
-    .Group
     .Prefix('/v1')
     .Route('/estoque/posicao')
       .Get(EstoquePosicao)
     .&End
-    .Group
     .Prefix('/v1')
     .Route('/posicao-estoque')
       .Get(EstoquePosicao)

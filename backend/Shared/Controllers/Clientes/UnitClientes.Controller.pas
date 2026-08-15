@@ -41,13 +41,11 @@ begin
       .Post(Post)
       .Put(Put)
     .&End
-    .Group
     .Prefix('/v1')
     .Route('/clientes/:id')
       .Get(GetForID)
       .Delete(Delete)
     .&End
-    .Group
     .Prefix('/v1')
     .Route('/clientes/:id/valor-devedor')
       .Get(GetValorDevedor)

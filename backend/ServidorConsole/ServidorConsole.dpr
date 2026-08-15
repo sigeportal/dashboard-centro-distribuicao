@@ -65,6 +65,8 @@ uses
   UnitNfe.Controller in '..\Shared\Controllers\Nfe\UnitNfe.Controller.pas',
   UnitClientes.Model in '..\Shared\Models\Clientes\UnitClientes.Model.pas',
   UnitClientes.Controller in '..\Shared\Controllers\Clientes\UnitClientes.Controller.pas',
+  UnitPedidosCompra.Model in '..\Shared\Models\PedidosCompra\UnitPedidosCompra.Model.pas',
+  UnitPedidosCompra.Controller in '..\Shared\Controllers\PedidosCompra\UnitPedidosCompra.Controller.pas',
   ConciliacaoFiscal.Controller in '..\Shared\Controllers\ConciliacaoFiscal.Controller.pas';
 
 var
@@ -106,6 +108,7 @@ begin
     TSyncController.Router;
     THisProController.Router;
     TNfeController.Router;
+    TPedidosCompraController.Router;
     
     //inicializa classes
     TInicializarClasses.Iniciar;  

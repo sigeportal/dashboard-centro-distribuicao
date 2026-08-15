@@ -122,7 +122,6 @@ begin
           .Post(Post)
           .Put(Put)
         .&End
-        .Group
         .Prefix('/v1')
         .Route('/funcionarios/:id')
           .Get(GetForID)

@@ -12,6 +12,7 @@ import ServiceOrdersTab from '../components/tabs/ServiceOrdersTab';
 import TransferTab from '../components/tabs/TransferTab';
 import CadastrosTab from '../components/tabs/CadastrosTab';
 import PurchasesTab from '../components/tabs/PurchasesTab';
+import PurchaseOrdersTab from '../components/tabs/PurchaseOrdersTab';
 import NfeTab from '../components/tabs/NfeTab';
 import ConciliacaoFiscalModal from '../components/ConciliacaoFiscalModal';
 
@@ -143,6 +144,7 @@ export default function Dashboard() {
       )}
 
       {activeTab === 'compras' && <PurchasesTab />}
+      {activeTab === 'pedidos-compra' && <PurchaseOrdersTab />}
       {activeTab === 'transferencias' && <TransferTab />}
       {activeTab === 'nfe' && <NfeTab />}
       {activeTab === 'conciliacao' && <ConciliacaoFiscalModal onClose={() => navigate('/dashboard?tab=produtos')} />}

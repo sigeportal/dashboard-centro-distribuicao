@@ -1,4 +1,4 @@
-unit UnitGrades.Controller;
+﻿unit UnitGrades.Controller;
 
 interface
 
@@ -266,18 +266,15 @@ begin
       .Post(Post)
       .Put(Put)
     .&End
-    .Group
     .Prefix('/v1')
     .Route('/grades/:id')
     	.Get(GetForID)
       .Delete(Delete)
     .&End
-    .Group
     .Prefix('/v1')
     .Route('/grades/produto/:id')
     	.Get(GetGradeProduto)
     .&End
-    .Group
     .Prefix('/v1')
     .Route('/grades/emLote')
     	.Post(PostEmLote)
