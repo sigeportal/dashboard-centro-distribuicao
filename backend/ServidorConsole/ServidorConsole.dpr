@@ -6,6 +6,7 @@ program ServidorConsole;
 
 uses
   Horse,
+  Horse.GBSwagger,
   Horse.CORS,
   Horse.Jhonson,
   Horse.HandleException,
@@ -36,7 +37,6 @@ uses
   UnitCidade.Model in '..\..\..\FormsComuns\Classes\Cidade\UnitCidade.Model.pas',
   UnitEstado.Model in '..\..\..\FormsComuns\Classes\Estado\UnitEstado.Model.pas',
   UnitDatabase in '..\Shared\Database\UnitDatabase.pas',
-  UnitConstants in '..\Shared\Utils\UnitConstants.pas',
   UnitLogin.Controller in '..\Shared\Controllers\Login\UnitLogin.Controller.pas',
   UnitFuncionarios.Model in '..\Shared\Models\Funcionarios\UnitFuncionarios.Model.pas',
   UnitPedidoRemoto.Controller in '..\Shared\Controllers\Pedidos\UnitPedidoRemoto.Controller.pas',
@@ -67,15 +67,16 @@ uses
   UnitClientes.Controller in '..\Shared\Controllers\Clientes\UnitClientes.Controller.pas',
   UnitPedidosCompra.Model in '..\Shared\Models\PedidosCompra\UnitPedidosCompra.Model.pas',
   UnitPedidosCompra.Controller in '..\Shared\Controllers\PedidosCompra\UnitPedidosCompra.Controller.pas',
-  UnitFaturamento2.Model in '..\..\..\FormsComuns\Classes\Faturamento2\UnitFaturamento2.Model.pas',
   UnitFaturamento2.Controller in '..\..\..\FormsComuns\Classes\Faturamento2\UnitFaturamento2.Controller.pas',
-  UnitPagamentos.Model in '..\..\..\FormsComuns\Classes\Pagamentos\UnitPagamentos.Model.pas',
   UnitPagamentos.Controller in '..\..\..\FormsComuns\Classes\Pagamentos\UnitPagamentos.Controller.pas',
   UnitPagPgm.Model in '..\..\..\FormsComuns\Classes\PagPgm\UnitPagPgm.Model.pas',
   UnitPagPgm.Controller in '..\..\..\FormsComuns\Classes\PagPgm\UnitPagPgm.Controller.pas',
   UnitMovimentacoes.Model in '..\..\..\FormsComuns\Classes\Movimentacoes\UnitMovimentacoes.Model.pas',
   UnitMovimentacoes.Controller in '..\..\..\FormsComuns\Classes\Movimentacoes\UnitMovimentacoes.Controller.pas',
-  ConciliacaoFiscal.Controller in '..\Shared\Controllers\ConciliacaoFiscal.Controller.pas';
+  ConciliacaoFiscal.Controller in '..\Shared\Controllers\ConciliacaoFiscal.Controller.pas',
+  UnitFaturamento2.Model in '..\..\..\FormsComuns\Classes\Faturamento2\UnitFaturamento2.Model.pas',
+  UnitPagamentos.Model in '..\..\..\FormsComuns\Classes\Pagamentos\UnitPagamentos.Model.pas',
+  UnitConstants in '..\..\..\FormsComuns\Classes\ServidoresUtils\Utils\UnitConstants.pas';
 
 var
 	LLogFileConfig: THorseLoggerConsoleConfig;
@@ -89,7 +90,8 @@ begin
     THorse.Use(CORS)
           .Use(Jhonson)
           .Use(THorseLoggerManager.HorseCallback)		
-          .Use(HandleException);
+          .Use(HandleException)
+          .Use(HorseSwagger); // Access http://localhost:9000/swagger/doc/html
     //controllers
     TLoginController.Router;
     TClientesController.Router;
@@ -121,6 +123,17 @@ begin
     TPagamentosController.Router;
     TPagPgmController.Router;
     TMovimentacoesController.Router;
+
+    Swagger
+    .Info
+      .Title('API PDV PORTAL')
+      .Description('API para o sistema PDV PORTAL')
+      .Contact
+        .Name('Portal.com')
+        .Email('sigeportal@gmail.com')
+        .URL('http://www.portalsoft.net.br')
+      .&End
+    .&End;
     
     //inicializa classes
     TInicializarClasses.Iniciar;  

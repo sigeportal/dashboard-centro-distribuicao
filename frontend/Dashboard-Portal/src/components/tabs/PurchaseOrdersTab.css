@@ -1,0 +1,215 @@
+/* PurchaseOrdersTab.css - Official Design System for Purchase Orders (Ordem de Compra) */
+
+.orders-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  animation: fadeIn 0.25s ease-out;
+}
+
+/* Header & KPIs */
+.orders-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 1.25rem 1.5rem;
+  border-radius: 1.25rem;
+}
+
+.orders-header-info h2 {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+.orders-header-info p {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+.orders-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+/* KPI Summary Cards */
+.orders-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.25rem;
+}
+
+.orders-kpi-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--glass-border);
+  border-radius: 1.25rem;
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  box-shadow: var(--shadow-level-1);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.orders-kpi-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-level-2);
+  border-color: var(--accent);
+}
+
+.orders-kpi-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 1rem;
+  background: rgba(249, 115, 22, 0.1);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.orders-kpi-icon.success {
+  background: rgba(0, 108, 73, 0.1);
+  color: var(--success);
+}
+
+.orders-kpi-icon.info {
+  background: rgba(0, 101, 145, 0.1);
+  color: var(--info);
+}
+
+.orders-kpi-data {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.orders-kpi-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+}
+
+.orders-kpi-value {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+}
+
+/* Planilha Matrix Styles */
+.matrix-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--glass-border);
+  border-radius: 1.25rem;
+  padding: 1.5rem;
+  box-shadow: var(--shadow-level-1);
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.matrix-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.matrix-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  text-align: left;
+}
+
+.matrix-table th {
+  background: #f8fafc;
+  color: var(--text-secondary);
+  font-weight: 700;
+  padding: 0.65rem 0.75rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.matrix-table td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  vertical-align: middle;
+}
+
+.matrix-table tr:hover {
+  background: rgba(249, 115, 22, 0.02);
+}
+
+.matrix-input-cell {
+  width: 50px;
+  height: 32px;
+  text-align: center;
+  font-weight: 700;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 0.4rem;
+  font-size: 0.88rem;
+  transition: all 0.2s ease;
+}
+
+.matrix-input-cell:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.2);
+  outline: none;
+}
+
+.matrix-total-row {
+  background: #f1f5f9;
+  font-weight: 800;
+}
+
+.matrix-total-row td {
+  padding: 0.75rem;
+  border-top: 2px solid rgba(0, 0, 0, 0.1);
+}
+
+/* Preset Chips */
+.grade-preset-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.grade-preset-chip {
+  padding: 0.4rem 0.8rem;
+  border-radius: 0.6rem;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.grade-preset-chip:hover {
+  background: rgba(0, 0, 0, 0.04);
+  color: var(--text-primary);
+  border-color: rgba(0, 0, 0, 0.2);
+}
+
+.grade-preset-chip.active {
+  background: rgba(249, 115, 22, 0.1);
+  color: var(--accent);
+  border-color: var(--accent);
+  font-weight: 700;
+}

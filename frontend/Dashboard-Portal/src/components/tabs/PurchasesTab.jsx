@@ -10,7 +10,7 @@ import { createApi } from '../../services/api';
 import Pagination from '../Pagination';
 import SearchBar from '../SearchBar';
 import { formatCurrency } from '../../utils/formatters';
-import './CadastrosTab.css';
+import './PurchasesTab.css';
 
 export default function PurchasesTab() {
   const api = createApi(true); // Conecta na CD_API_BASE (port 9000)
@@ -645,13 +645,13 @@ export default function PurchasesTab() {
     <div className="tab-container">
       
       {/* CABEÇALHO DA ABA COMPRAS */}
-      <div className="tab-header glass">
-        <div>
+      <div className="purchases-header glass">
+        <div className="purchases-header-info">
           <h2>Entrada de Compras & Gestão de Fornecedores</h2>
-          <p className="tab-subtitle">Lançamento de NF-e, Análise de Custos (F5), Rateio de Despesas e Faturamento Contas a Pagar</p>
+          <p>Lançamento de NF-e, Análise de Custos (F5), Rateio de Despesas e Faturamento Contas a Pagar</p>
         </div>
 
-        <div className="tab-header-actions" style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+        <div className="purchases-header-actions">
           <button className="btn-secondary" onClick={() => fetchCompras(page)}>
             <RefreshCw size={16} /> Atualizar
           </button>
@@ -663,13 +663,58 @@ export default function PurchasesTab() {
             accept=".xml" 
             style={{ display: 'none' }} 
           />
-          <button className="btn-secondary" onClick={() => fileInputRef.current?.click()} style={{ background: '#f8fafc' }}>
-            <Upload size={16} color="#2563eb" /> Importar XML (NF-e)
+          <button className="btn-secondary" onClick={() => fileInputRef.current?.click()}>
+            <Upload size={16} color="var(--info)" /> Importar XML (NF-e)
           </button>
 
-          <button className="btn-primary" onClick={handleOpenCreatePurchase} style={{ background: 'linear-gradient(135deg, #ea580c, #c2410c)' }}>
+          <button className="btn-primary" onClick={handleOpenCreatePurchase}>
             <Plus size={16} /> + Lançar Compra Manual
           </button>
+        </div>
+      </div>
+
+      {/* KPI METRIC CARDS */}
+      <div className="purchases-kpis">
+        <div className="purchases-kpi-card glass">
+          <div className="purchases-kpi-icon">
+            <ShoppingCart size={24} />
+          </div>
+          <div className="purchases-kpi-data">
+            <span className="purchases-kpi-label">Total de Compras</span>
+            <span className="purchases-kpi-value">{meta.total || compras.length}</span>
+          </div>
+        </div>
+
+        <div className="purchases-kpi-card glass">
+          <div className="purchases-kpi-icon success">
+            <DollarSign size={24} />
+          </div>
+          <div className="purchases-kpi-data">
+            <span className="purchases-kpi-label">Volume de Compras</span>
+            <span className="purchases-kpi-value" style={{ color: 'var(--success)' }}>
+              {formatCurrency(compras.reduce((acc, c) => acc + (Number(c.valor_total) || 0), 0))}
+            </span>
+          </div>
+        </div>
+
+        <div className="purchases-kpi-card glass">
+          <div className="purchases-kpi-icon info">
+            <Building2 size={24} />
+          </div>
+          <div className="purchases-kpi-data">
+            <span className="purchases-kpi-label">Fornecedores Cadastrados</span>
+            <span className="purchases-kpi-value">{fornecedores.length}</span>
+          </div>
+        </div>
+
+        <div className="purchases-kpi-card glass">
+          <div className="purchases-kpi-icon">
+            <Package size={24} />
+          </div>
+          <div className="purchases-kpi-data">
+            <span className="purchases-kpi-label">Catálogo de Produtos</span>
+            <span className="purchases-kpi-value">{produtos.length}</span>
+          </div>
         </div>
       </div>
 
@@ -999,17 +1044,17 @@ export default function PurchasesTab() {
         <div className="product-form-modal-overlay" style={{ zIndex: 1000000 }}>
           <div className="product-form-modal-container glass" style={{ maxWidth: '1200px', maxHeight: '90vh' }}>
             
-            <div className="product-modal-header" style={{ background: 'linear-gradient(135deg, #ea580c, #c2410c)', color: '#ffffff' }}>
+            <div className="product-modal-header">
               <div className="product-modal-title-group">
-                <div className="product-modal-icon-badge" style={{ background: 'rgba(255, 255, 255, 0.2)' }}>
-                  <Calculator size={22} color="#ffffff" />
+                <div className="product-modal-icon-badge">
+                  <Calculator size={22} />
                 </div>
                 <div>
-                  <h3 style={{ color: '#ffffff' }}>F5 - Painel de Análise de Custos & Formação de Preço de Venda</h3>
-                  <span className="product-modal-subtitle" style={{ color: '#fed7aa' }}>Inspirado no UnitCompra.pas • Rateio Automático • Margens e 3 Preços de Venda</span>
+                  <h3>F5 - Painel de Análise de Custos & Preços de Venda</h3>
+                  <span className="product-modal-subtitle">Rateio Automático • Margens de Lucro • Formação dos 3 Preços de Venda</span>
                 </div>
               </div>
-              <button className="btn-close" onClick={() => setShowCostAnalysisModal(false)} style={{ color: '#ffffff' }}><X size={20} /></button>
+              <button className="btn-close" onClick={() => setShowCostAnalysisModal(false)}><X size={20} /></button>
             </div>
 
             <div className="product-modal-body">
@@ -1148,17 +1193,17 @@ export default function PurchasesTab() {
         <div className="product-form-modal-overlay" style={{ zIndex: 1000000 }}>
           <div className="product-form-modal-container glass" style={{ maxWidth: '900px' }}>
             
-            <div className="product-modal-header" style={{ background: 'linear-gradient(135deg, #2563eb, #1d4ed8)', color: '#ffffff' }}>
+            <div className="product-modal-header">
               <div className="product-modal-title-group">
-                <div className="product-modal-icon-badge" style={{ background: 'rgba(255, 255, 255, 0.2)' }}>
-                  <CreditCard size={22} color="#ffffff" />
+                <div className="product-modal-icon-badge">
+                  <CreditCard size={22} />
                 </div>
                 <div>
-                  <h3 style={{ color: '#ffffff' }}>Faturamento da Compra & Contas a Pagar</h3>
-                  <span className="product-modal-subtitle" style={{ color: '#bfdbfe' }}>Geração de Grade de Parcelas e Vencimentos (UnitLancamentoEntradas)</span>
+                  <h3>Faturamento da Compra & Contas a Pagar</h3>
+                  <span className="product-modal-subtitle">Geração de Grade de Parcelas e Vencimentos Financeiros</span>
                 </div>
               </div>
-              <button className="btn-close" onClick={() => setShowBillingModal(false)} style={{ color: '#ffffff' }}><X size={20} /></button>
+              <button className="btn-close" onClick={() => setShowBillingModal(false)}><X size={20} /></button>
             </div>
 
             <div className="product-modal-body">

@@ -74,6 +74,14 @@
 			"failed": false,
 			"changed": false
 		},
+		"https://github.com/gabrielbaltazar/gbswagger": {
+			"name": "gbswagger",
+			"version": "3.1.0",
+			"hash": "1d45cb3210674c8eca2d9fe24c675c57",
+			"artifacts": {},
+			"failed": false,
+			"changed": false
+		},
 		"https://github.com/hashload/handle-exception": {
 			"name": "handle-exception",
 			"version": "0.2.1",

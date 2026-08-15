@@ -1,4 +1,4 @@
-unit UnitCompras.Controller;
+﻿unit UnitCompras.Controller;
 
 interface
 
@@ -7,6 +7,7 @@ uses
   Horse.Commons,
   Classes,
   SysUtils,
+  System.Math,
   System.Json,
   FireDAC.Comp.Client;
 
@@ -23,7 +24,8 @@ type
 
 implementation
 
-uses
+uses    	
+	System.StrUtils,
   UnitConnection.Model.Interfaces,
   UnitDatabase,
   UnitFunctions,

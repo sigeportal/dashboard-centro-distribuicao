@@ -68,7 +68,7 @@
         <DCC_UsePackage>RESTComponents;emsclientfiredac;DataSnapFireDAC;FireDACIBDriver;emsclient;FireDACCommon;RESTBackendComponents;soapserver;CloudService;FireDACCommonDriver;inet;FireDAC;FireDACSqliteDriver;soaprtl;soapmidas;$(DCC_UsePackage)</DCC_UsePackage>
         <DCC_Namespace>System;Xml;Data;Datasnap;Web;Soap;$(DCC_Namespace)</DCC_Namespace>
         <SanitizedProjectName>ServidorConsole</SanitizedProjectName>
-        <DCC_UnitSearchPath>..\modules\.dcp;..\modules\.dcu;..\modules;..\modules\clientrest\src;..\modules\dataset-serialize\src;..\modules\factory-connections\src\FireDAC;..\modules\factory-connections\src\IBExpress;..\modules\factory-connections\src;..\modules\handle-exception\src;..\modules\horse\src;..\modules\horse-cors\src;..\modules\horse-logger\src;..\modules\horse-logger-provider-console\src;..\modules\horse-octet-stream\src;..\modules\horse-utils-clientip\src;..\modules\jhonson\src;..\modules\portalorm\src\Model;..\modules\portalorm\src\Modulos\FormRTTI\Model;..\modules\portalorm\src\Modulos\FormRTTI;..\modules\portalorm\src\Modulos\Helpers;..\modules\portalorm\src\Modulos\InsereTabela;..\modules\portalorm\src\Modulos\PatternCommand;..\modules\portalorm\src\Utils;..\modules\portalorm\src\views;$(DCC_UnitSearchPath);modules\.dcp;modules\.dcu;modules;modules\clientrest\src;modules\dataset-serialize\src;modules\factory-connections\src\FireDAC;modules\factory-connections\src\IBExpress;modules\factory-connections\src;modules\handle-exception\src;modules\horse\src;modules\horse-cors\src;modules\horse-logger\src;modules\horse-logger-provider-console\src;modules\horse-octet-stream\src;modules\horse-utils-clientip\src;modules\jhonson\src;modules\portalorm\src\Model;modules\portalorm\src\Modulos\FormRTTI\Model;modules\portalorm\src\Modulos\FormRTTI;modules\portalorm\src\Modulos\Helpers;modules\portalorm\src\Modulos\InsereTabela;modules\portalorm\src\Modulos\PatternCommand;modules\portalorm\src\Utils;modules\portalorm\src\views</DCC_UnitSearchPath>
+        <DCC_UnitSearchPath>..\modules\.dcp;..\modules\.dcu;..\modules;..\modules\clientrest\src;..\modules\dataset-serialize\src;..\modules\factory-connections\src\FireDAC;..\modules\factory-connections\src\IBExpress;..\modules\factory-connections\src;..\modules\handle-exception\src;..\modules\horse\src;..\modules\horse-cors\src;..\modules\horse-logger\src;..\modules\horse-logger-provider-console\src;..\modules\horse-octet-stream\src;..\modules\horse-utils-clientip\src;..\modules\jhonson\src;..\modules\portalorm\src\Model;..\modules\portalorm\src\Modulos\FormRTTI\Model;..\modules\portalorm\src\Modulos\FormRTTI;..\modules\portalorm\src\Modulos\Helpers;..\modules\portalorm\src\Modulos\InsereTabela;..\modules\portalorm\src\Modulos\PatternCommand;..\modules\portalorm\src\Utils;..\modules\portalorm\src\views;modules\.dcp;modules\.dcu;modules;modules\clientrest\src;modules\dataset-serialize\src;modules\factory-connections\src\FireDAC;modules\factory-connections\src\IBExpress;modules\factory-connections\src;modules\gbswagger\Source\Core;modules\gbswagger\Source\Datasnap;modules\gbswagger\Source\Horse;modules\gbswagger\Source\Validator;modules\handle-exception\src;modules\horse\src;modules\horse-cors\src;modules\horse-logger\src;modules\horse-logger-provider-console\src;modules\horse-octet-stream\src;modules\horse-utils-clientip\src;modules\jhonson\src;modules\portalorm\src\Model;modules\portalorm\src\Modulos\FormRTTI\Model;modules\portalorm\src\Modulos\FormRTTI;modules\portalorm\src\Modulos\Helpers;modules\portalorm\src\Modulos\InsereTabela;modules\portalorm\src\Modulos\PatternCommand;modules\portalorm\src\Utils;modules\portalorm\src\views;$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
         <DCC_Define>PORTALORM;$(DCC_Define)</DCC_Define>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base_Linux64)'!=''">
@@ -93,7 +93,7 @@
         <DCC_RemoteDebug>true</DCC_RemoteDebug>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_1_Linux64)'!=''">
-        <Debugger_Launcher>/usr/bin/xterm -e "%debuggee%"</Debugger_Launcher>
+        <Debugger_Launcher>/usr/bin/xterm -e &quot;%debuggee%&quot;</Debugger_Launcher>
         <Manifest_File>(None)</Manifest_File>
         <DCC_ExeOutput>.\dist_dev\</DCC_ExeOutput>
     </PropertyGroup>
@@ -112,7 +112,7 @@
         <DCC_DebugInformation>0</DCC_DebugInformation>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_2_Linux64)'!=''">
-        <Debugger_Launcher>/usr/bin/xterm -e "%debuggee%"</Debugger_Launcher>
+        <Debugger_Launcher>/usr/bin/xterm -e &quot;%debuggee%&quot;</Debugger_Launcher>
         <Manifest_File>(None)</Manifest_File>
         <DCC_ExeOutput>./dist</DCC_ExeOutput>
     </PropertyGroup>
@@ -151,7 +151,6 @@
         <DCCReference Include="..\..\..\FormsComuns\Classes\Cidade\UnitCidade.Model.pas"/>
         <DCCReference Include="..\..\..\FormsComuns\Classes\Estado\UnitEstado.Model.pas"/>
         <DCCReference Include="..\Shared\Database\UnitDatabase.pas"/>
-        <DCCReference Include="..\Shared\Utils\UnitConstants.pas"/>
         <DCCReference Include="..\Shared\Controllers\Login\UnitLogin.Controller.pas"/>
         <DCCReference Include="..\Shared\Models\Funcionarios\UnitFuncionarios.Model.pas"/>
         <DCCReference Include="..\Shared\Controllers\Pedidos\UnitPedidoRemoto.Controller.pas"/>
@@ -180,7 +179,18 @@
         <DCCReference Include="..\Shared\Controllers\Nfe\UnitNfe.Controller.pas"/>
         <DCCReference Include="..\Shared\Models\Clientes\UnitClientes.Model.pas"/>
         <DCCReference Include="..\Shared\Controllers\Clientes\UnitClientes.Controller.pas"/>
+        <DCCReference Include="..\Shared\Models\PedidosCompra\UnitPedidosCompra.Model.pas"/>
+        <DCCReference Include="..\Shared\Controllers\PedidosCompra\UnitPedidosCompra.Controller.pas"/>
+        <DCCReference Include="..\..\..\FormsComuns\Classes\Faturamento2\UnitFaturamento2.Controller.pas"/>
+        <DCCReference Include="..\..\..\FormsComuns\Classes\Pagamentos\UnitPagamentos.Controller.pas"/>
+        <DCCReference Include="..\..\..\FormsComuns\Classes\PagPgm\UnitPagPgm.Model.pas"/>
+        <DCCReference Include="..\..\..\FormsComuns\Classes\PagPgm\UnitPagPgm.Controller.pas"/>
+        <DCCReference Include="..\..\..\FormsComuns\Classes\Movimentacoes\UnitMovimentacoes.Model.pas"/>
+        <DCCReference Include="..\..\..\FormsComuns\Classes\Movimentacoes\UnitMovimentacoes.Controller.pas"/>
         <DCCReference Include="..\Shared\Controllers\ConciliacaoFiscal.Controller.pas"/>
+        <DCCReference Include="..\..\..\FormsComuns\Classes\Faturamento2\UnitFaturamento2.Model.pas"/>
+        <DCCReference Include="..\..\..\FormsComuns\Classes\Pagamentos\UnitPagamentos.Model.pas"/>
+        <DCCReference Include="..\..\..\FormsComuns\Classes\ServidoresUtils\Utils\UnitConstants.pas"/>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>
             <CfgParent>Base</CfgParent>
@@ -249,12 +259,18 @@
                         <Overwrite>true</Overwrite>
                     </Platform>
                 </DeployFile>
+                <DeployFile LocalName="dist_dev\ServidorConsole.exe" Configuration="Debug" Class="ProjectOutput">
+                    <Platform Name="Win32">
+                        <RemoteName>ServidorConsole.exe</RemoteName>
+                        <Overwrite>true</Overwrite>
+                    </Platform>
+                </DeployFile>
                 <DeployFile LocalName="$(BDS)\Redist\osx32\libcgsqlite3.dylib" Class="DependencyModule">
                     <Platform Name="OSX32">
                         <Overwrite>true</Overwrite>
                     </Platform>
                 </DeployFile>
-                <DeployFile LocalName="Win32\Debug\ServidorConsole.exe" Configuration="Debug" Class="ProjectOutput">
+                <DeployFile LocalName="dist_dev\ServidorConsole.exe" Configuration="Debug" Class="ProjectOutput">
                     <Platform Name="Win32">
                         <RemoteName>ServidorConsole.exe</RemoteName>
                         <Overwrite>true</Overwrite>

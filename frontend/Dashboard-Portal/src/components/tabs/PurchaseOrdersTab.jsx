@@ -10,7 +10,7 @@ import { createApi } from '../../services/api';
 import SearchBar from '../SearchBar';
 import Pagination from '../Pagination';
 import { formatCurrency } from '../../utils/formatters';
-import './CadastrosTab.css';
+import './PurchaseOrdersTab.css';
 
 export default function PurchaseOrdersTab() {
   const api = createApi(true);
@@ -423,21 +423,70 @@ export default function PurchaseOrdersTab() {
   return (
     <div className="tab-container">
       
-      {/* CABEÇALHO DA ABA */}
-      <div className="tab-header glass">
-        <div>
+      {/* CABEÇALHO DA ABA ORDENS DE COMPRA */}
+      <div className="orders-header glass">
+        <div className="orders-header-info">
           <h2>Controle de Pedidos de Compras (Ordem de Compra)</h2>
-          <p className="tab-subtitle">Matriz de Grades por Tamanho & Cor • 3 Preços de Venda • Relatórios Timbrados para Fornecedores</p>
+          <p>Matriz de Grades por Tamanho & Cor • 3 Preços de Venda • Relatórios Timbrados para Fornecedores</p>
         </div>
 
-        <div className="tab-header-actions" style={{ display: 'flex', gap: '0.6rem' }}>
+        <div className="orders-header-actions">
           <button className="btn-secondary" onClick={() => fetchPedidos(page)}>
             <RefreshCw size={16} /> Atualizar
           </button>
           
-          <button className="btn-primary" onClick={handleOpenCreateOrder} style={{ background: 'linear-gradient(135deg, #7c3aed, #6d28d9)' }}>
+          <button className="btn-primary" onClick={handleOpenCreateOrder}>
             <Plus size={16} /> + Nova Ordem de Compra
           </button>
+        </div>
+      </div>
+
+      {/* KPI METRIC CARDS */}
+      <div className="orders-kpis">
+        <div className="orders-kpi-card glass">
+          <div className="orders-kpi-icon">
+            <FileSpreadsheet size={24} />
+          </div>
+          <div className="orders-kpi-data">
+            <span className="orders-kpi-label">Ordens de Compra</span>
+            <span className="orders-kpi-value">{meta.total || pedidos.length}</span>
+          </div>
+        </div>
+
+        <div className="orders-kpi-card glass">
+          <div className="orders-kpi-icon info">
+            <Layers size={24} />
+          </div>
+          <div className="orders-kpi-data">
+            <span className="orders-kpi-label">Total de Peças/Pares</span>
+            <span className="orders-kpi-value" style={{ color: 'var(--info)' }}>
+              {pedidos.reduce((acc, p) => acc + (Number(p.total_pecas) || 0), 0)}
+            </span>
+          </div>
+        </div>
+
+        <div className="orders-kpi-card glass">
+          <div className="orders-kpi-icon success">
+            <DollarSign size={24} />
+          </div>
+          <div className="orders-kpi-data">
+            <span className="orders-kpi-label">Valor Total Pedidos</span>
+            <span className="orders-kpi-value" style={{ color: 'var(--success)' }}>
+              {formatCurrency(pedidos.reduce((acc, p) => acc + (Number(p.valor_total) || 0), 0))}
+            </span>
+          </div>
+        </div>
+
+        <div className="orders-kpi-card glass">
+          <div className="orders-kpi-icon">
+            <Building2 size={24} />
+          </div>
+          <div className="orders-kpi-data">
+            <span className="orders-kpi-label">Fornecedores / Marcas</span>
+            <span className="orders-kpi-value">
+              {new Set(pedidos.map(p => p.marca || p.fornecedor_nome).filter(Boolean)).size || fornecedores.length}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -527,18 +576,18 @@ export default function PurchaseOrdersTab() {
         <div className="product-form-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowOrderModal(false); }}>
           <div className="product-form-modal-container glass" style={{ maxWidth: '1250px', maxHeight: '92vh' }}>
             
-            {/* CABEÇALHO */}
-            <div className="product-modal-header" style={{ background: 'linear-gradient(135deg, #7c3aed, #6d28d9)', color: '#ffffff' }}>
+            {/* CABEÇALHO DO MODAL */}
+            <div className="product-modal-header">
               <div className="product-modal-title-group">
-                <div className="product-modal-icon-badge" style={{ background: 'rgba(255, 255, 255, 0.2)' }}>
-                  <FileSpreadsheet size={22} color="#ffffff" />
+                <div className="product-modal-icon-badge">
+                  <FileSpreadsheet size={22} />
                 </div>
                 <div>
-                  <h3 style={{ color: '#ffffff' }}>Ordem de Compra Nº {orderForm.numero_ordem}</h3>
-                  <span className="product-modal-subtitle" style={{ color: '#ddd6fe' }}>Modelo Oficial MOONCITY • Matriz de Grade por Produto & 3 Preços de Venda</span>
+                  <h3>Ordem de Compra Nº {orderForm.numero_ordem}</h3>
+                  <span className="product-modal-subtitle">Matriz de Grade por Produto & 3 Preços de Venda • Fornecedores</span>
                 </div>
               </div>
-              <button className="btn-close" onClick={() => setShowOrderModal(false)} style={{ color: '#ffffff' }}><X size={20} /></button>
+              <button className="btn-close" onClick={() => setShowOrderModal(false)}><X size={20} /></button>
             </div>
 
             <div className="product-modal-body">
@@ -546,7 +595,7 @@ export default function PurchaseOrdersTab() {
               {/* CABEÇALHO COMERCIAL DA ORDEM DE COMPRA */}
               <div className="product-section-card">
                 <div className="product-section-title">
-                  <Building2 size={16} color="#7c3aed" /> Dados do Pedido & Condições Comerciais
+                  <Building2 size={16} color="var(--accent)" /> Dados do Pedido & Condições Comerciais
                 </div>
 
                 <div className="product-grid-4">
@@ -664,18 +713,18 @@ export default function PurchaseOrdersTab() {
 
               {/* SELETOR DE PRESETS DE GRADE DE TAMANHOS */}
               <div className="product-section-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.8rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                <div className="grade-preset-group">
                   <span style={{ fontWeight: 700, fontSize: '0.88rem' }}>Configuração de Grade da Matriz:</span>
-                  <button type="button" className="btn-secondary small" onClick={() => handleSetTamanhosPreset('calcados')}>
+                  <button type="button" className={`grade-preset-chip ${colunasTamanhos.join('') === '343536373839' ? 'active' : ''}`} onClick={() => handleSetTamanhosPreset('calcados')}>
                     👟 Calçados (34 a 39)
                   </button>
-                  <button type="button" className="btn-secondary small" onClick={() => handleSetTamanhosPreset('calcados_grandes')}>
+                  <button type="button" className={`grade-preset-chip ${colunasTamanhos.join('') === '3738394041424344' ? 'active' : ''}`} onClick={() => handleSetTamanhosPreset('calcados_grandes')}>
                     👟 Calçados Grandes (37 a 44)
                   </button>
-                  <button type="button" className="btn-secondary small" onClick={() => handleSetTamanhosPreset('roupas')}>
+                  <button type="button" className={`grade-preset-chip ${colunasTamanhos.join('') === 'PMGXXG' || colunasTamanhos.join('') === 'PMGGG' ? 'active' : ''}`} onClick={() => handleSetTamanhosPreset('roupas')}>
                     👕 Vestuário (P a XG)
                   </button>
-                  <button type="button" className="btn-secondary small" onClick={() => handleSetTamanhosPreset('numeros')}>
+                  <button type="button" className={`grade-preset-chip ${colunasTamanhos.join('') === '363840424446' ? 'active' : ''}`} onClick={() => handleSetTamanhosPreset('numeros')}>
                     👖 Calças (36 a 46)
                   </button>
                 </div>
@@ -854,19 +903,19 @@ export default function PurchaseOrdersTab() {
             <div className="product-modal-footer">
               <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
                 <div>
-                  <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block' }}>TOTAL DE PEÇAS:</span>
-                  <strong style={{ fontSize: '1.2rem', color: '#7c3aed' }}>{totaisGerais.totalPecas} pares/peças</strong>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block' }}>TOTAL DE PEÇAS:</span>
+                  <strong style={{ fontSize: '1.2rem', color: 'var(--accent)' }}>{totaisGerais.totalPecas} pares/peças</strong>
                 </div>
 
                 <div>
-                  <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block' }}>VALOR TOTAL DA ORDEM:</span>
-                  <strong style={{ fontSize: '1.3rem', color: '#16a34a' }}>{formatCurrency(totaisGerais.valorLiquido)}</strong>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block' }}>VALOR TOTAL DA ORDEM:</span>
+                  <strong style={{ fontSize: '1.3rem', color: 'var(--success)' }}>{formatCurrency(totaisGerais.valorLiquido)}</strong>
                 </div>
               </div>
 
               <div style={{ display: 'flex', gap: '0.8rem' }}>
                 <button type="button" className="btn-secondary" onClick={() => setShowOrderModal(false)}>Cancelar</button>
-                <button type="button" className="btn-primary" onClick={handleSaveOrder} disabled={loading} style={{ background: 'linear-gradient(135deg, #7c3aed, #6d28d9)', minWidth: '180px' }}>
+                <button type="button" className="btn-primary" onClick={handleSaveOrder} disabled={loading} style={{ minWidth: '180px' }}>
                   {loading ? <RefreshCw size={18} className="spinner" /> : <Save size={18} />} Salvar Ordem de Compra
                 </button>
               </div>
@@ -883,17 +932,17 @@ export default function PurchaseOrdersTab() {
         <div className="product-form-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowPrintModal(null); }}>
           <div className="product-form-modal-container glass" style={{ maxWidth: '950px', background: '#ffffff' }}>
             
-            <div className="product-modal-header" style={{ background: '#1e293b', color: '#ffffff' }}>
+            <div className="product-modal-header">
               <div className="product-modal-title-group">
-                <div className="product-modal-icon-badge" style={{ background: '#334155' }}>
-                  <Printer size={22} color="#ffffff" />
+                <div className="product-modal-icon-badge">
+                  <Printer size={22} />
                 </div>
                 <div>
-                  <h3 style={{ color: '#ffffff' }}>Relatório Timbrado da Ordem de Compra</h3>
-                  <span className="product-modal-subtitle" style={{ color: '#94a3b8' }}>Pronto para Impressão A4 ou Envio via WhatsApp ao Representante</span>
+                  <h3>Relatório Timbrado da Ordem de Compra</h3>
+                  <span className="product-modal-subtitle">Pronto para Impressão A4 ou Envio via WhatsApp ao Representante</span>
                 </div>
               </div>
-              <button className="btn-close" onClick={() => setShowPrintModal(null)} style={{ color: '#ffffff' }}><X size={20} /></button>
+              <button className="btn-close" onClick={() => setShowPrintModal(null)}><X size={20} /></button>
             </div>
 
             {/* ÁREA DE IMPRESSÃO A4 */}
