@@ -57,9 +57,186 @@
     * `[TCampo('CAMPO_BD', 'TIPO_SQL')]`
     * `[TRelacionamento('TABELA_REL', 'PK_REL', 'FK_LOCAL', TClasseRel, TTipoRelacionamento.UmPraUm / UmPraMuitos)]`
 - **Uso Máximo do PortalORM**:
-  - Sempre priorizar métodos nativos: `CriaTabela`, `BuscaDadosTabela(id)`, `SalvaNoBanco(1)`, `Apagar(id)`, `ToJson`, `SetJson`.
+  - Sempre priorizar métodos nativos: `CriaTabela`, `BuscaDadosTabela(id)`, `SalvaNoBanco(1)`, `Apagar(id)`, `ToJson`, `SetJson`, `fromJson<T>(Req.Body)`.
   - **Regra de SQL Raw**: Somente utilizar SQL manual (`iQuery` / `TDatabase.Query`) caso o PortalORM não forneça a funcionalidade necessária (consultas analíticas agregadas complexas, joins analíticos customizados ou bulk updates de alta performance).
   - Ao usar `iQuery`, respeitar estritamente a execução sem parâmetros no `ExecSQL` (`LQuery.Clear; LQuery.Add('...'); LQuery.ExecSQL;`).
+
+- **Padrão Oficial de Criação de Controllers (Wizard IOTA - `WizardOTAControllersREST`)**:
+  Ao criar ou refatorar Controllers REST no Horse, seguir rigorosamente o padrão gerado pelo wizard da IDE Delphi (`G:\PROJETOS\CENTRO-DISTRIBUICAO\backend\ServidorConsole\modules\portalorm\WizardOTAControllersREST`):
+  ```pascal
+  unit Unit<ModelName>.Controller;
+
+  interface
+
+  uses
+    Horse,
+    Horse.Commons,
+    Classes,
+    SysUtils,
+    System.Json;
+
+  type
+    T<ModelName>Controller = class
+      class procedure Router;
+      class procedure Get(Req: THorseRequest; Res: THorseResponse);
+      class procedure GetForID(Req: THorseRequest; Res: THorseResponse);
+      class procedure Post(Req: THorseRequest; Res: THorseResponse);
+      class procedure Put(Req: THorseRequest; Res: THorseResponse);
+      class procedure Delete(Req: THorseRequest; Res: THorseResponse);
+    end;
+
+  implementation
+
+  uses
+    UnitConnection.Model.Interfaces,
+    UnitDatabase,
+    UnitFunctions,
+    Unit<ModelName>.Model,
+    UnitConstants,
+    UnitTabela.Helpers;
+
+  class procedure T<ModelName>Controller.Delete(Req: THorseRequest; Res: THorseResponse);
+  var
+    Model: T<ModelName>;
+    id: Integer;
+  begin
+    try
+      id := Req.Params.Items['id'].ToInteger();
+      Model := T<ModelName>.Create(TDatabase.Connection);
+      Model.Apagar(id);
+      Res.Send('').Status(THTTPStatus.NoContent);
+    finally
+      Model.DisposeOf;
+    end;
+  end;
+
+  class procedure T<ModelName>Controller.Get(Req: THorseRequest; Res: THorseResponse);
+  var
+    Model: T<ModelName>;
+    aJson: TJSONArray;
+    Query: iQuery;
+    Filtros: TStringList;
+    ParamName, ParamValue, QueryParams: string;
+    Limite, Pagina, Pular: Integer;
+    SQLBase, WhereClause: string;
+  begin
+    aJson := TJSONArray.Create;
+    Query := TDatabase.Query;
+    Model := T<ModelName>.Create(TDatabase.Connection);
+    Model.CriaTabela;
+    Filtros := TStringList.Create;
+    try
+      Limite := 10;
+      Pagina := 1;
+      if Req.Query.ContainsKey('limit') then
+        Limite := Req.Query.Items['limit'].ToInteger();
+      if Req.Query.ContainsKey('page') then
+        Pagina := Req.Query.Items['page'].ToInteger();
+
+      if Pagina < 1 then Pagina := 1;
+      Pular := (Pagina - 1) * Limite;
+
+      if Limite > 0 then
+        SQLBase := Format('SELECT FIRST %d SKIP %d DISTINCT <prefix>_CODIGO FROM <TABELA>', [Limite, Pular])
+      else
+        SQLBase := 'SELECT DISTINCT <prefix>_CODIGO FROM <TABELA>';
+
+      for QueryParams in Req.Query.Dictionary.Keys do
+      begin
+        ParamName := QueryParams.ToUpper;
+        ParamValue := Req.Query.Items[ParamName].Replace('''', '');
+        if (ParamName = 'LIMIT') or (ParamName = 'PAGE') then Continue;
+        if not ParamValue.IsEmpty then
+          Filtros.Add(Format('%s LIKE %s', [ParamName, QuotedStr('%' + ParamValue + '%')]));
+      end;
+
+      Query.Add(SQLBase);
+      if Filtros.Count > 0 then
+      begin
+        WhereClause := 'WHERE ' + String.Join(' OR ', Filtros.ToStringArray);
+        Query.Add(WhereClause);
+      end;
+      Query.Add('ORDER BY <prefix>_CODIGO');
+      Query.Open;
+
+      Query.Dataset.First;
+      while not Query.Dataset.Eof do
+      begin
+        Model.BuscaDadosTabela(Query.Dataset.FieldByName('<prefix>_CODIGO').AsInteger);
+        aJson.Add(TJSONObject.ParseJSONValue(Model.ToJson) as TJSONObject);
+        Query.Dataset.Next;
+      end;
+
+      Res.Send<TJSONArray>(aJson);
+    finally
+      Filtros.Free;
+      Model.DisposeOf;
+    end;
+  end;
+
+  class procedure T<ModelName>Controller.GetForID(Req: THorseRequest; Res: THorseResponse);
+  var
+    Model: T<ModelName>;
+    id: Integer;
+  begin
+    id := Req.Params.Items['id'].ToInteger();
+    try
+      Model := T<ModelName>.Create(TDatabase.Connection);
+      Model.CriaTabela;
+      Model.BuscaDadosTabela(id);
+      Res.Send<TJSONObject>(Model.ToJsonObject);
+    finally
+      Model.DisposeOf;
+    end;
+  end;
+
+  class procedure T<ModelName>Controller.Post(Req: THorseRequest; Res: THorseResponse);
+  var
+    Model: T<ModelName>;
+  begin
+    try
+      Model := T<ModelName>.Create(TDatabase.Connection).fromJson<T<ModelName>>(Req.Body);
+      Model.CriaTabela;
+      if Model.Codigo = 0 then
+        Model.Codigo := GeraCodigo('<TABELA>', '<prefix>_CODIGO');
+      Model.SalvaNoBanco(1);
+      Res.Send<TJSONObject>(Model.ToJsonObject);
+    finally
+      Model.DisposeOf;
+    end;
+  end;
+
+  class procedure T<ModelName>Controller.Put(Req: THorseRequest; Res: THorseResponse);
+  var
+    Model: T<ModelName>;
+  begin
+    try
+      Model := T<ModelName>.Create(TDatabase.Connection).fromJson<T<ModelName>>(Req.Body);
+      Model.CriaTabela;
+      Model.SalvaNoBanco(1);
+      Res.Send<TJSONObject>(Model.ToJsonObject);
+    finally
+      Model.DisposeOf;
+    end;
+  end;
+
+  class procedure T<ModelName>Controller.Router;
+  begin
+    THorse.Group
+          .Prefix('/v1')
+          .Route('/<route>')
+            .Get(Get)
+            .Post(Post)
+            .Put(Put)
+          .&End
+          .Group
+          .Prefix('/v1')
+          .Route('/<route>/:id')
+            .Get(GetForID)
+            .Delete(Delete)
+          .&End;
+  end;
+  ```
 
 ## 7. Diretrizes do Agente Especialista em Frontend React & Design System
 - **Padrão Visual Unificado**:
