@@ -4,6 +4,10 @@
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
   animation: fadeIn 0.25s ease-out;
 }
 
@@ -21,6 +25,8 @@
   flex-wrap: wrap;
   padding: 1.25rem 1.5rem;
   border-radius: 1.25rem;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .purchases-header-info h2 {
@@ -48,6 +54,8 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 1.25rem;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .purchases-kpi-card {
@@ -60,6 +68,7 @@
   gap: 1.25rem;
   box-shadow: var(--shadow-level-1);
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  min-width: 0;
 }
 
 .purchases-kpi-card:hover {
@@ -94,6 +103,7 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
+  min-width: 0;
 }
 
 .purchases-kpi-label {
@@ -109,6 +119,9 @@
   font-weight: 800;
   color: var(--text-primary);
   letter-spacing: -0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Modals & Sections */
@@ -121,6 +134,8 @@
   flex-direction: column;
   gap: 1.25rem;
   box-shadow: var(--shadow-level-1);
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .purchases-section-title {
@@ -139,12 +154,38 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 1rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Fluid Quick Add Grid for Item Inclusion */
+.purchases-quick-add-grid {
+  display: grid;
+  grid-template-columns: minmax(200px, 2.5fr) minmax(80px, 0.9fr) minmax(100px, 1fr) minmax(90px, 1fr) minmax(90px, 1fr) auto;
+  gap: 0.75rem;
+  align-items: flex-end;
+  background: var(--bg-primary, #f8f9ff);
+  padding: 1rem;
+  border-radius: var(--radius-md, 0.75rem);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  margin-bottom: 1rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 1100px) {
+  .purchases-quick-add-grid {
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)) auto;
+  }
 }
 
 .purchases-form-group {
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .purchases-form-group label {
@@ -165,6 +206,9 @@
   font-family: inherit;
   font-size: 0.9rem;
   transition: all 0.2s ease;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .purchases-form-group textarea {
@@ -180,6 +224,17 @@
   outline: none;
 }
 
+/* Strict Table Containment */
+.purchases-container .table-responsive,
+.product-section-card .table-responsive,
+.list-card .table-responsive {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  box-sizing: border-box;
+  -webkit-overflow-scrolling: touch;
+}
+
 /* F5 Cost Analysis Panel */
 .cost-analysis-box {
   background: #fff8f3;
@@ -189,12 +244,16 @@
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .cost-card-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 1rem;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .cost-mini-card {
@@ -253,6 +312,31 @@
   box-shadow: 0 2px 8px rgba(249, 115, 22, 0.25);
 }
 
+/* Feedback Banners */
+.feedback-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.85rem 1.25rem;
+  border-radius: var(--radius-md, 0.75rem);
+  font-size: 0.9rem;
+  font-weight: 600;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.feedback-banner.success {
+  background: rgba(0, 108, 73, 0.1);
+  color: var(--success, #006c49);
+  border: 1px solid rgba(0, 108, 73, 0.25);
+}
+
+.feedback-banner.error {
+  background: rgba(186, 26, 26, 0.1);
+  color: var(--danger, #ba1a1a);
+  border: 1px solid rgba(186, 26, 26, 0.25);
+}
+
 /* Modal Actions and Buttons */
 .btn-primary {
   display: inline-flex;
@@ -296,4 +380,10 @@
 .btn-secondary:hover {
   background: rgba(0, 0, 0, 0.03);
   border-color: rgba(0, 0, 0, 0.25);
+}
+
+.btn-secondary.small {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.8rem;
+  border-radius: 0.5rem;
 }

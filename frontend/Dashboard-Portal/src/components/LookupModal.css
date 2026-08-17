@@ -232,12 +232,15 @@
   align-items: center;
   gap: 0.5rem;
   width: 100%;
+  min-width: 0;
 }
 
 .lookup-display-input {
+  position: relative;
   flex: 1;
+  min-width: 0;
   height: 40px;
-  padding: 0 0.85rem;
+  padding: 0 2.2rem 0 0.85rem;
   border-radius: var(--radius-md, 0.75rem);
   border: 1px solid rgba(0, 0, 0, 0.12);
   background: #ffffff;
@@ -250,6 +253,30 @@
   cursor: pointer;
   transition: all 0.2s ease;
   user-select: none;
+}
+
+.lookup-display-input .lookup-clear-btn {
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(0, 0, 0, 0.05);
+  border: none;
+  border-radius: 50%;
+  color: var(--text-secondary, #584237);
+  cursor: pointer;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: all 0.15s ease;
+}
+
+.lookup-display-input .lookup-clear-btn:hover {
+  background: rgba(186, 26, 26, 0.15);
+  color: var(--danger, #ba1a1a);
 }
 
 .lookup-display-input:hover {

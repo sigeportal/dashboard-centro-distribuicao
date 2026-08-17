@@ -643,7 +643,7 @@ export default function PurchasesTab() {
   };
 
   return (
-    <div className="tab-container">
+    <div className="purchases-container">
       
       {/* CABEÇALHO DA ABA COMPRAS */}
       <div className="purchases-header glass">
@@ -911,7 +911,7 @@ export default function PurchasesTab() {
                   <PackagePlus size={16} color="#059669" /> Inclusão de Itens da Compra
                 </div>
 
-                <div className="grade-quick-form" style={{ gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr auto' }}>
+                <div className="purchases-quick-add-grid">
                   <div className="form-group">
                     <label>Produto *</label>
                     <LookupSelect

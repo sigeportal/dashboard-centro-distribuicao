@@ -916,6 +916,18 @@ begin
       if not LNewSync.IsEmpty then
         FIniFile.WriteString('Sincronia', 'CD_LastSync', LNewSync);
 
+      // Envia confirmacao (ACK) ao CD para baixar os flags CADASTRAR = 'N'
+      try
+        LURL := TConstants.URL_CD + '/v1/sync/ack';
+        FClient.CustomHeaders['Authorization'] := 'Bearer ' + FToken;
+        FClient.CustomHeaders['X-Empresa-Id'] := FEmpresaId.ToString;
+        FClient.Post(LURL, TStringStream.Create('{}', TEncoding.UTF8));
+        Writeln('-> Confirmacao de sincronizacao (ACK) enviada ao CD.');
+      except
+        on E: Exception do
+          Writeln('-> Falha ao enviar ACK ao CD: ' + E.Message);
+      end;
+
     finally
       LJSON.Free;
     end;

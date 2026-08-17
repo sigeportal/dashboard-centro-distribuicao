@@ -763,7 +763,7 @@ export default function PurchaseOrdersTab() {
                   <Package size={16} color="#059669" /> Adicionar Produto / Referência na Matriz
                 </div>
 
-                <div className="grade-quick-form" style={{ gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr auto' }}>
+                <div className="orders-quick-add-grid">
                   <div className="form-group">
                     <label>Descrição do Produto *</label>
                     <LookupSelect

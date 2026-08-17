@@ -634,7 +634,7 @@ export default function ProductFormModal({
                   <Layers size={16} color="#2563eb" /> Classificação & Fornecedor
                 </div>
 
-                <div className="product-grid-3">
+                <div className="product-row-classification">
                   <div className="form-group">
                     <label>Grupo *</label>
                     <select 
@@ -717,8 +717,9 @@ export default function ProductFormModal({
                   <Package size={16} color="#f97316" /> Identificação do Produto
                 </div>
 
-                <div className="product-grid-4">
-                  <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                {/* LINHA 1: NOME (2 COLUNAS), MARCA (1 COLUNA), REFERENCIA (1 COLUNA) */}
+                <div className="product-row-ident-1">
+                  <div className="form-group">
                     <label>Nome do Produto *</label>
                     <input 
                       type="text" 
@@ -748,7 +749,10 @@ export default function ProductFormModal({
                       placeholder="Ex: 72110" 
                     />
                   </div>
+                </div>
 
+                {/* LINHA 2: COLEÇÃO (1 COLUNA), COR (1 COLUNA), CODIGO DE BARRAS + GERAR (2 COLUNAS) */}
+                <div className="product-row-ident-2">
                   <div className="form-group">
                     <label>Coleção</label>
                     <input 
@@ -769,7 +773,7 @@ export default function ProductFormModal({
                     />
                   </div>
 
-                  <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                  <div className="form-group">
                     <label>Código de Barras (EAN-13)</label>
                     <div style={{ display: 'flex', gap: '6px' }}>
                       <input 
@@ -790,7 +794,10 @@ export default function ProductFormModal({
                       </button>
                     </div>
                   </div>
+                </div>
 
+                {/* LINHA 3: UNIDADE, CLASSIFICAÇÃO ABC, LOCALIZAÇÃO, ESTADO */}
+                <div className="product-row-ident-3">
                   <div className="form-group">
                     <label>Unidade de Medida</label>
                     <select 

@@ -1,4 +1,4 @@
-﻿unit UnitRecebimentos.Controller;
+unit UnitRecebimentos.Controller;
 
 interface
 uses
@@ -29,7 +29,8 @@ uses
   UnitFunctions,
   UnitRecebimentos.Model,
   UnitConstants,
-  UnitTabela.Helpers;
+  UnitTabela.Helpers,
+  System.DateUtils;
 
 {class procedure TRecebimentosController.Delete(Req: THorseRequest; Res: THorseResponse);
 var Recebimentos: TRecebimentos;
@@ -149,6 +150,12 @@ begin
         Filtros.Add(Format('%s LIKE %s',
           [ParamName, QuotedStr('%' + ParamValue + '%')]));
     end;
+
+    // Data default caso nao informada
+    if StartDateParam.IsEmpty then
+      StartDateParam := FormatDateTime('yyyy-mm-dd', IncDay(Date, -30));
+    if EndDateParam.IsEmpty then
+      EndDateParam := FormatDateTime('yyyy-mm-dd', Date);
 
     // Monta a cláusula WHERE unificada antes de contar os registros e selecionar
     WhereClause := 'WHERE (p.RP_DATAPGM BETWEEN :DATE1 AND :DATE2)';

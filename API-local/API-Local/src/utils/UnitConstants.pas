@@ -39,10 +39,21 @@ begin
 end;
 
 class function TConstants.URL_CD: string;
+var
+  LIni: TIniFile;
 begin
   Result := GetEnvironmentVariable('URL_CD').Trim;
   if Result.IsEmpty then
-    Result := 'http://127.0.0.1:9000';
+  begin
+    LIni := TIniFile.Create(ExtractFilePath(ParamStr(0)) + 'sinc_config.ini');
+    try
+      Result := LIni.ReadString('Sincronia', 'URL_CD', LIni.ReadString('Sincronia', 'URL_CENTRO_DISTRIBUICAO', ''));
+    finally
+      LIni.Free;
+    end;
+  end;
+  if Result.IsEmpty then
+    Result := 'http://127.0.0.1:8080';
 end;
 
 class function TConstants.BancoDados: string;
