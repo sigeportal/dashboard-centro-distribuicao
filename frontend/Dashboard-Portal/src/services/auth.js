@@ -88,6 +88,7 @@ export function clearLegacyStorage() {
   localStorage.removeItem('cnpj');
   localStorage.removeItem('base_url');
   sessionStorage.removeItem('cnpj');
+  sessionStorage.removeItem('base_url');
 }
 
 // ---------- JWT helpers ----------

@@ -41,7 +41,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.75rem;
 }
 
 .refresh-btn {
@@ -69,8 +69,8 @@
   padding: 0.4rem 0.75rem;
   border-radius: 0.5rem;
   border: 1px solid transparent;
-  font-size: 0.85rem;
-  font-weight: 500;
+  font-size: 0.82rem;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
 }
@@ -88,7 +88,6 @@
 .cd-action-btn.check {
   background: rgba(16, 185, 129, 0.1);
   color: #10b981;
-  margin-left: 0.5rem;
 }
 
 .cd-action-btn.check:hover {
@@ -96,12 +95,10 @@
   color: #fff;
 }
 
-.actions-cell {
-  white-space: nowrap;
-}
-
 .badge {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
   padding: 0.25rem 0.5rem;
   font-size: 0.8rem;
   font-weight: 600;
@@ -128,197 +125,227 @@
   color: #ef4444;
 }
 
+/* Grids Responsivos */
+.grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.25rem;
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.25rem;
+}
+
+@media (max-width: 960px) {
+  .grid-3 {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  .grid-2 {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+}
+
 /* Nova Transferência Form */
 .cd-form {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 1.5rem;
 }
 
 .cd-input-container {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  font-size: 0.9rem;
-  font-weight: 500;
-  color: var(--text-primary);
+  gap: 0.45rem;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: #334155;
 }
 
 .cd-select, .cd-text-input {
-  padding: 0.65rem 1rem;
+  padding: 0.75rem 0.95rem;
   border-radius: 0.75rem;
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  font-size: 0.95rem;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 0.92rem;
   outline: none;
   transition: all 0.2s ease;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .cd-select:focus, .cd-text-input:focus {
-  border-color: var(--accent);
+  border-color: #f97316;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
 }
 
-.grid-2 {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+/* Card Cabeçalho do Romaneio */
+.transfer-header-box {
+  background: #ffffff;
+  padding: 1.5rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02);
+  display: flex;
+  flex-direction: column;
   gap: 1.25rem;
 }
 
-.grid-3 {
-  display: grid;
-  grid-template-columns: 2fr 1fr 1fr;
-  gap: 1rem;
-}
-
-.cd-add-item-box {
-  background: rgba(0, 0, 0, 0.01);
-  border: 1px dashed rgba(0, 0, 0, 0.15);
-  border-radius: 1rem;
-  padding: 1.25rem;
-}
-
-.cd-add-item-box h4 {
-  font-size: 1rem;
-  margin-bottom: 1rem;
-}
-
-.add-item-btn {
-  margin-top: 1rem;
-  padding: 0.5rem 1.25rem;
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  border-radius: 0.75rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.add-item-btn:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
-.cd-temp-items-list {
-  background: var(--bg-secondary);
-  border: 1px solid rgba(0, 0, 0, 0.05);
-  border-radius: 1rem;
-  padding: 1rem;
-}
-
-.cd-temp-items-list h5 {
-  font-size: 0.95rem;
-  margin-bottom: 0.75rem;
-}
-
-.temp-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.temp-table th {
-  text-align: left;
-  font-size: 0.85rem;
-  color: var(--text-secondary);
-  padding-bottom: 0.5rem;
-}
-
-.temp-table td {
-  padding: 0.5rem 0;
-  font-size: 0.9rem;
-  border-top: 1px solid rgba(0, 0, 0, 0.03);
-}
-
-.remove-temp-btn {
-  background: transparent;
-  border: none;
-  color: #ef4444;
-  font-size: 0.85rem;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.submit-transfer-btn {
+.transfer-section-title {
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 0.5rem;
-  padding: 0.75rem 1.5rem;
-  border-radius: 0.75rem;
-  border: none;
-  background: var(--accent);
-  color: #fff;
-  font-weight: 600;
-  font-size: 1rem;
-  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 0.25rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+/* Seção de Adição de Produtos */
+.transfer-add-items-card {
+  background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+  padding: 1.5rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+}
+
+/* Matriz de Grades / Tamanhos */
+.transfer-grade-matrix-card {
+  background: #ffffff;
+  padding: 1.25rem;
+  border-radius: 0.85rem;
+  border: 1px solid #cbd5e1;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+}
+
+.transfer-grade-matrix-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 0.75rem;
+}
+
+.transfer-grade-box {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.6rem;
+  padding: 0.6rem;
+  text-align: center;
   transition: all 0.2s ease;
 }
 
-.submit-transfer-btn:hover {
-  opacity: 0.95;
+.transfer-grade-box:hover {
+  border-color: #94a3b8;
+  background: #f1f5f9;
 }
 
-.submit-transfer-btn.reject {
-  background: #ef4444;
+.transfer-grade-label {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: #0f172a;
 }
 
-.cd-inline-input {
-  width: 80px;
+.transfer-grade-stock {
+  font-size: 0.72rem;
+  color: #64748b;
+  margin: 2px 0 6px 0;
+}
+
+.transfer-grade-input {
+  width: 100%;
   padding: 0.4rem;
-  border-radius: 0.5rem;
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  background: var(--bg-secondary);
-  color: var(--text-primary);
   text-align: center;
+  font-weight: 700;
+  font-size: 0.95rem;
+  border-radius: 0.4rem;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
   outline: none;
 }
 
-.cd-inline-input:focus {
-  border-color: var(--accent);
+.transfer-grade-input:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
 }
 
-/* Notificações */
-.cd-notifications-bar {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+/* Resumo & KPIs do Romaneio */
+.transfer-summary-panel {
+  margin-top: 0.5rem;
 }
 
-.cd-notification {
+.transfer-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1rem;
+}
+
+.transfer-kpi-card {
+  background: #ffffff;
+  padding: 1.1rem 1.25rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.03);
+}
+
+.transfer-kpi-card.total {
+  border-left: 4px solid #f97316;
+}
+
+.transfer-kpi-card.fiscal {
+  border-left: 4px solid #059669;
+  background: #f0fdf4;
+}
+
+.transfer-kpi-card.physical {
+  border-left: 4px solid #0284c7;
+  background: #f0f9ff;
+}
+
+.transfer-kpi-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.transfer-kpi-value {
+  font-size: 1.45rem;
+  font-weight: 800;
+  color: #1e293b;
+  margin: 4px 0;
+}
+
+.transfer-kpi-sub {
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+/* Banner de Feedback */
+.cd-feedback-banner {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.8rem 1.2rem;
-  border-radius: 1rem;
+  padding: 0.85rem 1.25rem;
+  border-radius: 0.75rem;
+  font-weight: 600;
   font-size: 0.9rem;
-  font-weight: 500;
-  border: 1px solid transparent;
 }
 
-.cd-notification.warning {
-  background: rgba(245, 158, 11, 0.12);
+.cd-feedback-banner.success {
+  background: #dcfce7;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
+}
+
+.cd-feedback-banner.warning {
+  background: #fef3c7;
   color: #b45309;
-  border-color: rgba(245, 158, 11, 0.2);
-}
-
-.cd-notification.success {
-  background: rgba(16, 185, 129, 0.12);
-  color: #047857;
-  border-color: rgba(16, 185, 129, 0.2);
-}
-
-.cd-details-meta {
-  background: rgba(0, 0, 0, 0.01);
-  padding: 1rem;
-  border-radius: 1rem;
-  border: 1px solid rgba(0, 0, 0, 0.03);
-  font-size: 0.9rem;
-}
-
-.loading-bar {
-  text-align: center;
-  font-size: 0.9rem;
-  color: var(--accent);
-  font-weight: 500;
+  border: 1px solid #fde68a;
 }

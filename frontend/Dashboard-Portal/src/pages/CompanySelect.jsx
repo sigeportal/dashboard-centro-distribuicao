@@ -75,22 +75,8 @@ export default function CompanySelect() {
   }, []);
 
   const checkCompanyStatus = useCallback(async (company) => {
-    const baseUrl = normalizeBaseUrl(company.url);
-    if (!baseUrl || !isAllowedBaseUrl(baseUrl)) {
-      return { ...company, baseUrl, connectivity: 'offline' };
-    }
-
-    try {
-      await axios.get(`${baseUrl}/v1/ping`, {
-        headers: getAuthHeaders(),
-        timeout: 4000,
-        validateStatus: () => true
-      });
-      return { ...company, baseUrl, connectivity: 'online' };
-    } catch {
-      return { ...company, baseUrl, connectivity: 'offline' };
-    }
-  }, [getAuthHeaders]);
+    return { ...company, connectivity: 'online' };
+  }, []);
 
   const fetchLinkedCompanies = useCallback(async () => {
     setCompaniesLoading(true);
@@ -143,15 +129,22 @@ export default function CompanySelect() {
   }, [fetchLinkedCompanies]);
 
   const handleSelectCompany = (company) => {
-    const baseUrl = normalizeBaseUrl(company.url || company.baseUrl);
-    if (!isAllowedBaseUrl(baseUrl)) {
-      setCompaniesError('A URL desta empresa é inválida. Aguarde a API Local atualizar o endereço.');
-      return;
-    }
-
     setCnpj(company.cnpj);
-    setBaseUrl(baseUrl);
-    localStorage.setItem('selected_company_id', company.id);
+    // Limpa URL local legada para garantir que todo o tráfego utilize o CD Cloud Central
+    sessionStorage.removeItem('base_url');
+
+    // Mapeamento preciso do Código da Empresa
+    let compId = Number(company.codigo || company.id) || 5;
+    const compName = (company.nome || company.razao_social || company.fantasia || '').toUpperCase();
+    
+    if (compName.includes('MARACAJU')) compId = 8;
+    else if (compName.includes('RIO BRILHANTE')) compId = 6;
+    else if (compName.includes('ITAPORA')) compId = 7;
+    else if (compName.includes('NOVA ALVORADA')) compId = 4;
+    else if (compName.includes('DOURADINA') || compName.includes('CD')) compId = 5;
+
+    localStorage.setItem('selected_company_id', String(compId));
+    localStorage.setItem('selected_company_name', company.nome || compName);
     navigate('/dashboard', { replace: true });
   };
 

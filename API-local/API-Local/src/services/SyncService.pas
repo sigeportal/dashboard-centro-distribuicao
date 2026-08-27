@@ -1,4 +1,4 @@
-unit SyncService;
+﻿unit SyncService;
 
 interface
 
@@ -47,6 +47,7 @@ type
     function QueryClientesCidadeJson: TJSONArray;
     function QueryVendasHoraJson(StartDate, EndDate: string): TJSONArray;
     function QueryEstoqueJson: TJSONArray;
+    function QueryEmpresaJson: TJSONObject;
     function SafeGetInt(const AObj: TJSONObject; const AKey: string; ADefault: Integer = 0): Integer;
     function SafeGetFloat(const AObj: TJSONObject; const AKey: string; ADefault: Double = 0): Double;
     function SafeGetString(const AObj: TJSONObject; const AKey: string; const ADefault: string = ''): string;
@@ -585,6 +586,63 @@ begin
     Result := LStr;
 end;
 
+function TSyncThread.QueryEmpresaJson: TJSONObject;
+var
+  LQuery: iQuery;
+begin
+  Result := TJSONObject.Create;
+  try
+    LQuery := TDatabase.Query;
+    LQuery.Add('SELECT FIRST 1 * FROM EMPRESA WHERE EMP_CODIGO = 1 OR EMP_CNPJ IS NOT NULL ORDER BY EMP_CODIGO');
+    LQuery.Open;
+    if not LQuery.DataSet.Eof then
+    begin
+      Result.AddPair('emp_codigo', TJSONNumber.Create(LQuery.DataSet.FieldByName('EMP_CODIGO').AsInteger));
+      Result.AddPair('emp_cnpj', LQuery.DataSet.FieldByName('EMP_CNPJ').AsString);
+      Result.AddPair('emp_inscest', LQuery.DataSet.FieldByName('EMP_INSCEST').AsString);
+      Result.AddPair('emp_razao_social', LQuery.DataSet.FieldByName('EMP_RAZAO_SOCIAL').AsString);
+      Result.AddPair('emp_municipio', LQuery.DataSet.FieldByName('EMP_MUNICIPIO').AsString);
+      Result.AddPair('emp_uf', LQuery.DataSet.FieldByName('EMP_UF').AsString);
+      Result.AddPair('emp_fone', LQuery.DataSet.FieldByName('EMP_FONE').AsString);
+      Result.AddPair('emp_fax', LQuery.DataSet.FieldByName('EMP_FAX').AsString);
+      Result.AddPair('emp_logradouro', LQuery.DataSet.FieldByName('EMP_LOGRADOURO').AsString);
+      Result.AddPair('emp_numero', LQuery.DataSet.FieldByName('EMP_NUMERO').AsString);
+      Result.AddPair('emp_complemento', LQuery.DataSet.FieldByName('EMP_COMPLEMENTO').AsString);
+      Result.AddPair('emp_bairro', LQuery.DataSet.FieldByName('EMP_BAIRRO').AsString);
+      Result.AddPair('emp_cep', LQuery.DataSet.FieldByName('EMP_CEP').AsString);
+      Result.AddPair('emp_contato', LQuery.DataSet.FieldByName('EMP_CONTATO').AsString);
+      Result.AddPair('emp_codmun_ibge', LQuery.DataSet.FieldByName('EMP_CODMUN_IBGE').AsString);
+      Result.AddPair('emp_coduf_ibge', LQuery.DataSet.FieldByName('EMP_CODUF_IBGE').AsString);
+      Result.AddPair('emp_fantasia', LQuery.DataSet.FieldByName('EMP_FANTASIA').AsString);
+      Result.AddPair('emp_crt', LQuery.DataSet.FieldByName('EMP_CRT').AsString);
+      Result.AddPair('emp_suframa', LQuery.DataSet.FieldByName('EMP_SUFRAMA').AsString);
+      Result.AddPair('emp_perfil', LQuery.DataSet.FieldByName('EMP_PERFIL').AsString);
+      Result.AddPair('emp_atividade', LQuery.DataSet.FieldByName('EMP_ATIVIDADE').AsString);
+      Result.AddPair('emp_email', LQuery.DataSet.FieldByName('EMP_EMAIL').AsString);
+      Result.AddPair('emp_titulo1', LQuery.DataSet.FieldByName('EMP_TITULO1').AsString);
+      Result.AddPair('emp_titulo2', LQuery.DataSet.FieldByName('EMP_TITULO2').AsString);
+      Result.AddPair('emp_titulo3', LQuery.DataSet.FieldByName('EMP_TITULO3').AsString);
+      Result.AddPair('emp_md5', LQuery.DataSet.FieldByName('EMP_MD5').AsString);
+      Result.AddPair('emp_licenca', LQuery.DataSet.FieldByName('EMP_LICENCA').AsString);
+      Result.AddPair('emp_licenca_dll_nfe', LQuery.DataSet.FieldByName('EMP_LICENCA_DLL_NFE').AsString);
+      Result.AddPair('emp_id_csc', LQuery.DataSet.FieldByName('EMP_ID_CSC').AsString);
+      Result.AddPair('emp_csc', LQuery.DataSet.FieldByName('EMP_CSC').AsString);
+      Result.AddPair('emp_inscmun', LQuery.DataSet.FieldByName('EMP_INSCMUN').AsString);
+      Result.AddPair('emp_rntrc', LQuery.DataSet.FieldByName('EMP_RNTRC').AsString);
+      Result.AddPair('emp_licenca_dll_mdf', LQuery.DataSet.FieldByName('EMP_LICENCA_DLL_MDF').AsString);
+      Result.AddPair('emp_tipo_atividade', LQuery.DataSet.FieldByName('EMP_TIPO_ATIVIDADE').AsString);
+      Result.AddPair('emp_ind_nat_pj', LQuery.DataSet.FieldByName('EMP_IND_NAT_PJ').AsString);
+      Result.AddPair('emp_logo', LQuery.DataSet.FieldByName('EMP_LOGO').AsString);
+      Result.AddPair('emp_cnae', LQuery.DataSet.FieldByName('EMP_CNAE').AsString);
+      if not LQuery.DataSet.FieldByName('EMP_CC_CODIGO').IsNull then
+        Result.AddPair('emp_cc_codigo', TJSONNumber.Create(LQuery.DataSet.FieldByName('EMP_CC_CODIGO').AsInteger));
+    end;
+  except
+    on E: Exception do
+      Writeln('-> Erro ao extrair dados cadastrais da EMPRESA local: ' + E.Message);
+  end;
+end;
+
 procedure TSyncThread.SyncDashboard;
 var
   LPayload: TJSONObject;
@@ -603,6 +661,7 @@ begin
     LPayload.AddPair('clientes_cidade', QueryClientesCidadeJson);
     LPayload.AddPair('vendas_hora', QueryVendasHoraJson(LStartDate, LEndDate));
     LPayload.AddPair('estoque', QueryEstoqueJson);
+    LPayload.AddPair('empresa', QueryEmpresaJson);
 
     LURL := TConstants.URL_CD + '/v1/sync/dashboard';
     LBody := TStringStream.Create(LPayload.ToString, TEncoding.UTF8);
@@ -628,16 +687,34 @@ var
   LLastSync, LURL, LResponseStr, LNewSync: string;
   LResponse: IHTTPResponse;
   LJSON, LObj: TJSONObject;
-  LArrGrupos, LArrSubgrupos, LArrGrades, LArrTamanhos, LArrFornecedores, LArrProdutos, LArrTransf, LArrItens: TJSONArray;
-  I, J, LTransfId, LGru, LFor: Integer;
+  LArrGrupos, LArrSubgrupos, LArrGrades, LArrTamanhos, LArrFornecedores, LArrProdutos, LArrTransf, LArrItens, LArrModelos: TJSONArray;
+  I, J, LTransfId, LGru, LFor, LProCod: Integer;
   LXmlVal: TJSONValue;
   LObjItem: TJSONObject;
   LQuery: iQuery;
   Null: Variant;
   LArrClientes: TJSONArray;
+  LIsCargaInicial: Boolean;
 begin
   LLastSync := FIniFile.ReadString('Sincronia', 'CD_LastSync', '');
-  LURL := TConstants.URL_CD + '/v1/sync/pending?last_sync=' + LLastSync;
+  
+  // Verifica se o banco local de produtos está zerado (primeira carga)
+  LIsCargaInicial := False;
+  try
+    LQuery := TDatabase.Query;
+    LQuery.Open('SELECT FIRST 1 PRO_CODIGO FROM PRODUTOS');
+    if LQuery.DataSet.IsEmpty then
+    begin
+      LLastSync := '';
+      LIsCargaInicial := True;
+    end;
+  except
+  end;
+
+  if LLastSync.IsEmpty or LIsCargaInicial then
+    LURL := TConstants.URL_CD + '/v1/sync/pending?carga_inicial=S'
+  else
+    LURL := TConstants.URL_CD + '/v1/sync/pending?last_sync=' + LLastSync;
 
   try
     FClient.CustomHeaders['Authorization'] := 'Bearer ' + FToken;
@@ -665,7 +742,7 @@ begin
           begin
             LObj := TJSONObject(LArrGrupos.Items[I]);
             LQuery.Clear;
-            LQuery.Add('UPDATE OR INSERT INTO GRUPOS (GRU_CODIGO, GRU_NOME) VALUES (:COD, :NOME) MATCHING (GRU_CODIGO)');
+            LQuery.Add('UPDATE OR INSERT INTO GRUPO_1 (G1_CODIGO, G1_NOME) VALUES (:COD, :NOME) MATCHING (G1_CODIGO)');
             LQuery.AddParam('COD', SafeGetInt(LObj, 'gru_codigo', 0));
             LQuery.AddParam('NOME', SafeGetString(LObj, 'gru_nome'));
             LQuery.ExecSQL;
@@ -686,13 +763,21 @@ begin
           begin
             LObj := TJSONObject(LArrFornecedores.Items[I]);
             LQuery.Clear;
-            LQuery.Add('UPDATE OR INSERT INTO FORNECEDORES (FOR_CODIGO, FOR_NOME, FOR_NOMEFANTASIA, FOR_CNPJ_CPF, FOR_INSC_ESTADUAL)');
-            LQuery.Add('VALUES (:COD, :NOME, :FANTASIA, :CNPJ, :IE) MATCHING (FOR_CODIGO)');
+            LQuery.Add('UPDATE OR INSERT INTO FORNECEDORES (FOR_CODIGO, FOR_NOME, FOR_FANTASIA, FOR_CNPJ_CPF, FOR_INSC_ESTADUAL, ');
+            LQuery.Add('FOR_FONE, FOR_EMAIL, FOR_ENDERECO, FOR_BAIRRO, FOR_CID, FOR_UF, FOR_CONTATO)');
+            LQuery.Add('VALUES (:COD, :NOME, :FANTASIA, :CNPJ, :IE, :FONE, :EMAIL, :END, :BAI, :CID, :UF, :CONT) MATCHING (FOR_CODIGO)');
             LQuery.AddParam('COD', SafeGetInt(LObj, 'for_codigo', 0));
             LQuery.AddParam('NOME', SafeGetString(LObj, 'for_nome'));
             LQuery.AddParam('FANTASIA', SafeGetString(LObj, 'for_nomefantasia'));
             LQuery.AddParam('CNPJ', SafeGetString(LObj, 'for_cnpj_cpf'));
             LQuery.AddParam('IE', SafeGetString(LObj, 'for_insc_estadual'));
+            LQuery.AddParam('FONE', SafeGetString(LObj, 'for_fone'));
+            LQuery.AddParam('EMAIL', SafeGetString(LObj, 'for_email'));
+            LQuery.AddParam('END', SafeGetString(LObj, 'for_endereco'));
+            LQuery.AddParam('BAI', SafeGetString(LObj, 'for_bairro'));
+            LQuery.AddParam('CID', SafeGetInt(LObj, 'for_cid', 0));
+            LQuery.AddParam('UF', SafeGetString(LObj, 'for_uf'));
+            LQuery.AddParam('CONT', SafeGetString(LObj, 'for_contato'));
             LQuery.ExecSQL;
           end;
           Writeln('-> Sincronizados ' + LArrFornecedores.Count.ToString + ' fornecedores da matriz.');
@@ -701,7 +786,28 @@ begin
         on E: Exception do Writeln('-> Erro ao sincronizar fornecedores: ' + E.Message);
       end;
 
-      // 3. Produtos
+      // 3. Modelos
+      try
+        LArrModelos := LJSON.GetValue<TJSONArray>('modelos', nil);
+        if Assigned(LArrModelos) and (LArrModelos.Count > 0) then
+        begin
+          LQuery := TDatabase.Query;
+          for I := 0 to LArrModelos.Count - 1 do
+          begin
+            LObj := TJSONObject(LArrModelos.Items[I]);
+            LQuery.Clear;
+            LQuery.Add('UPDATE OR INSERT INTO MODELOS (MOD_CODIGO, MOD_NOME) VALUES (:COD, :NOME) MATCHING (MOD_CODIGO)');
+            LQuery.AddParam('COD', SafeGetInt(LObj, 'codigo', SafeGetInt(LObj, 'mod_codigo', 0)));
+            LQuery.AddParam('NOME', SafeGetString(LObj, 'nome', SafeGetString(LObj, 'mod_nome')));
+            LQuery.ExecSQL;
+          end;
+          Writeln('-> Sincronizados ' + LArrModelos.Count.ToString + ' modelos da matriz.');
+        end;
+      except
+        on E: Exception do Writeln('-> Erro ao sincronizar modelos: ' + E.Message);
+      end;
+
+      // 4. Produtos
       try
         LArrProdutos := LJSON.GetValue<TJSONArray>('produtos', nil);
         if Assigned(LArrProdutos) and (LArrProdutos.Count > 0) then
@@ -712,33 +818,67 @@ begin
             LObj := TJSONObject(LArrProdutos.Items[I]);
             LGru := SafeGetInt(LObj, 'pro_gru', 0);
             LFor := SafeGetInt(LObj, 'pro_for', 0);
+            LProCod := SafeGetInt(LObj, 'pro_codigo', 0);
 
             LQuery.Clear;
-            LQuery.Add('UPDATE OR INSERT INTO PRODUTOS (PRO_CODIGO, PRO_NOME, PRO_DESCRICAO, PRO_CODBARRA, PRO_VALORV, PRO_VALOR_DINHEIRO, PRO_VALORV_PRAZO, PRO_VALORC, PRO_EMBALAGEM, PRO_FABRICANTE, PRO_GRU, PRO_FOR, PRO_DATAUA)');
-            LQuery.Add('VALUES (:COD, :NOME, :DESC, :BARRA, :VALORV, :VALORD, :VALORP, :VALORC, :EMB, :FAB, :GRU, :FOR, :DATAUA) MATCHING (PRO_CODIGO)');
-            LQuery.AddParam('COD', SafeGetInt(LObj, 'pro_codigo', 0));
-            LQuery.AddParam('NOME', SafeGetString(LObj, 'pro_nome'));
-            LQuery.AddParam('DESC', SafeGetString(LObj, 'pro_descricao'));
-            LQuery.AddParam('BARRA', SafeGetString(LObj, 'pro_codbarra'));
-            LQuery.AddParam('VALORV', SafeGetFloat(LObj, 'pro_valorv', 0));
-            LQuery.AddParam('VALORD', SafeGetFloat(LObj, 'pro_valor_dinheiro', 0));
-            LQuery.AddParam('VALORP', SafeGetFloat(LObj, 'pro_valorv_prazo', 0));
-            LQuery.AddParam('VALORC', SafeGetFloat(LObj, 'pro_valorc', 0));
-            LQuery.AddParam('EMB', SafeGetString(LObj, 'pro_embalagem'));
-            LQuery.AddParam('FAB', SafeGetString(LObj, 'pro_fabricante'));
+            LQuery.Add('SELECT PRO_CODIGO FROM PRODUTOS WHERE PRO_CODIGO = :COD');
+            LQuery.AddParam('COD', LProCod);
+            LQuery.Open;
 
-            if LGru > 0 then
-              LQuery.AddParam('GRU', LGru)
+            if LQuery.DataSet.IsEmpty then
+            begin
+              // Inserção nova (Carga Inicial ou Produto Novo)
+              LQuery.Clear;
+              LQuery.Add('INSERT INTO PRODUTOS (PRO_CODIGO, PRO_NOME, PRO_DESCRICAO, PRO_CODBARRA, PRO_VALORV, PRO_VALOR_DINHEIRO,');
+              LQuery.Add('PRO_VALORV_PRAZO, PRO_VALORC, PRO_EMBALAGEM, PRO_FABRICANTE, PRO_GRU, PRO_FOR, PRO_TOTALIZADOR, PRO_NCM,');
+              LQuery.Add('PRO_UM, PRO_QUANTIDADE, PRO_ESTADO, PRO_DATAUA)');
+              LQuery.Add('VALUES (:COD, :NOME, :DESC, :BARRA, :VALORV, :VALORD, :VALORP, :VALORC, :EMB, :FAB, :GRU, :FOR, :TOT, :NCM, :UM, :QTD, :EST, :DATAUA)');
+              LQuery.AddParam('COD', LProCod);
+              LQuery.AddParam('NOME', SafeGetString(LObj, 'pro_nome'));
+              LQuery.AddParam('DESC', SafeGetString(LObj, 'pro_descricao'));
+              LQuery.AddParam('BARRA', SafeGetString(LObj, 'pro_codbarra'));
+              LQuery.AddParam('VALORV', SafeGetFloat(LObj, 'pro_valorv', 0));
+              LQuery.AddParam('VALORD', SafeGetFloat(LObj, 'pro_valor_dinheiro', 0));
+              LQuery.AddParam('VALORP', SafeGetFloat(LObj, 'pro_valorv_prazo', 0));
+              LQuery.AddParam('VALORC', SafeGetFloat(LObj, 'pro_valorc', 0));
+              LQuery.AddParam('EMB', SafeGetString(LObj, 'pro_embalagem', 'UN'));
+              LQuery.AddParam('FAB', SafeGetString(LObj, 'pro_fabricante'));
+              if LGru > 0 then LQuery.AddParam('GRU', LGru) else LQuery.AddParam('GRU', Null);
+              if LFor > 0 then LQuery.AddParam('FOR', LFor) else LQuery.AddParam('FOR', Null);
+              LQuery.AddParam('TOT', SafeGetInt(LObj, 'pro_totalizador', SafeGetInt(LObj, 'codTotalizador', 1)));
+              LQuery.AddParam('NCM', SafeGetString(LObj, 'pro_ncm', SafeGetString(LObj, 'ncm', '6109.10.00')));
+              LQuery.AddParam('UM', SafeGetInt(LObj, 'pro_um', SafeGetInt(LObj, 'um', 0)));
+              LQuery.AddParam('QTD', SafeGetFloat(LObj, 'pro_quantidade', 0));
+              LQuery.AddParam('EST', 'ATIVO');
+              LQuery.AddParam('DATAUA', SafeGetDateParam(LObj, 'pro_dataua'));
+              LQuery.ExecSQL;
+            end
             else
-              LQuery.AddParam('GRU', Null);
-
-            if LFor > 0 then
-              LQuery.AddParam('FOR', LFor)
-            else
-              LQuery.AddParam('FOR', Null);
-
-            LQuery.AddParam('DATAUA', SafeGetDateParam(LObj, 'pro_dataua'));
-            LQuery.ExecSQL;
+            begin
+              // Atualização cadastral sem alterar o estoque físico já existente na filial
+              LQuery.Clear;
+              LQuery.Add('UPDATE PRODUTOS SET PRO_NOME = :NOME, PRO_DESCRICAO = :DESC, PRO_CODBARRA = :BARRA, PRO_VALORV = :VALORV, ');
+              LQuery.Add('PRO_VALOR_DINHEIRO = :VALORD, PRO_VALORV_PRAZO = :VALORP, PRO_VALORC = :VALORC, PRO_EMBALAGEM = :EMB, ');
+              LQuery.Add('PRO_FABRICANTE = :FAB, PRO_GRU = :GRU, PRO_FOR = :FOR, PRO_TOTALIZADOR = :TOT, PRO_NCM = :NCM, PRO_UM = :UM, PRO_DATAUA = :DATAUA ');
+              LQuery.Add('WHERE PRO_CODIGO = :COD');
+              LQuery.AddParam('COD', LProCod);
+              LQuery.AddParam('NOME', SafeGetString(LObj, 'pro_nome'));
+              LQuery.AddParam('DESC', SafeGetString(LObj, 'pro_descricao'));
+              LQuery.AddParam('BARRA', SafeGetString(LObj, 'pro_codbarra'));
+              LQuery.AddParam('VALORV', SafeGetFloat(LObj, 'pro_valorv', 0));
+              LQuery.AddParam('VALORD', SafeGetFloat(LObj, 'pro_valor_dinheiro', 0));
+              LQuery.AddParam('VALORP', SafeGetFloat(LObj, 'pro_valorv_prazo', 0));
+              LQuery.AddParam('VALORC', SafeGetFloat(LObj, 'pro_valorc', 0));
+              LQuery.AddParam('EMB', SafeGetString(LObj, 'pro_embalagem', 'UN'));
+              LQuery.AddParam('FAB', SafeGetString(LObj, 'pro_fabricante'));
+              if LGru > 0 then LQuery.AddParam('GRU', LGru) else LQuery.AddParam('GRU', Null);
+              if LFor > 0 then LQuery.AddParam('FOR', LFor) else LQuery.AddParam('FOR', Null);
+              LQuery.AddParam('TOT', SafeGetInt(LObj, 'pro_totalizador', SafeGetInt(LObj, 'codTotalizador', 1)));
+              LQuery.AddParam('NCM', SafeGetString(LObj, 'pro_ncm', SafeGetString(LObj, 'ncm', '6109.10.00')));
+              LQuery.AddParam('UM', SafeGetInt(LObj, 'pro_um', SafeGetInt(LObj, 'um', 0)));
+              LQuery.AddParam('DATAUA', SafeGetDateParam(LObj, 'pro_dataua'));
+              LQuery.ExecSQL;
+            end;
           end;
           Writeln('-> Sincronizados ' + LArrProdutos.Count.ToString + ' produtos da matriz.');
         end;
@@ -848,6 +988,15 @@ begin
             LQuery.AddParam('COR', SafeGetString(LObj, 'cor'));
             LQuery.ExecSQL;
           end;
+
+          // Atualiza PRO_QUANTIDADE em PRODUTOS a partir da soma de GRADES
+          try
+            LQuery.Clear;
+            LQuery.Add('UPDATE PRODUTOS P SET P.PRO_QUANTIDADE = COALESCE((SELECT SUM(G.GRA_QUANTIDADE) FROM GRADES G WHERE G.GRA_PRO = P.PRO_CODIGO), P.PRO_QUANTIDADE, 0) WHERE EXISTS (SELECT 1 FROM GRADES G WHERE G.GRA_PRO = P.PRO_CODIGO)');
+            LQuery.ExecSQL;
+          except
+          end;
+
           Writeln('-> Sincronizadas ' + LArrGrades.Count.ToString + ' grades da matriz.');
         end;
       except

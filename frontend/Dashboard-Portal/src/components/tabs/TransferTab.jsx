@@ -1,9 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowRightLeft, Plus, CheckCircle, AlertCircle, Eye, RefreshCw, Send, ShieldCheck, XCircle, Search, Package, X, Printer, FileText } from 'lucide-react';
+import { 
+  ArrowRightLeft, Plus, CheckCircle, AlertCircle, Eye, RefreshCw, Send, 
+  ShieldCheck, XCircle, Search, Package, X, Printer, FileText, Barcode, 
+  Trash2, Edit2, Layers, Check, ShoppingBag, Truck, Sparkles, Filter, ChevronRight,
+  Building2
+} from 'lucide-react';
 import { createApi } from '../../services/api';
 import SearchBar from '../SearchBar';
 import Pagination from '../Pagination';
+import LookupSelect from '../LookupSelect';
 import RomaneioModal from '../RomaneioModal';
 import NfeTransferModal from '../NfeTransferModal';
 import { formatCurrency, formatDate } from '../../utils/formatters';
@@ -12,16 +18,18 @@ import './TransferTab.css';
 export default function TransferTab() {
   const api = createApi(true); // Conecta na CD_API_BASE (port 9000)
   const [activeSubTab, setActiveSubTab] = useState('list'); // 'list', 'new', 'reception'
+  const defaultUnitsList = [
+    { id: 5, name: '5 - CD DOURADINA (Matriz)', isCd: true, isMatriz: true },
+    { id: 6, name: '6 - RIO BRILHANTE', isCd: false, isMatriz: false },
+    { id: 7, name: '7 - ITAPORA', isCd: false, isMatriz: false },
+    { id: 4, name: '4 - NOVA ALVORADA', isCd: false, isMatriz: false },
+    { id: 8, name: '8 - MARACAJU', isCd: false, isMatriz: false }
+  ];
+
   const [loading, setLoading] = useState(false);
   const [transfers, setTransfers] = useState([]);
   const [products, setProducts] = useState([]);
-  const [units, setUnits] = useState([]);
-  
-  // Modal de Busca de Produtos Paginada e Debounced
-  const [modalProducts, setModalProducts] = useState([]);
-  const [modalSearchPage, setModalSearchPage] = useState(1);
-  const [modalSearchMeta, setModalSearchMeta] = useState({ page: 1, limit: 10, total: 0, pages: 1 });
-  const [modalSearchLoading, setModalSearchLoading] = useState(false);
+  const [units, setUnits] = useState(defaultUnitsList);
   
   // Detalhes da Transferência Selecionada
   const [selectedTransfer, setSelectedTransfer] = useState(null);
@@ -38,114 +46,44 @@ export default function TransferTab() {
   const [nfeTransfer, setNfeTransfer] = useState(null);
   const [nfeItems, setNfeItems] = useState([]);
 
-  // Nova Transferência
-  const [origin, setOrigin] = useState('');
-  const [destination, setDestination] = useState('');
-  const [tipoFiscal, setTipoFiscal] = useState('FISCAL'); // 'FISCAL' (Com NF-e) ou 'NAO_FISCAL' (Sem Nota)
-  const [numeroNf, setNumeroNf] = useState('');
-  const [chaveNfe, setChaveNfe] = useState('');
+  // =========================================================================
+  // ESTADO DO NOVO ROMANEIO DE TRANSFERÊNCIA (Criação com Total Liberdade)
+  // =========================================================================
+  const [origin, setOrigin] = useState('5'); // Padrão: 5 - CD DOURADINA (Matriz)
+  const [destination, setDestination] = useState('6'); // Padrão: 6 - RIO BRILHANTE
+  const [dataEnvio, setDataEnvio] = useState(new Date().toISOString().split('T')[0]);
+  const [motorista, setMotorista] = useState('');
+  const [placaVeiculo, setPlacaVeiculo] = useState('');
   const [obs, setObs] = useState('');
-  const [transferItems, setTransferItems] = useState([]); // { produto_id, quantidade, valor }
-  
-  // Inputs da linha de item temporário
-  const [selectedProduct, setSelectedProduct] = useState('');
-  const [quantity, setQuantity] = useState('');
-  const [price, setPrice] = useState('');
+  const [transferItems, setTransferItems] = useState([]); // [{ produto_id, nome, codbarra, grade_id, tamanho, cor, quantidade, valor, pro_cod_fiscal, pro_fiscal_gerar, isFiscal }]
+
+  // Seleção rápida de produto atual para o Romaneio
+  const [selectedProductObj, setSelectedProductObj] = useState(null);
+  const [productGrades, setProductGrades] = useState([]);
+  const [matrixQuantities, setMatrixQuantities] = useState({}); // { [gradeId]: number }
+  const [singleQty, setSingleQty] = useState(1);
+  const [singlePrice, setSinglePrice] = useState('');
+  const [loadingGrades, setLoadingGrades] = useState(false);
+
+  // Bipagem rápida via Código de Barras / EAN
+  const [barcodeInput, setBarcodeInput] = useState('');
+  const barcodeInputRef = useRef(null);
+
+  // Puxar itens de Compra / NF-e
+  const [nfSearchTerm, setNfSearchTerm] = useState('');
   const [loadingNf, setLoadingNf] = useState(false);
+  const [showNfImportBox, setShowNfImportBox] = useState(false);
 
-  const handleFetchNfItems = async () => {
-    const term = (chaveNfe || '').trim() || (numeroNf || '').trim();
-    if (!term) {
-      alert('Por favor, informe a Chave de Acesso ou o Número da Nota Fiscal.');
-      return;
-    }
-    setLoadingNf(true);
-    try {
-      const res = await api.get(`/v1/compras/buscar-nf?termo=${encodeURIComponent(term)}`);
-      const compraData = res.data;
-      if (compraData && Array.isArray(compraData.itens) && compraData.itens.length > 0) {
-        const importedItems = compraData.itens.map(it => ({
-          produto_id: it.produto_codigo,
-          nome: it.produto_nome || `Produto #${it.produto_codigo}`,
-          quantidade: Number(it.quantidade) || 1,
-          valor: Number(it.valor_unitario) || 0
-        }));
-        
-        setTransferItems(prev => {
-          const map = new Map();
-          prev.forEach(item => map.set(item.produto_id, item));
-          importedItems.forEach(item => map.set(item.produto_id, item));
-          return Array.from(map.values());
-        });
-
-        if (compraData.numero_nf && !numeroNf) setNumeroNf(compraData.numero_nf);
-        if (compraData.chave_nfe && !chaveNfe) setChaveNfe(compraData.chave_nfe);
-
-        alert(`Sucesso! ${importedItems.length} itens da NF #${compraData.numero_nf || term} foram carregados no lote.`);
-      } else {
-        alert('Nenhum item encontrado nesta Nota Fiscal.');
-      }
-    } catch (err) {
-      console.error('Erro ao buscar itens da NF:', err);
-      alert('Nota Fiscal não encontrada. Verifique se o número ou a chave foram digitados corretamente.');
-    } finally {
-      setLoadingNf(false);
-    }
-  };
-
-  const handleEmitTransferNfe = async () => {
-    if (transferItems.length === 0) {
-      alert('Adicione ao menos um produto no lote da transferência antes de emitir a NF-e.');
-      return;
-    }
-    setLoadingNf(true);
-    try {
-      const payload = {
-        origem: Number(originUnit),
-        destino: Number(destinationUnit),
-        obs: obs || 'Transferência de estoque entre unidades',
-        tipoFiscal: 'FISCAL',
-        numeroNf: numeroNf || '0',
-        chaveNfe: chaveNfe || '',
-        itens: transferItems.map(it => ({
-          produto_id: it.produto_id,
-          quantidade: it.quantidade,
-          valor: it.valor
-        }))
-      };
-      const resTr = await api.post('/v1/transferencias', payload);
-      const trId = resTr.data?.id || resTr.data?.transferencia_id || 1;
-
-      const resNfe = await api.post('/v1/nfe/emitir-transferencia', { transferencia_id: trId });
-      if (resNfe.data && resNfe.data.sucesso) {
-        setNumeroNf(String(resNfe.data.numero || trId));
-        setChaveNfe(resNfe.data.chave);
-        alert(`NF-e Modelo 55 autorizada na SEFAZ com sucesso!\n\nLote Transferência: #${trId}\nChave NFe: ${resNfe.data.chave}\nProtocolo SEFAZ: ${resNfe.data.protocolo}`);
-        fetchTransfers();
-      } else {
-        alert('Falha na autorização da NF-e na SEFAZ.');
-      }
-    } catch (err) {
-      console.error('Erro ao emitir NF-e da transferência:', err);
-      alert('Erro na transmissão da NF-e para a SEFAZ.');
-    } finally {
-      setLoadingNf(false);
-    }
-  };
-
-  // Modal de Pesquisa de Produtos (Igual à tela de Produtos)
-  const [showProductSearchModal, setShowProductSearchModal] = useState(false);
-  const [modalSearchTerm, setModalSearchTerm] = useState('');
-  const [modalStockFilter, setModalStockFilter] = useState('todos'); // 'todos', 'low', 'out'
-
-  // Conferência de Recebimento
+  // Conferência de Recebimento na Filial (Conferência Cega)
   const [receptionTransfer, setReceptionTransfer] = useState(null);
-  const [receptionItems, setReceptionItems] = useState([]); // { item, checked_qty, justificativa }
+  const [receptionItems, setReceptionItems] = useState([]);
   const [checkerName, setCheckerName] = useState('');
   const [receptionObs, setReceptionObs] = useState('');
+  const [blindCheckRevealed, setBlindCheckRevealed] = useState(false); // true = mostra divergências
 
   // Notificações
   const [notifications, setNotifications] = useState([]);
+  const [successMsg, setSuccessMsg] = useState('');
 
   useEffect(() => {
     fetchTransfers();
@@ -153,83 +91,18 @@ export default function TransferTab() {
     fetchUnits();
   }, []);
 
-  // Gerenciamento de notificações dispensadas pelo usuário
-  const [dismissedNotifications, setDismissedNotifications] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem('dismissed_transfer_notifications') || '[]');
-    } catch {
-      return [];
-    }
-  });
-
-  // Notifica o gestor sobre transferências direcionadas pendentes de conferência
-  useEffect(() => {
-    if (transfers.length > 0) {
-      const activeUnitId = Number(localStorage.getItem('selected_company_id')) || 1;
-      const newNotifications = [];
-
-      // Notifica se a unidade atual possui transferências recebidas pendentes de conferência
-      const pendingReception = transfers.filter(
-        t => t.destino === activeUnitId && t.status === 'Em Trânsito'
-      );
-      
-      pendingReception.forEach(t => {
-        const notifId = `pending-${t.id}`;
-        if (!dismissedNotifications.includes(notifId)) {
-          const origName = getUnitName(t.origem);
-          newNotifications.push({
-            id: notifId,
-            message: `Atenção: Nova transferência #${t.id} enviada pela unidade [${origName}] está pendente de recepção e conferência!`,
-            type: 'warning'
-          });
-        }
-      });
-
-      // Notifica se a unidade de destino confirmou/aprovou uma transferência enviada por esta unidade
-      const approvedSent = transfers.filter(
-        t => t.origem === activeUnitId && t.status === 'Conferido/Aprovado'
-      );
-
-      approvedSent.forEach(t => {
-        const notifId = `app-${t.id}`;
-        if (!dismissedNotifications.includes(notifId)) {
-          const destName = getUnitName(t.destino);
-          newNotifications.push({
-            id: notifId,
-            message: `Sucesso: Unidade [${destName}] confirmou e aprovou o recebimento da transferência #${t.id}!`,
-            type: 'success'
-          });
-        }
-      });
-
-      setNotifications(newNotifications);
-    }
-  }, [transfers, units, dismissedNotifications]);
-
-  const handleDismissNotification = (id) => {
-    const updated = [...dismissedNotifications, id];
-    setDismissedNotifications(updated);
-    localStorage.setItem('dismissed_transfer_notifications', JSON.stringify(updated));
-  };
-
-  const handleClearAllNotifications = () => {
-    const allIds = notifications.map(n => n.id);
-    const updated = [...dismissedNotifications, ...allIds];
-    setDismissedNotifications(updated);
-    localStorage.setItem('dismissed_transfer_notifications', JSON.stringify(updated));
-  };
-
   const fetchTransfers = async () => {
     setLoading(true);
     try {
       const response = await api.get('/v1/transferencias');
       if (Array.isArray(response.data)) {
-        const activeUnitId = Number(localStorage.getItem('selected_company_id')) || 1;
-        // Regra de Visibilidade: A Matriz (ID 1) vê todas, as filiais veem apenas as suas
-        const visibleTransfers = activeUnitId === 1 
-          ? response.data 
+        const activeUnitId = Number(localStorage.getItem('selected_company_id')) || 5;
+        // O CD MATRIZ DOURADINA (ID 5 ou 1) visualiza todas as transferências do grupo
+        const isMatriz = activeUnitId === 5 || activeUnitId === 1;
+        const visibleTransfers = isMatriz
+          ? response.data
           : response.data.filter(t => t.origem === activeUnitId || t.destino === activeUnitId);
-        
+
         setTransfers(visibleTransfers);
       }
     } catch (err) {
@@ -241,108 +114,425 @@ export default function TransferTab() {
 
   const fetchProducts = async () => {
     try {
-      const response = await api.get('/v1/produtos?limit=500');
+      const response = await api.get('/v1/produtos?limit=1000');
       if (Array.isArray(response.data)) {
         setProducts(response.data);
       } else if (response.data?.data && Array.isArray(response.data.data)) {
         setProducts(response.data.data);
       }
     } catch (err) {
-      console.error('Erro ao buscar produtos para transferência:', err);
+      console.error('Erro ao buscar produtos:', err);
     }
   };
 
   const fetchUnits = async () => {
     try {
       const response = await api.get('/v1/empresa');
-      if (Array.isArray(response.data)) {
-        const formattedUnits = response.data.map(u => {
-          const rawName = u.fantasia || u.Fantasia || u.razao_social || u.Razao_social || 'Unidade';
-          const code = u.codigo || u.Codigo;
-          const isCd = rawName.toUpperCase().includes('CD') || code === 5 || rawName.toUpperCase().includes('DOURADINA');
-          return {
-            id: code,
-            name: `${code} - ${rawName}`,
-            ccCodigo: u.ccCodigo || u.CcCodigo,
-            isCd: isCd
-          };
+      const unitMap = new Map();
+
+      // Mapeamento das 5 unidades reais
+      if (Array.isArray(response.data) && response.data.length > 0) {
+        response.data.forEach(u => {
+          const rawName = (u.fantasia || u.Fantasia || u.razao_social || u.Razao_social || '').trim().toUpperCase();
+          const code = Number(u.codigo || u.Codigo || u.id);
+          const isMatriz = code === 5 || code === 1 || rawName.includes('CD') || rawName.includes('DOURADINA');
+
+          let displayName = `${code} - ${rawName}`;
+          if (isMatriz) {
+            displayName = '5 - CD DOURADINA (Matriz)';
+          } else if (code === 6 || rawName.includes('RIO BRILHANTE')) {
+            displayName = '6 - RIO BRILHANTE';
+          } else if (code === 7 || rawName.includes('ITAPORA')) {
+            displayName = '7 - ITAPORA';
+          } else if (code === 4 || rawName.includes('NOVA ALVORADA')) {
+            displayName = '4 - NOVA ALVORADA';
+          } else if (code === 8 || rawName.includes('MARACAJU')) {
+            displayName = '8 - MARACAJU';
+          }
+
+          unitMap.set(isMatriz ? 5 : code, {
+            id: isMatriz ? 5 : code,
+            name: displayName,
+            isCd: isMatriz,
+            isMatriz: isMatriz
+          });
         });
+      }
 
-        // Ordena para que o Centro de Distribuição (CD) seja SEMPRE a 1ª OPÇÃO!
-        formattedUnits.sort((a, b) => (b.isCd ? 1 : 0) - (a.isCd ? 1 : 0));
+      // Garante a presença das 5 unidades oficiais
+      if (!unitMap.has(5)) unitMap.set(5, { id: 5, name: '5 - CD DOURADINA (Matriz)', isCd: true, isMatriz: true });
+      if (!unitMap.has(6)) unitMap.set(6, { id: 6, name: '6 - RIO BRILHANTE', isCd: false, isMatriz: false });
+      if (!unitMap.has(7)) unitMap.set(7, { id: 7, name: '7 - ITAPORA', isCd: false, isMatriz: false });
+      if (!unitMap.has(4)) unitMap.set(4, { id: 4, name: '4 - NOVA ALVORADA', isCd: false, isMatriz: false });
+      if (!unitMap.has(8)) unitMap.set(8, { id: 8, name: '8 - MARACAJU', isCd: false, isMatriz: false });
 
-        setUnits(formattedUnits);
+      const finalUnits = Array.from(unitMap.values());
+      finalUnits.sort((a, b) => (b.isMatriz ? 1 : 0) - (a.isMatriz ? 1 : 0));
 
-        // Define a unidade de origem padrão como o Centro de Distribuição (1ª opção)
-        if (formattedUnits.length > 0) {
-          setOrigin(String(formattedUnits[0].id));
-        }
+      setUnits(finalUnits);
+      setOrigin('5');
+      if (!destination || destination === '5') {
+        setDestination('6');
       }
     } catch (err) {
       console.error('Erro ao buscar unidades (empresas):', err);
     }
   };
 
-  // Busca de Produtos Paginada e Servidor para o Modal (Desempenho Extremo)
-  const fetchModalProducts = async (search = modalSearchTerm, targetPage = 1, stockFilter = modalStockFilter) => {
-    setModalSearchLoading(true);
+  const getUnitName = (id) => {
+    const numId = Number(id);
+    if (numId === 1 || numId === 5) return '5 - CD DOURADINA (Matriz)';
+    const unit = units.find(u => Number(u.id) === numId);
+    if (unit) return unit.name;
+    const fallbackMap = {
+      4: '4 - NOVA ALVORADA',
+      5: '5 - CD DOURADINA (Matriz)',
+      6: '6 - RIO BRILHANTE',
+      7: '7 - ITAPORA',
+      8: '8 - MARACAJU'
+    };
+    return fallbackMap[numId] || `Unidade #${id}`;
+  };
+
+  // =========================================================================
+  // SELEÇÃO DE PRODUTO & CARREGAMENTO DE GRADES (TAMANHOS/VARIAÇÕES)
+  // =========================================================================
+  const handleSelectProduct = async (prod) => {
+    if (!prod) {
+      setSelectedProductObj(null);
+      setProductGrades([]);
+      setMatrixQuantities({});
+      return;
+    }
+
+    setSelectedProductObj(prod);
+    const pId = prod.codigo || prod.PRO_CODIGO;
+    const defaultPrice = Number(prod.valorv || prod.custo || prod.pro_valor_dinheiro || 0);
+    setSinglePrice(defaultPrice > 0 ? String(defaultPrice) : '0.00');
+    setSingleQty(1);
+    setMatrixQuantities({});
+
+    setLoadingGrades(true);
     try {
-      const searchParam = search ? `&search=${encodeURIComponent(search)}` : '';
-      const stockParam = stockFilter !== 'todos' ? `&stockStatus=${stockFilter}` : '';
-      const url = `/v1/produtos?page=${targetPage}&limit=10${searchParam}${stockParam}`;
-      const res = await api.get(url);
-
-      let items = [];
-      let metaData = { page: targetPage, limit: 10, total: 0, pages: 1 };
-
-      if (Array.isArray(res.data)) {
-        items = res.data;
-        metaData = { page: 1, limit: items.length || 10, total: items.length, pages: 1 };
-      } else if (res.data && Array.isArray(res.data.data)) {
-        items = res.data.data;
-        metaData = res.data.meta || metaData;
+      const res = await api.get(`/v1/grades?produto_id=${pId}`);
+      if (Array.isArray(res.data) && res.data.length > 0) {
+        setProductGrades(res.data);
+      } else {
+        setProductGrades([]);
       }
-
-      setModalProducts(items);
-      setModalSearchMeta(metaData);
-      setModalSearchPage(metaData.page || targetPage);
     } catch (err) {
-      console.error('Erro ao buscar produtos no modal de transferência:', err);
+      console.warn('Produto sem variações de grade cadastradas:', err);
+      setProductGrades([]);
     } finally {
-      setModalSearchLoading(false);
+      setLoadingGrades(false);
     }
   };
 
-  useEffect(() => {
-    if (showProductSearchModal) {
-      const timer = setTimeout(() => {
-        fetchModalProducts(modalSearchTerm, 1, modalStockFilter);
-      }, 300);
-      return () => clearTimeout(timer);
+  const handleMatrixQtyChange = (gradeId, value) => {
+    const val = parseInt(value, 10);
+    setMatrixQuantities(prev => ({
+      ...prev,
+      [gradeId]: isNaN(val) || val < 0 ? 0 : val
+    }));
+  };
+
+  // 1. Adicionar Variações da Grade ao Romaneio
+  const handleAddGradeMatrixToTransfer = () => {
+    if (!selectedProductObj) return;
+
+    const itemsToAdd = [];
+    const pId = Number(selectedProductObj.codigo || selectedProductObj.PRO_CODIGO);
+    const pNome = selectedProductObj.nome || selectedProductObj.PRO_NOME;
+    const pFiscalGerar = selectedProductObj.pro_fiscal_gerar || selectedProductObj.fiscalGerar || 'S';
+    const pCodFiscal = Number(selectedProductObj.pro_cod_fiscal || selectedProductObj.codFiscal || 0);
+    const isFiscal = pFiscalGerar !== 'N' && (pCodFiscal > 0 || pFiscalGerar === 'S');
+
+    productGrades.forEach(g => {
+      const gId = g.codigo || g.id || g.gra_codigo;
+      const qtd = Number(matrixQuantities[gId] || 0);
+      if (qtd > 0) {
+        const val = Number(g.valor || g.valor_dinheiro || singlePrice || selectedProductObj.valorv || selectedProductObj.custo || 0);
+        itemsToAdd.push({
+          produto_id: pId,
+          nome: pNome,
+          codbarra: g.codbarra || selectedProductObj.codbarra || '',
+          grade_id: gId,
+          tamanho: g.tam_nome || g.tam || g.sigla || 'UN',
+          cor: g.cor || 'UNICA',
+          quantidade: qtd,
+          valor: val,
+          pro_cod_fiscal: pCodFiscal,
+          pro_fiscal_gerar: pFiscalGerar,
+          isFiscal: isFiscal
+        });
+      }
+    });
+
+    if (itemsToAdd.length === 0) {
+      alert('Informe ao menos uma quantidade em um dos tamanhos da grade.');
+      return;
     }
-  }, [showProductSearchModal, modalSearchTerm, modalStockFilter]);
 
-  const handleModalPageChange = (newPage) => {
-    fetchModalProducts(modalSearchTerm, newPage, modalStockFilter);
+    setTransferItems(prev => [...prev, ...itemsToAdd]);
+    setMatrixQuantities({});
+    setSelectedProductObj(null);
+    setProductGrades([]);
+    setSuccessMsg(`${itemsToAdd.length} variação(ões) adicionada(s) ao Romaneio!`);
+    setTimeout(() => setSuccessMsg(''), 3500);
   };
 
-  const handleSelectProductFromModal = (prod) => {
-    setSelectedProduct(String(prod.codigo));
-    setPrice(prod.valorv || '');
-    setShowProductSearchModal(false);
+  // 2. Adicionar Produto Simples (Sem Grade) ao Romaneio
+  const handleAddSingleProductToTransfer = () => {
+    if (!selectedProductObj) {
+      alert('Selecione um produto antes de adicionar.');
+      return;
+    }
+    const qtd = Number(singleQty);
+    if (!qtd || qtd <= 0) {
+      alert('Informe uma quantidade válida.');
+      return;
+    }
+
+    const pId = Number(selectedProductObj.codigo || selectedProductObj.PRO_CODIGO);
+    const pNome = selectedProductObj.nome || selectedProductObj.PRO_NOME;
+    const pFiscalGerar = selectedProductObj.pro_fiscal_gerar || selectedProductObj.fiscalGerar || 'S';
+    const pCodFiscal = Number(selectedProductObj.pro_cod_fiscal || selectedProductObj.codFiscal || 0);
+    const isFiscal = pFiscalGerar !== 'N' && (pCodFiscal > 0 || pFiscalGerar === 'S');
+    const val = Number(singlePrice) || Number(selectedProductObj.valorv || selectedProductObj.custo || 0);
+
+    const newItem = {
+      produto_id: pId,
+      nome: pNome,
+      codbarra: selectedProductObj.codbarra || '',
+      grade_id: 0,
+      tamanho: selectedProductObj.um || 'UN',
+      cor: 'UNICA',
+      quantidade: qtd,
+      valor: val,
+      pro_cod_fiscal: pCodFiscal,
+      pro_fiscal_gerar: pFiscalGerar,
+      isFiscal: isFiscal
+    };
+
+    setTransferItems(prev => [...prev, newItem]);
+    setSelectedProductObj(null);
+    setProductGrades([]);
+    setSingleQty(1);
+    setSuccessMsg(`Produto #${pId} - ${pNome} adicionado ao Romaneio!`);
+    setTimeout(() => setSuccessMsg(''), 3500);
   };
 
-  const handleViewDetails = async (transfer) => {
-    setSelectedTransfer(transfer);
+  // 3. Bipagem Rápida via Código de Barras
+  const handleBarcodeScan = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const code = barcodeInput.trim();
+      if (!code) return;
+
+      const matchedProd = products.find(p => p.codbarra === code || String(p.codigo) === code);
+      if (matchedProd) {
+        const pId = Number(matchedProd.codigo);
+        const pFiscalGerar = matchedProd.pro_fiscal_gerar || matchedProd.fiscalGerar || 'S';
+        const pCodFiscal = Number(matchedProd.pro_cod_fiscal || matchedProd.codFiscal || 0);
+        const isFiscal = pFiscalGerar !== 'N' && (pCodFiscal > 0 || pFiscalGerar === 'S');
+
+        // Se o item já estiver no Romaneio, incrementa quantidade + 1
+        const existingIdx = transferItems.findIndex(it => it.produto_id === pId && (!it.grade_id || it.grade_id === 0));
+        if (existingIdx >= 0) {
+          setTransferItems(prev => {
+            const next = [...prev];
+            next[existingIdx].quantidade += 1;
+            return next;
+          });
+        } else {
+          setTransferItems(prev => [
+            ...prev,
+            {
+              produto_id: pId,
+              nome: matchedProd.nome,
+              codbarra: matchedProd.codbarra,
+              grade_id: 0,
+              tamanho: matchedProd.um || 'UN',
+              cor: 'UNICA',
+              quantidade: 1,
+              valor: Number(matchedProd.valorv || matchedProd.custo || 0),
+              pro_cod_fiscal: pCodFiscal,
+              pro_fiscal_gerar: pFiscalGerar,
+              isFiscal: isFiscal
+            }
+          ]);
+        }
+        setSuccessMsg(`Bipado: #${pId} - ${matchedProd.nome} (+1 un)`);
+        setTimeout(() => setSuccessMsg(''), 2500);
+      } else {
+        alert(`Código de barras "${code}" não encontrado no catálogo do CD.`);
+      }
+      setBarcodeInput('');
+    }
+  };
+
+  // 4. Puxar Itens de Nota de Compra / XML Recente
+  const handleFetchNfItems = async () => {
+    const term = nfSearchTerm.trim();
+    if (!term) {
+      alert('Informe o número da NF ou chave de acesso da compra.');
+      return;
+    }
+    setLoadingNf(true);
+    try {
+      const res = await api.get(`/v1/compras/buscar-nf?termo=${encodeURIComponent(term)}`);
+      const compraData = res.data;
+      if (compraData && Array.isArray(compraData.itens) && compraData.itens.length > 0) {
+        const importedItems = compraData.itens.map(it => {
+          const pFiscalGerar = it.pro_fiscal_gerar || 'S';
+          const pCodFiscal = Number(it.pro_cod_fiscal || 0);
+          return {
+            produto_id: Number(it.produto_codigo || it.produto_id),
+            nome: it.produto_nome || `Produto #${it.produto_codigo}`,
+            codbarra: it.codbarra || '',
+            grade_id: 0,
+            tamanho: it.um || 'UN',
+            cor: 'UNICA',
+            quantidade: Number(it.quantidade) || 1,
+            valor: Number(it.valor_unitario) || 0,
+            pro_cod_fiscal: pCodFiscal,
+            pro_fiscal_gerar: pFiscalGerar,
+            isFiscal: pFiscalGerar !== 'N' && (pCodFiscal > 0 || pFiscalGerar === 'S')
+          };
+        });
+
+        setTransferItems(prev => [...prev, ...importedItems]);
+        setShowNfImportBox(false);
+        setNfSearchTerm('');
+        setSuccessMsg(`Sucesso! ${importedItems.length} itens importados da NF de compra #${compraData.numero_nf || term}!`);
+        setTimeout(() => setSuccessMsg(''), 4000);
+      } else {
+        alert('Nenhum item encontrado nesta Nota de Compra.');
+      }
+    } catch (err) {
+      console.error('Erro ao buscar itens da NF:', err);
+      alert('Nota de compra não localizada.');
+    } finally {
+      setLoadingNf(false);
+    }
+  };
+
+  // Edição inline de itens na tabela do Romaneio
+  const handleUpdateItemQty = (idx, newQty) => {
+    const val = parseFloat(newQty);
+    setTransferItems(prev => {
+      const next = [...prev];
+      next[idx].quantidade = isNaN(val) || val <= 0 ? 1 : val;
+      return next;
+    });
+  };
+
+  const handleUpdateItemValor = (idx, newVal) => {
+    const val = parseFloat(newVal);
+    setTransferItems(prev => {
+      const next = [...prev];
+      next[idx].valor = isNaN(val) || val < 0 ? 0 : val;
+      return next;
+    });
+  };
+
+  const handleToggleItemFiscal = (idx) => {
+    setTransferItems(prev => {
+      const next = [...prev];
+      next[idx].isFiscal = !next[idx].isFiscal;
+      next[idx].pro_fiscal_gerar = next[idx].isFiscal ? 'S' : 'N';
+      return next;
+    });
+  };
+
+  const handleRemoveItemFromTransfer = (idx) => {
+    setTransferItems(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  // =========================================================================
+  // CÁLCULOS E CLASSIFICAÇÃO AUTOMÁTICA EM TEMPO REAL
+  // =========================================================================
+  const totalPecas = transferItems.reduce((acc, it) => acc + (Number(it.quantidade) || 0), 0);
+  const totalValor = transferItems.reduce((acc, it) => acc + ((Number(it.quantidade) || 0) * (Number(it.valor) || 0)), 0);
+
+  const itensFiscais = transferItems.filter(it => it.isFiscal);
+  const pecasFiscais = itensFiscais.reduce((acc, it) => acc + (Number(it.quantidade) || 0), 0);
+  const valorFiscal = itensFiscais.reduce((acc, it) => acc + ((Number(it.quantidade) || 0) * (Number(it.valor) || 0)), 0);
+
+  const itensFisicos = transferItems.filter(it => !it.isFiscal);
+  const pecasFisicas = itensFisicos.reduce((acc, it) => acc + (Number(it.quantidade) || 0), 0);
+  const valorFisico = itensFisicos.reduce((acc, it) => acc + ((Number(it.quantidade) || 0) * (Number(it.valor) || 0)), 0);
+
+  // =========================================================================
+  // SALVAR E EXPEDIR ROMANEIO DE TRANSFERÊNCIA
+  // =========================================================================
+  const handleCreateTransfer = async (e) => {
+    if (e) e.preventDefault();
+
+    if (!destination) {
+      alert('Selecione a Filial de Destino da transferência.');
+      return;
+    }
+
+    if (transferItems.length === 0) {
+      alert('Adicione ao menos um produto no Romaneio antes de expedir.');
+      return;
+    }
+
     setLoading(true);
     try {
-      const response = await api.get(`/v1/transferenciaItens?transferencia_id=${transfer.id}`);
-      if (Array.isArray(response.data)) {
-        setSelectedTransferItems(response.data);
-        setIsViewingDetails(true);
-      }
+      const payload = {
+        origem: Number(origin) || 5,
+        destino: Number(destination),
+        data: dataEnvio,
+        status: 'Em Trânsito',
+        obs: obs || `Romaneio de Envio (${totalPecas} un)`,
+        tipoFiscal: pecasFiscais > 0 ? 'FISCAL' : 'NAO_FISCAL',
+        numeroNf: '',
+        chaveNfe: '',
+        itens: transferItems.map(it => ({
+          produto_id: it.produto_id,
+          quantidade: it.quantidade,
+          valor: it.valor,
+          grade_id: it.grade_id || 0,
+          tamanho: it.tamanho || 'UN',
+          cor: it.cor || 'UNICA',
+          pro_cod_fiscal: it.pro_cod_fiscal || 0,
+          pro_fiscal_gerar: it.isFiscal ? 'S' : 'N'
+        }))
+      };
+
+      const res = await api.post('/v1/transferencias', payload);
+      const newTrId = Number(res.data?.id || res.data?.tr_id || res.data?.TR_ID || 1);
+
+      setSuccessMsg(`Romaneio de Transferência #${newTrId} salvo e expedido com sucesso!`);
+      setTimeout(() => setSuccessMsg(''), 5000);
+
+      // Limpa formulário
+      setTransferItems([]);
+      setObs('');
+      setMotorista('');
+      setPlacaVeiculo('');
+      setActiveSubTab('list');
+      fetchTransfers();
     } catch (err) {
-      alert('Erro ao carregar itens da transferência.');
+      console.error('Erro ao salvar romaneio:', err);
+      alert('Erro ao salvar e expedir transferência.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Visualização e Ações
+  const handleViewDetails = async (transfer) => {
+    setSelectedTransfer(transfer);
+    setIsViewingDetails(true);
+    setLoading(true);
+    try {
+      const res = await api.get(`/v1/transferenciaItens?transferencia_id=${transfer.id}`);
+      setSelectedTransferItems(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      setSelectedTransferItems([]);
     } finally {
       setLoading(false);
     }
@@ -352,151 +542,25 @@ export default function TransferTab() {
     setRomaneioTransfer(transfer);
     setLoading(true);
     try {
-      let items = selectedTransfer && selectedTransfer.id === transfer.id ? selectedTransferItems : [];
-      if (items.length === 0) {
-        const response = await api.get(`/v1/transferenciaItens?transferencia_id=${transfer.id}`);
-        if (Array.isArray(response.data)) {
-          items = response.data;
-        }
-      }
-      setRomaneioItems(items);
+      const res = await api.get(`/v1/transferenciaItens?transferencia_id=${transfer.id}`);
+      setRomaneioItems(Array.isArray(res.data) ? res.data : []);
       setShowRomaneioModal(true);
     } catch (err) {
-      alert('Erro ao carregar os itens para geração do romaneio.');
+      setRomaneioItems([]);
+      setShowRomaneioModal(true);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleAddItemToTransfer = () => {
-    if (!selectedProduct || !quantity || Number(quantity) <= 0) {
-      alert('Selecione o produto e informe uma quantidade válida.');
-      return;
-    }
-
-    const prod = products.find(p => p.codigo === Number(selectedProduct));
-    if (!prod) return;
-
-    const isFiscal = prod.fiscalGerar !== 'N' && (prod.fiscalGerar === 'S' || Number(prod.codFiscal || prod.pro_cod_fiscal) > 0 || (prod.ncm && prod.ncm.length >= 4));
-
-    setTransferItems([
-      ...transferItems,
-      {
-        produto_id: prod.codigo,
-        nome: prod.nome,
-        quantidade: Number(quantity),
-        valor: Number(price) || prod.valorv || 0,
-        codFiscal: prod.codFiscal || prod.pro_cod_fiscal || 0,
-        fiscalGerar: prod.fiscalGerar || prod.pro_fiscal_gerar || 'S',
-        ncm: prod.ncm || '6109.10.00',
-        isFiscal: isFiscal
-      }
-    ]);
-
-    setSelectedProduct('');
-    setQuantity('');
-    setPrice('');
-  };
-
-  const handleRemoveItemFromTransfer = (productId) => {
-    setTransferItems(transferItems.filter(item => item.produto_id !== productId));
-  };
-
-  const handleCreateTransfer = async (e) => {
-    e.preventDefault();
-    if (!origin || !destination) {
-      alert('Informe a unidade de origem e de destino.');
-      return;
-    }
-    if (origin === destination) {
-      alert('A unidade de origem não pode ser idêntica ao destino.');
-      return;
-    }
-    if (transferItems.length === 0) {
-      alert('Adicione pelo menos um produto na transferência.');
-      return;
-    }
-
+  const handleOpenNfeModal = async (transfer) => {
+    setNfeTransfer(transfer);
     setLoading(true);
     try {
-      const hasFiscalItems = transferItems.some(it => it.isFiscal !== false && it.fiscalGerar !== 'N');
-
-      const transferData = {
-        id: 0, // 0 para o backend gerar numeração sequencial estrita (GEN_TR_ID / 1, 2, 3...)
-        origem: Number(origin),
-        destino: Number(destination),
-        data: new Date().toISOString().split('T')[0],
-        status: 'Em Trânsito',
-        obs: obs,
-        usuarioRecebimento: '',
-        dataRecebimento: '1899-12-30', // Data padrão nula Delphi
-        tipoFiscal: hasFiscalItems ? 'FISCAL' : 'NAO_FISCAL',
-        numeroNf: tipoFiscal === 'FISCAL' ? numeroNf : '',
-        chaveNfe: tipoFiscal === 'FISCAL' ? chaveNfe : ''
-      };
-
-      // Cria cabeçalho e obtém ID sequencial real do backend
-      const resHeader = await api.post('/v1/transferencias', transferData);
-      const realTrId = resHeader.data?.id || resHeader.data?.tr_id || (Number(resHeader.data) || 0);
-      const finalTransferId = realTrId > 0 ? realTrId : (transfers.length > 0 ? Math.max(...transfers.map(t => Number(t.id) || 0)) + 1 : 1);
-
-      // Cria itens em Lote vinculados ao lote sequencial
-      const formattedItems = transferItems.map((item, idx) => ({
-        id: 0,
-        transferenciaId: finalTransferId,
-        produtoId: item.produto_id,
-        quantidade: item.quantidade,
-        valor: item.valor,
-        quantidadeConferida: 0
-      }));
-
-      await api.post('/v1/transferenciaItens/emLote', { itens: formattedItems });
-
-      alert(`Transferência #${finalTransferId} (${hasFiscalItems ? 'Itens Fiscais e Não Fiscais' : 'Não Fiscal'}) registrada com sucesso!`);
-      
-      // Reset formulário
-      setOrigin('');
-      setDestination('');
-      setTipoFiscal('FISCAL');
-      setNumeroNf('');
-      setChaveNfe('');
-      setObs('');
-      setTransferItems([]);
-      setActiveSubTab('list');
-      fetchTransfers();
-    } catch (err) {
-      console.error(err);
-      alert('Erro ao processar transferência.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleOpenNfeModal = async (transferItem) => {
-    setLoading(true);
-    setNfeTransfer(transferItem);
-    try {
-      const res = await api.get(`/v1/transferenciaItens?transferencia_id=${transferItem.id}`);
-      let rawItems = [];
-      if (Array.isArray(res.data)) rawItems = res.data;
-      else if (res.data?.data && Array.isArray(res.data.data)) rawItems = res.data.data;
-      
-      const enriched = rawItems.map(it => {
-        const prod = products.find(p => Number(p.codigo || p.id) === Number(it.produtoId || it.produto_id));
-        return {
-          ...it,
-          produto_id: it.produtoId || it.produto_id,
-          nome: prod?.nome || it.produto_nome || `Produto #${it.produtoId || it.produto_id}`,
-          ncm: prod?.ncm || '6109.10.00',
-          cest: prod?.cest || '28.038.00',
-          quantidade: it.quantidade,
-          valor: it.valor || prod?.valorv || 10.00
-        };
-      });
-      setNfeItems(enriched);
+      const res = await api.get(`/v1/transferenciaItens?transferencia_id=${transfer.id}`);
+      setNfeItems(Array.isArray(res.data) ? res.data : []);
       setShowNfeModal(true);
     } catch (err) {
-      console.warn('Erro ao carregar itens para NF-e:', err);
       setNfeItems([]);
       setShowNfeModal(true);
     } finally {
@@ -512,10 +576,11 @@ export default function TransferTab() {
         setReceptionTransfer(transfer);
         setReceptionItems(response.data.map(item => ({
           ...item,
-          quantidadeConferida: item.quantidadeConferida ?? item.quantidade,
+          quantidadeConferida: 0, // Conferência Cega: inicia em 0, conferente digita a contagem real
           justificativa: item.justificativa || ''
         })));
         setReceptionObs('');
+        setBlindCheckRevealed(false); // Esconde divergências até o conferente revelar
         setActiveSubTab('reception');
       }
     } catch (err) {
@@ -525,41 +590,23 @@ export default function TransferTab() {
     }
   };
 
-  const handleQtyConferidaChange = (idx, value) => {
-    const next = [...receptionItems];
-    next[idx].quantidadeConferida = Number(value) || 0;
-    setReceptionItems(next);
-  };
-
-  const handleJustificativaChange = (idx, value) => {
-    const next = [...receptionItems];
-    next[idx].justificativa = value;
-    setReceptionItems(next);
-  };
-
   const handleApproveReception = async (status) => {
     if (!checkerName.trim()) {
-      alert('Por favor, informe o nome do conferente/responsável.');
+      alert('Por favor, informe o nome do conferente/responsável pela conferência.');
       return;
     }
 
     setLoading(true);
     try {
-      // 1. Atualiza cabeçalho de transferência com Status, conferente, data e observações da recepção se houver
-      const finalObs = receptionObs.trim() 
-        ? `${receptionTransfer.obs ? receptionTransfer.obs + ' | ' : ''}Recepção: ${receptionObs.trim()}`
-        : receptionTransfer.obs;
-
       const updatedHeader = {
         ...receptionTransfer,
-        status: status, // 'Conferido/Aprovado', 'Aceito Parcialmente' ou 'Rejeitado'
+        status: status,
         usuarioRecebimento: checkerName,
         dataRecebimento: new Date().toISOString().split('T')[0],
-        obs: finalObs
+        obs: receptionObs ? `${receptionTransfer.obs || ''} | Recepção: ${receptionObs}` : receptionTransfer.obs
       };
       await api.put('/v1/transferencias', updatedHeader);
 
-      // 2. Atualiza os itens com a quantidade fisicamente conferida e a justificativa por item
       const formattedReceptionItems = receptionItems.map(it => ({
         ...it,
         quantidadeConferida: Number(it.quantidadeConferida ?? it.quantidade) || 0,
@@ -567,16 +614,12 @@ export default function TransferTab() {
       }));
       await api.post('/v1/transferenciaItens/emLote', { itens: formattedReceptionItems });
 
-      let msg = 'Recepção concluída e estoque atualizado com sucesso!';
-      if (status === 'Aceito Parcialmente') msg = 'Transferência Aceita Parcialmente com divergências registradas!';
-      if (status === 'Rejeitado') msg = 'Transferência Recusada / Devolvida!';
-      alert(msg);
-      
-      // Reset
+      alert('Recepção concluída e estoque da filial atualizado com sucesso!');
       setReceptionTransfer(null);
       setReceptionItems([]);
       setCheckerName('');
       setReceptionObs('');
+      setBlindCheckRevealed(false);
       setActiveSubTab('list');
       fetchTransfers();
     } catch (err) {
@@ -587,23 +630,18 @@ export default function TransferTab() {
     }
   };
 
-  const getUnitName = (id) => {
-    const unit = units.find(u => u.id === Number(id));
-    return unit ? unit.name : `Unidade #${id}`;
-  };
-
   const getStatusBadge = (status) => {
     switch (status) {
       case 'Pendente':
         return <span className="badge badge-warning">Pendente</span>;
       case 'Em Trânsito':
-        return <span className="badge badge-info">Em Trânsito</span>;
+        return <span className="badge badge-info" style={{ background: '#0284c7', color: '#fff' }}>🚚 Em Trânsito</span>;
       case 'Conferido/Aprovado':
-        return <span className="badge badge-success">Conferido & Aprovado</span>;
+        return <span className="badge badge-success">🟢 Conferido & Aprovado</span>;
       case 'Aceito Parcialmente':
-        return <span className="badge badge-warning" style={{ backgroundColor: '#f59e0b', color: '#ffffff' }}>Aceito em Partes</span>;
+        return <span className="badge badge-warning" style={{ backgroundColor: '#f59e0b', color: '#ffffff' }}>🟡 Aceito em Partes</span>;
       case 'Rejeitado':
-        return <span className="badge badge-danger">Recusado</span>;
+        return <span className="badge badge-danger">🔴 Recusado</span>;
       default:
         return <span className="badge">{status}</span>;
     }
@@ -612,80 +650,46 @@ export default function TransferTab() {
   return (
     <div className="cd-container full-width">
       
-      {/* Alertas de Notificações */}
-      {notifications.length > 0 && (
-        <div className="cd-notifications-bar" style={{ marginBottom: '1.25rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem', padding: '0 0.25rem' }}>
-            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
-              🔔 Notificações da Central ({notifications.length})
-            </span>
-            <button 
-              onClick={handleClearAllNotifications}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                color: '#6b7280',
-                fontSize: '0.82rem',
-                cursor: 'pointer',
-                fontWeight: 600,
-                textDecoration: 'underline'
-              }}
-            >
-              Limpar Notificações
-            </button>
-          </div>
-          {notifications.map((n) => (
-            <div key={n.id} className={`cd-notification ${n.type}`} style={{ justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                {n.type === 'warning' ? <AlertCircle size={20} /> : <CheckCircle size={20} />}
-                <span>{n.message}</span>
-              </div>
-              <button 
-                onClick={() => handleDismissNotification(n.id)}
-                title="Dispensar Notificação"
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  cursor: 'pointer',
-                  padding: '4px',
-                  color: 'inherit',
-                  opacity: 0.75,
-                  display: 'flex',
-                  alignItems: 'center'
-                }}
-              >
-                <X size={16} />
-              </button>
-            </div>
-          ))}
+      {/* Banner de Feedback / Sucesso */}
+      {successMsg && (
+        <div className="cd-feedback-banner success">
+          <CheckCircle size={20} />
+          <span>{successMsg}</span>
         </div>
       )}
 
-      {/* Navegação SubTabs */}
+      {/* Navegação de Abas Superiores */}
       <div className="cd-header-tabs glass">
         <button 
           className={`cd-tab-btn ${activeSubTab === 'list' ? 'active' : ''}`}
           onClick={() => { setActiveSubTab('list'); setIsViewingDetails(false); }}
         >
-          <ArrowRightLeft size={18} /> Transferências
+          <ArrowRightLeft size={18} /> Romaneios & Transferências
         </button>
         <button 
           className={`cd-tab-btn ${activeSubTab === 'new' ? 'active' : ''}`}
           onClick={() => setActiveSubTab('new')}
         >
-          <Plus size={18} /> Enviar Transferência
+          <Plus size={18} /> Novo Romaneio de Envio (Livre Escolha)
         </button>
       </div>
 
-      {loading && <div className="loading-bar">Carregando dados...</div>}
+      {loading && <div className="loading-bar">Processando dados do Centro de Distribuição...</div>}
 
-      {/* SUBTAB: LISTA DE TRANSFERÊNCIAS */}
+      {/* ========================================================================= */}
+      {/* SUBTAB 1: LISTAGEM DE ROMANEIOS & TRANSFERÊNCIAS                          */}
+      {/* ========================================================================= */}
       {activeSubTab === 'list' && !isViewingDetails && (
         <div className="list-card glass">
           <div className="cd-title-row">
-            <h3><ArrowRightLeft size={20} /> Controle do Centro de Distribuição</h3>
+            <div>
+              <h3><Truck size={22} color="#f97316" /> Romaneios de Transferência (CD ➔ Filiais | Filial ➔ Filial)</h3>
+              <p style={{ fontSize: '0.84rem', color: '#64748b', margin: '2px 0 0 0' }}>
+                Gestão centralizada de expedição física e emissão automática de NF-e entre quaisquer unidades
+              </p>
+            </div>
             <button className="refresh-btn" onClick={fetchTransfers} disabled={loading}>
-              <RefreshCw size={18} /> Sincronizar
+              <RefreshCw size={17} /> Atualizar Lista
             </button>
           </div>
 
@@ -693,77 +697,76 @@ export default function TransferTab() {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th style={{ width: '85px' }}>Cod. Lote</th>
-                  <th style={{ width: '100px' }}>Tipo</th>
-                  <th style={{ width: '130px' }}>Origem</th>
-                  <th style={{ width: '130px' }}>Destino</th>
+                  <th style={{ width: '85px' }}>Romaneio</th>
+                  <th style={{ width: '160px' }}>Origem</th>
+                  <th style={{ width: '160px' }}>Destino</th>
                   <th style={{ width: '100px' }}>Data Envio</th>
-                  <th style={{ width: '110px', textAlign: 'center' }}>Status</th>
-                  <th>Observação</th>
-                  <th style={{ width: '210px', textAlign: 'center' }}>Ações</th>
+                  <th style={{ width: '130px', textAlign: 'center' }}>Status</th>
+                  <th>Observação Logística</th>
+                  <th style={{ width: '120px', textAlign: 'center' }}>NF-e Mod 55</th>
+                  <th style={{ width: '230px', textAlign: 'center' }}>Ações</th>
                 </tr>
               </thead>
               <tbody>
                 {transfers.map((item, idx) => (
                   <tr key={item.id || idx}>
                     <td><span className="item-code">#{item.id}</span></td>
-                    <td>
-                      {item.tipoFiscal === 'NAO_FISCAL' ? (
-                        <span className="badge badge-warning" title="Produtos comprados sem nota fiscal">📦 Não Fiscal</span>
-                      ) : (
-                        <span className="badge badge-info" title={item.numeroNf ? `NF-e #${item.numeroNf}` : 'NF-e de Transferência'}>
-                          📄 Fiscal {item.numeroNf ? `#${item.numeroNf}` : ''}
-                        </span>
-                      )}
-                    </td>
                     <td>{getUnitName(item.origem)}</td>
-                    <td>{getUnitName(item.destino)}</td>
+                    <td><strong>{getUnitName(item.destino)}</strong></td>
                     <td>{formatDate(item.data)}</td>
                     <td style={{ textAlign: 'center' }}>{getStatusBadge(item.status)}</td>
                     <td>{item.obs || '-'}</td>
                     <td style={{ textAlign: 'center' }}>
-                      <div style={{ display: 'inline-flex', gap: '4px', justifyContent: 'center' }}>
+                      {item.chaveNfe ? (
+                        <span className="badge badge-success" title={`Chave: ${item.chaveNfe}`}>
+                          <ShieldCheck size={12} /> #{item.numeroNf || 'Emitida'}
+                        </span>
+                      ) : item.tipoFiscal === 'NAO_FISCAL' ? (
+                        <span className="badge" style={{ background: '#f1f5f9', color: '#64748b' }}>
+                          📦 Controle Físico
+                        </span>
+                      ) : (
+                        <span className="badge badge-warning" style={{ fontSize: '0.72rem' }}>
+                          ⚡ Pendente Emissão
+                        </span>
+                      )}
+                    </td>
+                    <td style={{ textAlign: 'center' }}>
+                      <div style={{ display: 'inline-flex', gap: '5px', justifyContent: 'center' }}>
                         <button 
                           className="cd-action-btn view" 
                           onClick={() => handleViewDetails(item)} 
-                          title="Ver Itens do Lote"
-                          style={{ padding: '4px 8px', fontSize: '0.78rem', gap: '3px' }}
+                          title="Ver Itens do Romaneio"
                         >
                           <Eye size={13} /> Itens
                         </button>
 
                         <button 
-                          className="cd-action-btn view" 
+                          className="cd-action-btn" 
                           onClick={() => handleOpenRomaneio(item)} 
-                          title="Imprimir Romaneio de Transferência"
-                          style={{ background: 'linear-gradient(135deg, #2563eb, #3b82f6)', color: '#ffffff', padding: '4px 8px', fontSize: '0.78rem', gap: '3px' }}
+                          title="Imprimir Guia de Separação / Romaneio de Carga A4"
+                          style={{ background: '#2563eb', color: '#ffffff' }}
                         >
                           <Printer size={13} /> Romaneio
                         </button>
 
-                        {item.tipoFiscal !== 'NAO_FISCAL' && (
-                          <button 
-                            className="cd-action-btn view" 
-                            onClick={() => handleOpenNfeModal(item)} 
-                            title="Visualizar, Editar ou Emitir NF-e de Transferência"
-                            style={{ 
-                              background: item.chaveNfe ? 'linear-gradient(135deg, #059669, #10b981)' : 'linear-gradient(135deg, #7c3aed, #6366f1)', 
-                              color: '#ffffff', 
-                              padding: '4px 8px', 
-                              fontSize: '0.78rem', 
-                              gap: '3px' 
-                            }}
-                          >
-                            <FileText size={13} /> {item.chaveNfe ? 'Ver NF-e' : 'Emitir NF-e'}
-                          </button>
-                        )}
+                        <button 
+                          className="cd-action-btn" 
+                          onClick={() => handleOpenNfeModal(item)} 
+                          title="Visualizar ou Emitir NF-e de Transferência dos Itens Fiscais"
+                          style={{ 
+                            background: item.chaveNfe ? '#059669' : '#7c3aed', 
+                            color: '#ffffff' 
+                          }}
+                        >
+                          <FileText size={13} /> {item.chaveNfe ? 'Ver NF-e' : 'Emitir NF-e'}
+                        </button>
                         
                         {item.status === 'Em Trânsito' && (
                           <button 
                             className="cd-action-btn check" 
                             onClick={() => handleOpenConference(item)}
-                            title="Conferir e Receber Carga"
-                            style={{ padding: '4px 8px', fontSize: '0.78rem', gap: '3px', marginLeft: 0 }}
+                            title="Conferir e Receber Carga na Filial"
                           >
                             <ShieldCheck size={13} /> Receber
                           </button>
@@ -774,8 +777,8 @@ export default function TransferTab() {
                 ))}
                 {transfers.length === 0 && (
                   <tr>
-                    <td colSpan="8" style={{ textAlign: 'center', padding: '2rem' }}>
-                      Nenhuma transferência registrada.
+                    <td colSpan="8" style={{ textAlign: 'center', padding: '2.5rem', color: '#94a3b8' }}>
+                      Nenhuma transferência registrada. Clique em <strong>"Novo Romaneio de Envio"</strong> para começar.
                     </td>
                   </tr>
                 )}
@@ -785,75 +788,72 @@ export default function TransferTab() {
         </div>
       )}
 
-      {/* MODAL / VIEW: DETALHES DE UMA TRANSFERÊNCIA */}
+      {/* ========================================================================= */}
+      {/* DETALHES DE UMA TRANSFERÊNCIA SELECIONADA                                 */}
+      {/* ========================================================================= */}
       {activeSubTab === 'list' && isViewingDetails && selectedTransfer && (
         <div className="list-card glass">
           <div className="cd-title-row">
-            <h3>Itens do Lote #{selectedTransfer.id}</h3>
+            <div>
+              <h3>Itens do Romaneio #{selectedTransfer.id}</h3>
+              <span style={{ fontSize: '0.85rem', color: '#64748b' }}>
+                Origem: {getUnitName(selectedTransfer.origem)} ➔ Destino: <strong>{getUnitName(selectedTransfer.destino)}</strong>
+              </span>
+            </div>
             <div style={{ display: 'flex', gap: '0.6rem' }}>
               <button 
                 className="refresh-btn" 
                 onClick={() => handleOpenRomaneio(selectedTransfer)}
-                style={{ background: 'linear-gradient(135deg, #2563eb, #3b82f6)', color: '#ffffff', border: 'none' }}
+                style={{ background: '#2563eb', color: '#ffffff', border: 'none' }}
               >
-                <Printer size={18} /> Imprimir Romaneio
+                <Printer size={16} /> Imprimir Romaneio A4
               </button>
-              <button className="refresh-btn" onClick={() => setIsViewingDetails(false)}>Voltar para Lista</button>
+              <button 
+                className="refresh-btn" 
+                onClick={() => handleOpenNfeModal(selectedTransfer)}
+                style={{ background: '#059669', color: '#ffffff', border: 'none' }}
+              >
+                <FileText size={16} /> NF-e de Transferência
+              </button>
+              <button className="refresh-btn" onClick={() => setIsViewingDetails(false)}>Voltar</button>
             </div>
           </div>
 
-          <div className="cd-details-meta grid-2">
-            <div>
-              <p><strong>Origem:</strong> {getUnitName(selectedTransfer.origem)}</p>
-              <p><strong>Destino:</strong> {getUnitName(selectedTransfer.destino)}</p>
-              <p><strong>Status:</strong> {getStatusBadge(selectedTransfer.status)}</p>
-            </div>
-            <div>
-              <p><strong>Responsável Recepção:</strong> {selectedTransfer.usuarioRecebimento || 'Não recebido ainda'}</p>
-              <p><strong>Data Recepção:</strong> {formatDate(selectedTransfer.dataRecebimento)}</p>
-              <p><strong>Obs:</strong> {selectedTransfer.obs || '-'}</p>
-            </div>
-          </div>
-
-          <div className="table-responsive">
+          <div className="table-responsive" style={{ marginTop: '1rem' }}>
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>ID Item</th>
-                  <th>Produto</th>
-                  <th>Qtd Enviada</th>
-                  <th>Qtd Conferida (Recepção)</th>
-                  <th>Status / Justificativa</th>
-                  <th>Valor Unitário</th>
+                  <th style={{ width: '80px' }}>Código</th>
+                  <th>Descrição do Produto</th>
+                  <th style={{ width: '130px' }}>Classificação</th>
+                  <th style={{ width: '100px', textAlign: 'center' }}>Qtd Enviada</th>
+                  <th style={{ width: '100px', textAlign: 'center' }}>Qtd Conferida</th>
+                  <th style={{ width: '120px', textAlign: 'right' }}>Valor Unitário</th>
+                  <th style={{ width: '130px', textAlign: 'right' }}>Subtotal</th>
                 </tr>
               </thead>
               <tbody>
                 {selectedTransferItems.map((item, idx) => {
                   const prod = products.find(p => p.codigo === item.produtoId);
-                  const isConferido = selectedTransfer.status === 'Conferido/Aprovado' || selectedTransfer.status === 'Aceito Parcialmente' || selectedTransfer.status === 'Rejeitado';
-                  const qtdConferidaVal = item.quantidadeConferida ?? item.quantidade;
-                  const isMatch = Number(qtdConferidaVal) === Number(item.quantidade);
+                  const isFiscal = item.fiscalGerar !== 'N' && (Number(item.codFiscal || item.pro_cod_fiscal) > 0 || item.fiscalGerar === 'S');
+                  const qtd = Number(item.quantidade) || 0;
+                  const vlr = Number(item.valor) || 0;
 
                   return (
                     <tr key={item.id || idx}>
-                      <td>#{item.id}</td>
-                      <td>{prod ? prod.nome : `Produto ID ${item.produtoId}`}</td>
-                      <td>{item.quantidade}</td>
-                      <td>{isConferido ? (item.quantidadeConferida ?? item.quantidade) : '-'}</td>
+                      <td><span className="item-code">#{item.produtoId}</span></td>
+                      <td><strong>{prod ? prod.nome : (item.nome || `Produto #${item.produtoId}`)}</strong></td>
                       <td>
-                        {!isConferido ? (
-                          <span className="badge badge-warning">Aguardando Conferência</span>
-                        ) : isMatch ? (
-                          <span style={{ color: '#10b981', display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}>
-                            <CheckCircle size={16} /> OK
-                          </span>
+                        {isFiscal ? (
+                          <span className="badge badge-success" style={{ fontSize: '0.72rem' }}>🏛️ Fiscal (NF-e)</span>
                         ) : (
-                          <span style={{ color: '#eab308', display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 600 }} title={item.justificativa || 'Divergência de quantidade'}>
-                            <AlertCircle size={16} /> {item.justificativa ? item.justificativa : `Divergência (${item.quantidadeConferida ?? 0}/${item.quantidade})`}
-                          </span>
+                          <span className="badge" style={{ background: '#f1f5f9', color: '#475569', fontSize: '0.72rem' }}>📦 Controle Físico</span>
                         )}
                       </td>
-                      <td>R$ {Number(item.valor).toFixed(2)}</td>
+                      <td style={{ textAlign: 'center', fontWeight: 700 }}>{qtd}</td>
+                      <td style={{ textAlign: 'center' }}>{item.quantidadeConferida ?? '-'}</td>
+                      <td style={{ textAlign: 'right' }}>{formatCurrency(vlr)}</td>
+                      <td style={{ textAlign: 'right', fontWeight: 700 }}>{formatCurrency(qtd * vlr)}</td>
                     </tr>
                   );
                 })}
@@ -863,461 +863,647 @@ export default function TransferTab() {
         </div>
       )}
 
-      {/* SUBTAB: ENVIAR TRANSFERÊNCIA (NOVA) */}
+      {/* ========================================================================= */}
+      {/* SUBTAB 2: NOVO ROMANEIO DE ENVIO (LIVRE ESCOLHA E CLASSIFICAÇÃO AUTO)    */}
+      {/* ========================================================================= */}
       {activeSubTab === 'new' && (
         <div className="list-card glass">
-          <h3><Send size={20} /> Registrar Novo Envio de Estoque</h3>
           
-          <form onSubmit={handleCreateTransfer} className="cd-form">
-            <div className="grid-2">
-              <label className="cd-input-container">
-                Unidade de Origem (Remetente)
-                <select value={origin} onChange={(e) => setOrigin(e.target.value)} className="cd-select" required>
-                  <option value="">Selecione...</option>
-                  {units.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-                </select>
-              </label>
-
-              <label className="cd-input-container">
-                Unidade de Destino (Destinatário)
-                <select value={destination} onChange={(e) => setDestination(e.target.value)} className="cd-select" required>
-                  <option value="">Selecione...</option>
-                  {units.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-                </select>
-              </label>
+          <div className="cd-title-row">
+            <div>
+              <h3><Send size={22} color="#f97316" /> Lançamento de Romaneio de Envio de Mercadorias</h3>
+              <p style={{ fontSize: '0.85rem', color: '#64748b', margin: '2px 0 0 0' }}>
+                Monte o romaneio livremente com qualquer produto e grade. O sistema separará automaticamente os itens fiscais para NF-e.
+              </p>
             </div>
+          </div>
 
-            {/* SELEÇÃO FISCAL VS NÃO FISCAL */}
-            <div style={{ background: 'rgba(255, 255, 255, 0.7)', padding: '1rem', borderRadius: '10px', border: '1px solid rgba(0, 0, 0, 0.08)', margin: '0.5rem 0 1rem 0' }}>
-              <label style={{ fontWeight: 600, display: 'block', marginBottom: '0.6rem', color: 'var(--text-primary)' }}>
-                Tipo de Transferência de Estoque *
-              </label>
-              <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', marginBottom: tipoFiscal === 'FISCAL' ? '1rem' : '0' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontWeight: 500 }}>
-                  <input 
-                    type="radio" 
-                    name="tipoFiscal" 
-                    value="FISCAL" 
-                    checked={tipoFiscal === 'FISCAL'} 
-                    onChange={() => setTipoFiscal('FISCAL')} 
-                  />
-                  📄 <strong>Fiscal (Com NF-e de Transferência)</strong>
+          <form onSubmit={handleCreateTransfer} className="cd-form">
+            
+            {/* CABEÇALHO DO ROMANEIO */}
+            <div className="transfer-header-box">
+              <div className="transfer-section-title">
+                <Building2 size={18} color="#f97316" />
+                <span>1. Dados da Remessa & Rota de Transferência</span>
+              </div>
+
+              <div className="grid-3">
+                <label className="cd-input-container">
+                  Unidade de Origem (Remetente) *
+                  <select 
+                    value={String(origin)} 
+                    onChange={(e) => {
+                      const newOrigin = e.target.value;
+                      setOrigin(newOrigin);
+                      if (String(destination) === String(newOrigin)) {
+                        const nextDest = units.find(u => String(u.id) !== String(newOrigin));
+                        if (nextDest) setDestination(String(nextDest.id));
+                      }
+                    }} 
+                    className="cd-select" 
+                    required
+                    style={{ fontWeight: 600 }}
+                  >
+                    {units.map(u => (
+                      <option key={u.id} value={String(u.id)}>
+                        {u.isMatriz ? '🏢' : '🏬'} {u.name}
+                      </option>
+                    ))}
+                  </select>
                 </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontWeight: 500 }}>
+
+                <label className="cd-input-container">
+                  Unidade de Destino (Destinatário) *
+                  <select 
+                    value={String(destination)} 
+                    onChange={(e) => setDestination(e.target.value)} 
+                    className="cd-select" 
+                    required
+                    style={{ fontWeight: 700, borderColor: '#f97316' }}
+                  >
+                    <option value="">Selecione a Unidade de Destino...</option>
+                    {units.filter(u => String(u.id) !== String(origin)).map(u => (
+                      <option key={u.id} value={String(u.id)}>
+                        {u.isMatriz ? '🏢' : '🏬'} {u.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="cd-input-container">
+                  Data de Saída
                   <input 
-                    type="radio" 
-                    name="tipoFiscal" 
-                    value="NAO_FISCAL" 
-                    checked={tipoFiscal === 'NAO_FISCAL'} 
-                    onChange={() => setTipoFiscal('NAO_FISCAL')} 
+                    type="date" 
+                    value={dataEnvio} 
+                    onChange={(e) => setDataEnvio(e.target.value)} 
+                    className="cd-text-input" 
+                    required 
                   />
-                  📦 <strong>Não Fiscal (Produtos comprados Sem Nota / Interna)</strong>
                 </label>
               </div>
 
-              {tipoFiscal === 'FISCAL' && (
-                <div style={{ marginTop: '0.75rem' }}>
-                  <div className="grid-2">
-                    <label className="cd-input-container">
-                      Número da Nota Fiscal (NF-e)
-                      <input 
-                        type="text" 
-                        value={numeroNf} 
-                        onChange={(e) => setNumeroNf(e.target.value)} 
-                        placeholder="Ex: 000.124.890" 
-                        className="cd-text-input" 
-                      />
-                    </label>
-                    <label className="cd-input-container">
-                      Chave de Acesso da NF-e (44 Dígitos)
-                      <input 
-                        type="text" 
-                        value={chaveNfe} 
-                        onChange={(e) => setChaveNfe(e.target.value)} 
-                        placeholder="3523..." 
-                        maxLength={44} 
-                        className="cd-text-input" 
-                      />
-                    </label>
-                  </div>
-                  <div style={{ marginTop: '0.65rem', display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                    <button 
-                      type="button" 
-                      onClick={handleFetchNfItems}
-                      disabled={loadingNf}
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        background: 'linear-gradient(135deg, #2563eb, #3b82f6)',
-                        color: '#ffffff',
-                        border: 'none',
-                        padding: '0.6rem 1.2rem',
-                        borderRadius: '8px',
-                        cursor: 'pointer',
-                        fontWeight: 600,
-                        fontSize: '0.88rem',
-                        boxShadow: '0 2px 6px rgba(37, 99, 235, 0.3)'
-                      }}
-                    >
-                      {loadingNf ? '⌛ Processando...' : '📥 Puxar Itens da Nota de Compra'}
-                    </button>
+              <div className="transfer-section-title" style={{ marginTop: '0.5rem' }}>
+                <Truck size={18} color="#2563eb" />
+                <span>2. Transporte & Observações Logísticas</span>
+              </div>
 
+              <div className="grid-3">
+                <label className="cd-input-container">
+                  Motorista / Transportador
+                  <input 
+                    type="text" 
+                    value={motorista} 
+                    onChange={(e) => setMotorista(e.target.value)} 
+                    placeholder="Nome do motorista / transportadora..." 
+                    className="cd-text-input" 
+                  />
+                </label>
+
+                <label className="cd-input-container">
+                  Placa do Veículo
+                  <input 
+                    type="text" 
+                    value={placaVeiculo} 
+                    onChange={(e) => setPlacaVeiculo(e.target.value.toUpperCase())} 
+                    placeholder="Ex: ABC-1234" 
+                    className="cd-text-input" 
+                  />
+                </label>
+
+                <label className="cd-input-container">
+                  Observações do Romaneio
+                  <input 
+                    type="text" 
+                    value={obs} 
+                    onChange={(e) => setObs(e.target.value)} 
+                    placeholder="Ex: Caixas 01 a 05 - Coleção Inverno" 
+                    className="cd-text-input" 
+                  />
+                </label>
+              </div>
+            </div>
+
+            {/* SEÇÃO DE ADIÇÃO RÁPIDA DE PRODUTOS AO ROMANEIO */}
+            <div className="transfer-add-items-card">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Package size={20} color="#2563eb" />
+                  <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 700 }}>Escolha de Produtos & Variações de Grade</h4>
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  {/* Bipagem Rápida */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '0.5rem', padding: '2px 8px' }}>
+                    <Barcode size={18} color="#64748b" />
+                    <input 
+                      ref={barcodeInputRef}
+                      type="text"
+                      value={barcodeInput}
+                      onChange={(e) => setBarcodeInput(e.target.value)}
+                      onKeyDown={handleBarcodeScan}
+                      placeholder="Bipar Código EAN..."
+                      style={{ border: 'none', outline: 'none', fontSize: '0.85rem', width: '150px' }}
+                    />
+                  </div>
+
+                  {/* Puxar de Compra / NF */}
+                  <button 
+                    type="button" 
+                    className="btn-secondary small" 
+                    onClick={() => setShowNfImportBox(!showNfImportBox)}
+                    style={{ background: '#f0fdf4', color: '#16a34a', borderColor: '#bbf7d0' }}
+                  >
+                    📥 Puxar de Compra / NF-e
+                  </button>
+                </div>
+              </div>
+
+              {/* Caixa de Importação de Compra */}
+              {showNfImportBox && (
+                <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: '0.75rem', border: '1px solid #e2e8f0', marginBottom: '1rem', display: 'flex', gap: '0.75rem', alignItems: 'flex-end' }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '4px' }}>
+                      Número da Nota ou Chave de Acesso da Compra:
+                    </label>
+                    <input 
+                      type="text" 
+                      value={nfSearchTerm} 
+                      onChange={(e) => setNfSearchTerm(e.target.value)} 
+                      placeholder="Digite o número da NF de compra..." 
+                      className="cd-text-input" 
+                    />
+                  </div>
+                  <button 
+                    type="button" 
+                    className="btn-primary" 
+                    onClick={handleFetchNfItems}
+                    disabled={loadingNf}
+                    style={{ height: '38px', padding: '0 1.25rem' }}
+                  >
+                    {loadingNf ? 'Importando...' : 'Carregar Itens'}
+                  </button>
+                </div>
+              )}
+
+              {/* Seletor com LookupSelect */}
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
+                <label style={{ fontWeight: 600, fontSize: '0.85rem' }}>Pesquisar Produto no Catálogo do CD:</label>
+                <LookupSelect
+                  value={selectedProductObj ? `#${selectedProductObj.codigo} - ${selectedProductObj.nome}` : ''}
+                  placeholder="Busque por descrição, código, EAN ou referência..."
+                  title="Selecionar Produto para o Romaneio"
+                  subtitle="Busca rápida no estoque central do CD"
+                  icon={Package}
+                  searchPlaceholder="Digite o nome, código ou EAN..."
+                  fetchData={async (termo, targetPage, limit) => {
+                    let url = `/v1/produtos?page=${targetPage}&limit=${limit}`;
+                    if (termo) url += `&busca=${encodeURIComponent(termo)}&termo=${encodeURIComponent(termo)}`;
+                    const res = await api.get(url);
+                    return res.data;
+                  }}
+                  columns={[
+                    { key: 'codigo', label: 'Código', width: '90px', render: (p) => <span className="item-code">#{p.codigo || p.PRO_CODIGO}</span> },
+                    { key: 'nome', label: 'Descrição do Produto', render: (p) => <strong>{p.nome || p.PRO_NOME}</strong> },
+                    { key: 'codbarra', label: 'Cód. Barras', render: (p) => <code>{p.codbarra || '-'}</code> },
+                    { 
+                      key: 'fiscal', 
+                      label: 'Natureza', 
+                      width: '110px',
+                      render: (p) => (p.pro_fiscal_gerar !== 'N' && ((p.pro_cod_fiscal && Number(p.pro_cod_fiscal) > 0) || p.pro_fiscal_gerar === 'S'))
+                        ? <span className="badge badge-success" style={{ fontSize: '0.7rem' }}>🏛️ Fiscal</span>
+                        : <span className="badge" style={{ background: '#f1f5f9', color: '#475569', fontSize: '0.7rem' }}>📦 Físico</span>
+                    },
+                    { key: 'valorv', label: 'Preço Venda', align: 'right', render: (p) => formatCurrency(p.valorv || 0) }
+                  ]}
+                  onSelect={(p) => handleSelectProduct(p)}
+                />
+              </div>
+
+              {/* MATRIZ DE VARIAÇÕES DE GRADE (Se o produto tiver variações cadastradas) */}
+              {selectedProductObj && productGrades.length > 0 && (
+                <div className="transfer-grade-matrix-card">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                    <span style={{ fontWeight: 700, color: '#1e293b' }}>
+                      ✨ Variações de Tamanho / Grade de: {selectedProductObj.nome}
+                    </span>
+                    <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                      Informe a quantidade desejada em cada tamanho:
+                    </span>
+                  </div>
+
+                  <div className="transfer-grade-matrix-grid">
+                    {productGrades.map(g => {
+                      const gId = g.codigo || g.id || g.gra_codigo;
+                      const tamNome = g.tam_nome || g.tam || g.sigla || 'UN';
+                      const currentVal = matrixQuantities[gId] || '';
+
+                      return (
+                        <div key={gId} className="transfer-grade-box">
+                          <div className="transfer-grade-label">{tamNome}</div>
+                          <div className="transfer-grade-stock">Estoque CD: {g.quantidade || 0}</div>
+                          <input 
+                            type="number"
+                            min="0"
+                            value={currentVal}
+                            onChange={(e) => handleMatrixQtyChange(gId, e.target.value)}
+                            placeholder="0"
+                            className="transfer-grade-input"
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
                     <button 
                       type="button" 
-                      onClick={handleEmitTransferNfe}
-                      disabled={loadingNf}
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        background: 'linear-gradient(135deg, #10b981, #059669)',
-                        color: '#ffffff',
-                        border: 'none',
-                        padding: '0.6rem 1.2rem',
-                        borderRadius: '8px',
-                        cursor: 'pointer',
-                        fontWeight: 600,
-                        fontSize: '0.88rem',
-                        boxShadow: '0 2px 6px rgba(16, 185, 129, 0.3)'
-                      }}
+                      className="btn-primary" 
+                      onClick={handleAddGradeMatrixToTransfer}
+                      style={{ padding: '0.6rem 1.5rem', fontWeight: 700 }}
                     >
-                      {loadingNf ? '⌛ Transmitindo SEFAZ...' : '⚡ Emitir Nova NF-e via SEFAZ'}
+                      + Inserir Grade no Romaneio
                     </button>
                   </div>
                 </div>
               )}
-            </div>
 
-            <label className="cd-input-container">
-              Observações gerais
-              <input 
-                type="text" 
-                value={obs} 
-                onChange={(e) => setObs(e.target.value)} 
-                placeholder="Ex: Envio de mercadorias entre filiais" 
-                className="cd-text-input" 
-              />
-            </label>
+              {/* SELEÇÃO SIMPLES (Caso o produto não tenha matriz de grades) */}
+              {selectedProductObj && productGrades.length === 0 && (
+                <div style={{ background: '#ffffff', padding: '1rem', borderRadius: '0.75rem', border: '1px solid #cbd5e1', display: 'flex', gap: '1rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                  <div style={{ flex: 2, minWidth: '200px' }}>
+                    <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#475569' }}>Produto Selecionado:</label>
+                    <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#1e293b' }}>
+                      #{selectedProductObj.codigo} - {selectedProductObj.nome}
+                    </div>
+                  </div>
 
-            {/* Adicionar Itens */}
-            <div className="cd-add-item-box">
-              <h4>Adicionar Produtos ao Lote</h4>
-              <div className="grid-3">
-                <div className="cd-input-container">
-                  <label>Produto Selecionado *</label>
-                  <button
-                    type="button"
-                    onClick={() => setShowProductSearchModal(true)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justify: 'space-between',
-                      padding: '0.65rem 0.9rem',
-                      backgroundColor: '#ffffff',
-                      border: '1px solid rgba(0, 0, 0, 0.15)',
-                      borderRadius: '8px',
-                      color: selectedProduct ? 'var(--text-primary)' : '#6b7280',
-                      fontWeight: selectedProduct ? 600 : 400,
-                      cursor: 'pointer',
-                      fontSize: '0.88rem',
-                      width: '100%',
-                      textAlign: 'left'
-                    }}
+                  <div style={{ width: '110px' }}>
+                    <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#475569' }}>Quantidade:</label>
+                    <input 
+                      type="number" 
+                      min="1"
+                      value={singleQty} 
+                      onChange={(e) => setSingleQty(e.target.value)} 
+                      className="cd-text-input" 
+                      style={{ fontWeight: 700 }}
+                    />
+                  </div>
+
+                  <div style={{ width: '130px' }}>
+                    <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#475569' }}>Valor Unitário:</label>
+                    <input 
+                      type="number" 
+                      step="0.01"
+                      value={singlePrice} 
+                      onChange={(e) => setSinglePrice(e.target.value)} 
+                      className="cd-text-input" 
+                    />
+                  </div>
+
+                  <button 
+                    type="button" 
+                    className="btn-primary" 
+                    onClick={handleAddSingleProductToTransfer}
+                    style={{ height: '38px', padding: '0 1.25rem' }}
                   >
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {selectedProduct ? (
-                        (() => {
-                          const p = products.find(prod => prod.codigo === Number(selectedProduct));
-                          return p ? `#${p.codigo} - ${p.nome}` : 'Produto Selecionado';
-                        })()
-                      ) : (
-                        '🔍 Buscar produto no estoque (Popup)...'
-                      )}
-                    </span>
-                    <Search size={16} style={{ color: 'var(--accent-primary)', flexShrink: 0, marginLeft: '6px' }} />
+                    + Adicionar Item
                   </button>
                 </div>
+              )}
 
-                <label className="cd-input-container">
-                  Quantidade
-                  <input 
-                    type="number" 
-                    value={quantity} 
-                    onChange={(e) => setQuantity(e.target.value)} 
-                    placeholder="Qtd" 
-                    className="cd-text-input" 
-                  />
-                </label>
-
-                <label className="cd-input-container">
-                  Preço Venda Unitário
-                  <input 
-                    type="number" 
-                    value={price} 
-                    onChange={(e) => setPrice(e.target.value)} 
-                    placeholder="Valor" 
-                    className="cd-text-input" 
-                  />
-                </label>
-              </div>
-              <button type="button" className="add-item-btn" onClick={handleAddItemToTransfer}>
-                + Adicionar Produto no Lote
-              </button>
             </div>
 
-            {/* Lista Temporária de Itens da Nova Transferência */}
-            {transferItems.length > 0 && (
-              <div className="cd-temp-items-list">
-                <h5>Produtos Prontos para Envio</h5>
-                <table className="temp-table">
+            {/* TABELA DE ITENS INCLUSOS NO ROMANEIO */}
+            <div className="product-section-card" style={{ marginTop: '1rem' }}>
+              <div className="product-section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <ShoppingBag size={18} color="#16a34a" /> Itens Inclusos no Romaneio de Envio ({transferItems.length} linhas)
+                </div>
+                {transferItems.length > 0 && (
+                  <button 
+                    type="button" 
+                    onClick={() => setTransferItems([])}
+                    style={{ background: 'transparent', border: 'none', color: '#dc2626', fontSize: '0.8rem', cursor: 'pointer', fontWeight: 600 }}
+                  >
+                    Limpar Todos
+                  </button>
+                )}
+              </div>
+
+              <div className="table-responsive" style={{ maxHeight: '320px', overflowY: 'auto' }}>
+                <table className="data-table">
                   <thead>
                     <tr>
-                      <th>Produto</th>
-                      <th>Quantidade</th>
-                      <th>Valor Unitário</th>
-                      <th>Ações</th>
+                      <th style={{ width: '80px' }}>Código</th>
+                      <th>Descrição do Produto</th>
+                      <th style={{ width: '120px', textAlign: 'center' }}>Variação / Tam</th>
+                      <th style={{ width: '150px' }}>Classificação Fiscal Auto</th>
+                      <th style={{ width: '100px', textAlign: 'center' }}>Qtd</th>
+                      <th style={{ width: '120px', textAlign: 'right' }}>Vlr Unitário</th>
+                      <th style={{ width: '130px', textAlign: 'right' }}>Subtotal</th>
+                      <th style={{ width: '60px', textAlign: 'center' }}>Ação</th>
                     </tr>
                   </thead>
                   <tbody>
                     {transferItems.map((item, idx) => (
                       <tr key={idx}>
-                        <td>{item.nome}</td>
-                        <td>{item.quantidade}</td>
-                        <td>R$ {Number(item.valor).toFixed(2)}</td>
+                        <td><span className="item-code">#{item.produto_id}</span></td>
+                        <td><strong>{item.nome}</strong></td>
+                        <td style={{ textAlign: 'center' }}>
+                          <span className="badge badge-info" style={{ fontSize: '0.75rem' }}>
+                            {item.tamanho || 'UN'} {item.cor && item.cor !== 'UNICA' ? `• ${item.cor}` : ''}
+                          </span>
+                        </td>
                         <td>
+                          {item.isFiscal ? (
+                            <span 
+                              className="badge badge-success" 
+                              style={{ fontSize: '0.75rem', cursor: 'pointer' }}
+                              onClick={() => handleToggleItemFiscal(idx)}
+                              title="Clique para alternar classificação"
+                            >
+                              🏛️ Fiscal (Gera NF-e)
+                            </span>
+                          ) : (
+                            <span 
+                              className="badge" 
+                              style={{ background: '#f1f5f9', color: '#475569', fontSize: '0.75rem', cursor: 'pointer' }}
+                              onClick={() => handleToggleItemFiscal(idx)}
+                              title="Clique para alternar classificação"
+                            >
+                              📦 Controle Físico
+                            </span>
+                          )}
+                        </td>
+                        <td style={{ textAlign: 'center' }}>
+                          <input 
+                            type="number"
+                            min="1"
+                            value={item.quantidade}
+                            onChange={(e) => handleUpdateItemQty(idx, e.target.value)}
+                            style={{ width: '70px', padding: '0.25rem', textAlign: 'center', fontWeight: 700, borderRadius: '0.35rem', border: '1px solid #cbd5e1' }}
+                          />
+                        </td>
+                        <td style={{ textAlign: 'right' }}>
+                          <input 
+                            type="number"
+                            step="0.01"
+                            value={item.valor}
+                            onChange={(e) => handleUpdateItemValor(idx, e.target.value)}
+                            style={{ width: '90px', padding: '0.25rem', textAlign: 'right', borderRadius: '0.35rem', border: '1px solid #cbd5e1' }}
+                          />
+                        </td>
+                        <td style={{ textAlign: 'right', fontWeight: 700 }}>
+                          {formatCurrency(item.quantidade * item.valor)}
+                        </td>
+                        <td style={{ textAlign: 'center' }}>
                           <button 
                             type="button" 
-                            className="remove-temp-btn" 
-                            onClick={() => handleRemoveItemFromTransfer(item.produto_id)}
+                            className="crud-row-btn delete" 
+                            onClick={() => handleRemoveItemFromTransfer(idx)}
+                            title="Remover Item"
                           >
-                            Remover
+                            <Trash2 size={14} />
                           </button>
                         </td>
                       </tr>
                     ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            <button type="submit" className="submit-transfer-btn" disabled={loading}>
-              Enviar Transferência (Mudar Status para "Em Trânsito")
-            </button>
-          </form>
-        </div>
-      )}
-
-      {/* SUBTAB: CONFERÊNCIA DE RECEBIMENTO */}
-      {activeSubTab === 'reception' && receptionTransfer && (
-        <div className="list-card glass">
-          <h3><ShieldCheck size={20} /> Conferência física e Recebimento de Carga</h3>
-          <p>Você está recebendo mercadorias destinadas a <strong>{getUnitName(receptionTransfer.destino)}</strong> vindas da unidade <strong>{getUnitName(receptionTransfer.origem)}</strong>.</p>
-          
-          <div className="cd-form">
-            <label className="cd-input-container" style={{ marginBottom: '1.5rem' }}>
-              Nome Completo do Conferente / Responsável pela Validação
-              <input 
-                type="text" 
-                value={checkerName} 
-                onChange={(e) => setCheckerName(e.target.value)} 
-                placeholder="Ex: João da Silva (Gerente)" 
-                className="cd-text-input" 
-                required
-              />
-            </label>
-
-            <div className="table-responsive">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Produto</th>
-                    <th>Qtd Enviada</th>
-                    <th>Qtd Conferida (Fisicamente Recebida)</th>
-                    <th>Status / Justificativa (Divergência)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {receptionItems.map((item, idx) => {
-                    const prod = products.find(p => p.codigo === item.produtoId);
-                    const isMatch = Number(item.quantidadeConferida) === Number(item.quantidade);
-
-                    return (
-                      <tr key={item.id || idx}>
-                        <td>{prod ? prod.nome : `Produto ID ${item.produtoId}`}</td>
-                        <td><strong>{item.quantidade}</strong></td>
-                        <td>
-                          <input 
-                            type="number" 
-                            value={item.quantidadeConferida} 
-                            onChange={(e) => handleQtyConferidaChange(idx, e.target.value)}
-                            className="cd-inline-input"
-                            style={{ width: '90px' }}
-                          />
-                        </td>
-                        <td>
-                          {isMatch ? (
-                            <span style={{ color: '#10b981', display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}>
-                              <CheckCircle size={16} /> OK (Quantidade Correta)
-                            </span>
-                          ) : (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              <AlertCircle size={16} style={{ color: '#eab308', flexShrink: 0 }} />
-                              <input 
-                                type="text" 
-                                value={item.justificativa || ''} 
-                                onChange={(e) => handleJustificativaChange(idx, e.target.value)}
-                                placeholder="Motivo/Justificativa da divergência..."
-                                className="cd-text-input"
-                                style={{ padding: '4px 8px', fontSize: '0.82rem' }}
-                              />
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            <label className="cd-input-container" style={{ marginTop: '1.25rem' }}>
-              Observações Gerais sobre a Recepção (Caso haja divergência ou rejeição)
-              <input 
-                type="text" 
-                value={receptionObs} 
-                onChange={(e) => setReceptionObs(e.target.value)} 
-                placeholder="Ex: 2 itens vieram com defeito na embalagem..." 
-                className="cd-text-input" 
-              />
-            </label>
-
-            <div className="cd-action-row" style={{ marginTop: '2rem', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-              <button 
-                type="button" 
-                className="submit-transfer-btn" 
-                onClick={() => handleApproveReception('Conferido/Aprovado')}
-                disabled={loading}
-                style={{ background: 'linear-gradient(135deg, #10b981, #059669)', flex: 1 }}
-              >
-                <CheckCircle size={18} /> Aceitar Total (Estoque 100% OK)
-              </button>
-
-              <button 
-                type="button" 
-                className="submit-transfer-btn" 
-                onClick={() => handleApproveReception('Aceito Parcialmente')}
-                disabled={loading}
-                style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', flex: 1 }}
-              >
-                <AlertCircle size={18} /> Aceitar em Partes (Com Divergências)
-              </button>
-
-              <button 
-                type="button" 
-                className="submit-transfer-btn reject" 
-                onClick={() => handleApproveReception('Rejeitado')}
-                disabled={loading}
-                style={{ flex: 1 }}
-              >
-                <XCircle size={18} /> Rejeitar Carga / Devolver
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL POPUP DE BUSCA DE PRODUTOS PARA TRANSFERÊNCIA (IGUAL À TELA PRODUTOS) */}
-      {showProductSearchModal && createPortal(
-        <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowProductSearchModal(false); }}>
-          <div className="modal-content glass" style={{ maxWidth: '1020px', width: '94vw', padding: '1.25rem 1.5rem' }}>
-            <div className="modal-header">
-              <h4><Package size={20} style={{ color: 'var(--accent-primary)' }} /> Selecionar Produto do Estoque</h4>
-              <button className="btn-close" onClick={() => setShowProductSearchModal(false)}><X size={18} /></button>
-            </div>
-
-            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1rem 0' }}>
-              <SearchBar
-                value={modalSearchTerm}
-                onChange={(val) => setModalSearchTerm(val)}
-                onSearch={() => {}}
-                onClear={() => setModalSearchTerm('')}
-                placeholder="Buscar por nome, fabricante, código de barras..."
-              />
-
-              <div className="filter-bar" style={{ margin: 0 }}>
-                <button className={`filter-btn ${modalStockFilter === 'todos' ? 'active' : ''}`} onClick={() => setModalStockFilter('todos')}>Todos</button>
-                <button className={`filter-btn ${modalStockFilter === 'low' ? 'active' : ''}`} onClick={() => setModalStockFilter('low')}>Quase Acabando</button>
-                <button className={`filter-btn ${modalStockFilter === 'out' ? 'active' : ''}`} onClick={() => setModalStockFilter('out')}>Sem Estoque</button>
-              </div>
-
-              <div className="table-responsive" style={{ maxHeight: '380px', overflowY: 'auto' }}>
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th style={{ width: '80px' }}>Código</th>
-                      <th>Nome</th>
-                      <th style={{ width: '120px' }}>Fabricante</th>
-                      <th style={{ width: '130px' }}>Cód. Barras</th>
-                      <th style={{ width: '90px', textAlign: 'center' }}>Estoque</th>
-                      <th style={{ width: '100px', textAlign: 'right' }}>Valor</th>
-                      <th style={{ width: '110px', textAlign: 'center' }}>Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {modalSearchLoading ? (
+                    {transferItems.length === 0 && (
                       <tr>
-                        <td colSpan="7" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
-                          ⌛ Buscando produtos no servidor central...
+                        <td colSpan="8" style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
+                          Nenhum produto adicionado ao romaneio ainda. Use a pesquisa ou o leitor de código de barras acima.
                         </td>
                       </tr>
-                    ) : modalProducts.length === 0 ? (
-                      <tr>
-                        <td colSpan="7" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
-                          Nenhum produto encontrado.
-                        </td>
-                      </tr>
-                    ) : (
-                      modalProducts.map(p => (
-                        <tr key={p.codigo} style={{ cursor: 'pointer' }} onClick={() => handleSelectProductFromModal(p)}>
-                          <td><span className="item-code">#{p.codigo}</span></td>
-                          <td><strong>{p.nome}</strong></td>
-                          <td>{p.fabricante || '-'}</td>
-                          <td>{p.codbarra || '-'}</td>
-                          <td style={{ textAlign: 'center' }}>
-                            <span className={`badge ${p.quantidade > 5 ? 'badge-success' : p.quantidade > 0 ? 'badge-warning' : 'badge-danger'}`}>
-                              {p.quantidade || 0}
-                            </span>
-                          </td>
-                          <td style={{ textAlign: 'right' }}><strong style={{ color: 'var(--accent-primary)' }}>{formatCurrency(p.valorv || 0)}</strong></td>
-                          <td style={{ textAlign: 'center' }}>
-                            <button type="button" className="btn-primary" style={{ padding: '4px 10px', fontSize: '0.78rem', whiteSpace: 'nowrap' }}>
-                              + Selecionar
-                            </button>
-                          </td>
-                        </tr>
-                      ))
                     )}
                   </tbody>
                 </table>
               </div>
+            </div>
 
-              <Pagination
-                currentPage={modalSearchMeta.page || modalSearchPage}
-                totalPages={modalSearchMeta.pages || 1}
-                onPageChange={handleModalPageChange}
+            {/* PAINEL DE RESUMO & CLASSIFICAÇÃO AUTOMÁTICA DO ROMANEIO */}
+            <div className="transfer-summary-panel">
+              <div className="transfer-summary-grid">
+                
+                <div className="transfer-kpi-card total">
+                  <div className="transfer-kpi-title">📦 Total no Romaneio</div>
+                  <div className="transfer-kpi-value">{totalPecas} peças</div>
+                  <div className="transfer-kpi-sub">{formatCurrency(totalValor)}</div>
+                </div>
+
+                <div className="transfer-kpi-card fiscal">
+                  <div className="transfer-kpi-title">🏛️ Itens Fiscais (NF-e Mod 55)</div>
+                  <div className="transfer-kpi-value" style={{ color: '#059669' }}>{pecasFiscais} peças</div>
+                  <div className="transfer-kpi-sub">
+                    {formatCurrency(valorFiscal)} • <em>Gera NF-e de Transferência</em>
+                  </div>
+                </div>
+
+                <div className="transfer-kpi-card physical">
+                  <div className="transfer-kpi-title">📋 Controle Físico / Interno</div>
+                  <div className="transfer-kpi-value" style={{ color: '#0284c7' }}>{pecasFisicas} peças</div>
+                  <div className="transfer-kpi-sub">
+                    {formatCurrency(valorFisico)} • <em>Apenas Romaneio de Carga</em>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            {/* BOTÕES DE FINALIZAÇÃO */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
+              <button 
+                type="button" 
+                className="btn-secondary" 
+                onClick={() => { setTransferItems([]); setActiveSubTab('list'); }}
+              >
+                Cancelar
+              </button>
+              <button 
+                type="submit" 
+                className="btn-primary" 
+                disabled={loading || transferItems.length === 0}
+                style={{ padding: '0.75rem 2rem', fontSize: '1rem', fontWeight: 700 }}
+              >
+                <Send size={18} /> Salvar & Expedir Romaneio
+              </button>
+            </div>
+
+          </form>
+
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* SUBTAB 3: CONFERÊNCIA CEGA DE RECEBIMENTO NA FILIAL                      */}
+      {/* ========================================================================= */}
+      {activeSubTab === 'reception' && receptionTransfer && (
+        <div className="list-card glass">
+          <div className="cd-title-row">
+            <div>
+              <h3><ShieldCheck size={22} color="#10b981" /> Conferência Cega — Recebimento de Carga</h3>
+              <span style={{ fontSize: '0.85rem', color: '#64748b' }}>
+                Romaneio Lote #{receptionTransfer.id} • Destino: {getUnitName(receptionTransfer.destino)}
+              </span>
+              <p style={{ fontSize: '0.78rem', color: '#94a3b8', margin: '4px 0 0 0', fontStyle: 'italic' }}>
+                🔒 Conferência Cega: conte fisicamente cada item e registre a quantidade real. A quantidade esperada ficará oculta até que você clique em "Revelar Divergências".
+              </p>
+            </div>
+            <button className="refresh-btn" onClick={() => setActiveSubTab('list')}>Voltar</button>
+          </div>
+
+          <div className="table-responsive" style={{ marginTop: '1rem' }}>
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th style={{ width: '80px' }}>Código</th>
+                  <th>Descrição do Produto</th>
+                  <th style={{ width: '130px', textAlign: 'center' }}>Qtd Contada (Real)</th>
+                  {blindCheckRevealed && (
+                    <>
+                      <th style={{ width: '100px', textAlign: 'center' }}>Qtd Esperada</th>
+                      <th style={{ width: '110px', textAlign: 'center' }}>Divergência</th>
+                    </>
+                  )}
+                  <th>Justificativa / Divergência</th>
+                </tr>
+              </thead>
+              <tbody>
+                {receptionItems.map((item, idx) => {
+                  const prod = products.find(p => p.codigo === item.produtoId);
+                  const diff = blindCheckRevealed ? (Number(item.quantidadeConferida) - Number(item.quantidade)) : null;
+                  return (
+                    <tr key={idx} style={blindCheckRevealed && diff !== 0 ? { background: '#fef2f2' } : {}}>
+                      <td><span className="item-code">#{item.produtoId}</span></td>
+                      <td><strong>{prod ? prod.nome : (item.nome || `Produto #${item.produtoId}`)}</strong></td>
+                      <td style={{ textAlign: 'center' }}>
+                        <input 
+                          type="number"
+                          min="0"
+                          value={item.quantidadeConferida}
+                          onChange={(e) => {
+                            const next = [...receptionItems];
+                            next[idx].quantidadeConferida = Number(e.target.value) || 0;
+                            setReceptionItems(next);
+                          }}
+                          style={{ 
+                            width: '90px', padding: '0.4rem', textAlign: 'center', fontWeight: 700, 
+                            borderRadius: '0.35rem', border: '2px solid #10b981', fontSize: '1rem',
+                            background: '#f0fdf4'
+                          }}
+                        />
+                      </td>
+                      {blindCheckRevealed && (
+                        <>
+                          <td style={{ textAlign: 'center', fontWeight: 700, color: '#64748b' }}>{item.quantidade}</td>
+                          <td style={{ textAlign: 'center' }}>
+                            {diff === 0 ? (
+                              <span className="badge badge-success" style={{ fontSize: '0.75rem' }}>✅ OK</span>
+                            ) : diff > 0 ? (
+                              <span className="badge badge-warning" style={{ background: '#f59e0b', color: '#fff', fontSize: '0.75rem' }}>+{diff} Sobra</span>
+                            ) : (
+                              <span className="badge" style={{ background: '#ef4444', color: '#fff', fontSize: '0.75rem' }}>{diff} Falta</span>
+                            )}
+                          </td>
+                        </>
+                      )}
+                      <td>
+                        <input 
+                          type="text"
+                          value={item.justificativa}
+                          onChange={(e) => {
+                            const next = [...receptionItems];
+                            next[idx].justificativa = e.target.value;
+                            setReceptionItems(next);
+                          }}
+                          placeholder={blindCheckRevealed ? "Justifique sobras, faltas ou avarias..." : "Observação (opcional)..."}
+                          style={{ width: '100%', padding: '0.35rem 0.6rem', borderRadius: '0.35rem', border: '1px solid #cbd5e1' }}
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          <div style={{ marginTop: '1.5rem', display: 'flex', gap: '1rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+            <div style={{ flex: 1, minWidth: '220px' }}>
+              <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                Nome do Conferente / Responsável *:
+              </label>
+              <input 
+                type="text"
+                value={checkerName}
+                onChange={(e) => setCheckerName(e.target.value)}
+                placeholder="Digite seu nome completo..."
+                className="cd-text-input"
+                required
               />
             </div>
 
-            <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
-              <button type="button" className="btn-secondary" onClick={() => setShowProductSearchModal(false)}>Fechar</button>
+            <div style={{ flex: 2, minWidth: '300px' }}>
+              <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                Observações da Recepção:
+              </label>
+              <input 
+                type="text"
+                value={receptionObs}
+                onChange={(e) => setReceptionObs(e.target.value)}
+                placeholder="Observações sobre o estado das caixas e lacres..."
+                className="cd-text-input"
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              {!blindCheckRevealed ? (
+                <button 
+                  type="button" 
+                  className="btn-primary" 
+                  onClick={() => {
+                    const allZero = receptionItems.every(it => Number(it.quantidadeConferida) === 0);
+                    if (allZero) {
+                      alert('Nenhum item foi contado ainda. Insira a quantidade real de cada item antes de revelar as divergências.');
+                      return;
+                    }
+                    setBlindCheckRevealed(true);
+                  }}
+                  style={{ background: '#7c3aed', height: '40px', padding: '0 1.5rem' }}
+                >
+                  <Eye size={18} /> Revelar Divergências
+                </button>
+              ) : (
+                <button 
+                  type="button" 
+                  className="btn-primary" 
+                  onClick={() => handleApproveReception('Conferido/Aprovado')}
+                  style={{ background: '#059669', height: '40px', padding: '0 1.5rem' }}
+                >
+                  <CheckCircle size={18} /> Aprovar Recepção
+                </button>
+              )}
             </div>
           </div>
-        </div>,
-        document.body
+
+          {blindCheckRevealed && (() => {
+            const divergences = receptionItems.filter(it => Number(it.quantidadeConferida) !== Number(it.quantidade));
+            if (divergences.length === 0) return (
+              <div style={{ marginTop: '1rem', padding: '0.75rem 1rem', background: '#f0fdf4', borderRadius: '0.5rem', border: '1px solid #86efac', fontSize: '0.9rem', color: '#166534' }}>
+                ✅ Conferência 100% — Todos os {receptionItems.length} itens bateram com as quantidades esperadas.
+              </div>
+            );
+            return (
+              <div style={{ marginTop: '1rem', padding: '0.75rem 1rem', background: '#fef2f2', borderRadius: '0.5rem', border: '1px solid #fca5a5', fontSize: '0.9rem', color: '#991b1b' }}>
+                ⚠️ {divergences.length} item(ns) com divergência detectada. Preencha a justificativa antes de aprovar.
+              </div>
+            );
+          })()}
+
+        </div>
       )}
 
-      {/* MODAL DE IMPRESSÃO DO ROMANEIO DE TRANSFERÊNCIA */}
+      {/* ========================================================================= */}
+      {/* MODAL DE IMPRESSÃO DO ROMANEIO (GUIA A4)                                  */}
+      {/* ========================================================================= */}
       {showRomaneioModal && romaneioTransfer && (
         <RomaneioModal
           transfer={romaneioTransfer}
@@ -1328,16 +1514,16 @@ export default function TransferTab() {
         />
       )}
 
-      {/* MODAL DE EMISSÃO, EDIÇÃO E VISUALIZAÇÃO DE NF-E DE TRANSFERÊNCIA */}
+      {/* ========================================================================= */}
+      {/* MODAL DE EMISSÃO / DANFE DA NF-e DE TRANSFERÊNCIA                         */}
+      {/* ========================================================================= */}
       {showNfeModal && nfeTransfer && (
         <NfeTransferModal
           transfer={nfeTransfer}
           items={nfeItems}
           units={units}
           onClose={() => setShowNfeModal(false)}
-          onNfeUpdated={() => {
-            fetchTransfers();
-          }}
+          onNfeUpdated={() => fetchTransfers()}
         />
       )}
 

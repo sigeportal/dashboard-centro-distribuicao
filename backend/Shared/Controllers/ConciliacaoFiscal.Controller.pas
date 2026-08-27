@@ -5,6 +5,7 @@ interface
 uses
   Horse,
   Horse.Commons,
+  Horse.GBSwagger,
   Classes,
   SysUtils,
   System.Json,
@@ -321,9 +322,16 @@ var
   Query: iQuery;
   ResArray: TJSONArray;
   Obj: TJSONObject;
+  LBusca: string;
 begin
   ResArray := TJSONArray.Create;
   try
+    LBusca := '';
+    if Req.Query.ContainsKey('busca') then
+      LBusca := Trim(Req.Query.Items['busca'])
+    else if Req.Query.ContainsKey('termo') then
+      LBusca := Trim(Req.Query.Items['termo']);
+
     Query := TDatabase.Query;
     Query.Clear;
     Query.Add('SELECT PRO_CODIGO, PRO_NOME, PRO_CODBARRA, PRO_NCM, PRO_CFOP, PRO_CEST,');
@@ -332,6 +340,15 @@ begin
     Query.Add('FROM PRODUTOS');
     Query.Add('WHERE COALESCE(PRO_ESTADO, ''ATIVO'') = ''ATIVO''');
     Query.Add('AND (COALESCE(PRO_COD_FISCAL, 0) = 0 OR PRO_COD_FISCAL = PRO_CODIGO)');
+    if LBusca <> '' then
+    begin
+      Query.Add('AND (UPPER(PRO_NOME) LIKE :BUSCA OR PRO_CODBARRA LIKE :BUSCA2');
+      if StrToIntDef(LBusca, 0) > 0 then
+        Query.Add('OR PRO_CODIGO = ' + LBusca);
+      Query.Add(')');
+      Query.AddParam('BUSCA', '%' + UpperCase(LBusca) + '%');
+      Query.AddParam('BUSCA2', '%' + LBusca + '%');
+    end;
     Query.Add('ORDER BY PRO_CODIGO');
     Query.Open;
 
@@ -355,5 +372,50 @@ begin
   finally
   end;
 end;
+
+initialization
+  Swagger
+    .BasePath('v1')
+      .Path('conciliacao/comparativo')
+        .Tag('ConciliacaoFiscal')
+        .GET('Comparativo Fiscal vs Fisico', 'Relatorio comparativo de estoque contabilidade fiscal versus estoque fisico real')
+          .AddResponse(200, 'Operacao bem Sucedida')
+          .&End
+          .AddResponse(500, 'InternalServerError').&End
+        .&End
+      .&End
+    .&End
+    .BasePath('v1')
+      .Path('conciliacao/fiscais')
+        .Tag('ConciliacaoFiscal')
+        .GET('Produtos Fiscais Mestre', 'Lista produtos que atuam como mestres na base fiscal')
+          .AddResponse(200, 'Operacao bem Sucedida')
+          .&End
+          .AddResponse(500, 'InternalServerError').&End
+        .&End
+      .&End
+    .&End
+    .BasePath('v1')
+      .Path('conciliacao/vincular')
+        .Tag('ConciliacaoFiscal')
+        .POST('Vincular Produto ao Fiscal', 'Vincula o produto ao codigo mestre fiscal (PRO_COD_FISCAL)')
+          .AddResponse(200, 'Ok')
+          .&End
+          .AddResponse(400, 'BadRequest').&End
+          .AddResponse(500, 'InternalServerError').&End
+        .&End
+      .&End
+    .&End
+    .BasePath('v1')
+      .Path('conciliacao/desvincular')
+        .Tag('ConciliacaoFiscal')
+        .POST('Desvincular Produto do Fiscal', 'Remove o vinculo fiscal do produto, tornando-o independente')
+          .AddResponse(200, 'Ok')
+          .&End
+          .AddResponse(400, 'BadRequest').&End
+          .AddResponse(500, 'InternalServerError').&End
+        .&End
+      .&End
+    .&End;
 
 end.

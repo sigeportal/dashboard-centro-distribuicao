@@ -5,6 +5,7 @@ interface
 uses
 	Horse,
 	Horse.Commons,
+	Horse.GBSwagger,
 	Classes,
 	SysUtils,
 	System.IOUtils,
@@ -70,12 +71,13 @@ class procedure TProdutosController.Get(Req: THorseRequest; Res: THorseResponse;
 var
   Produtos: TProdutos;
   aJson: TJSONArray;
-  LResponseObj, LMetaObj: TJSONObject;
+  LResponseObj, LMetaObj, LItemObj: TJSONObject;
   QueryCount, QueryData: iQuery;
   LSearch, LStockStatus, LCodigo, LNome, LCodbarra, LCadastrar, LWhereClause: string;
   LPage, LLimit, LOffset, LTotalRecords, LTotalPages, I: Integer;
   LWhereList: TStringList;
   LIsPaginated: Boolean;
+  LQtdGrades: Double;
 begin
   aJson := TJSONArray.Create;
   QueryCount := TDatabase.Query;
@@ -83,6 +85,14 @@ begin
   Produtos := TProdutos.Create(TDatabase.Connection);
   LWhereList := TStringList.Create;
   try
+    // Sincroniza em segundo plano os registros de PRODUTOS cuja quantidade difere da soma de grades
+    try
+      QueryCount.Clear;
+      QueryCount.Add('UPDATE PRODUTOS P SET P.PRO_QUANTIDADE = COALESCE((SELECT SUM(G.GRA_QUANTIDADE) FROM GRADES G WHERE G.GRA_PRO = P.PRO_CODIGO), P.PRO_QUANTIDADE, 0) WHERE EXISTS (SELECT 1 FROM GRADES G WHERE G.GRA_PRO = P.PRO_CODIGO)');
+      QueryCount.ExecSQL;
+    except
+    end;
+
     LIsPaginated := Req.Query.ContainsKey('page') or Req.Query.ContainsKey('limit') or Req.Query.ContainsKey('search') or Req.Query.ContainsKey('stockStatus');
     LPage := StrToIntDef(Req.Query.Items['page'], 1);
     if LPage < 1 then LPage := 1;
@@ -141,9 +151,9 @@ begin
     begin
       LStockStatus := LowerCase(Trim(Req.Query.Items['stockStatus']));
       if LStockStatus = 'sem_estoque' then
-        LWhereList.Add('(PRO_QUANTIDADE <= 0 OR PRO_QUANTIDADE IS NULL)')
+        LWhereList.Add('(COALESCE((SELECT SUM(G.GRA_QUANTIDADE) FROM GRADES G WHERE G.GRA_PRO = PRODUTOS.PRO_CODIGO), PRO_QUANTIDADE, 0) <= 0)')
       else if LStockStatus = 'acabando' then
-        LWhereList.Add('(PRO_QUANTIDADE > 0 AND PRO_QUANTIDADE <= 5)');
+        LWhereList.Add('(COALESCE((SELECT SUM(G.GRA_QUANTIDADE) FROM GRADES G WHERE G.GRA_PRO = PRODUTOS.PRO_CODIGO), PRO_QUANTIDADE, 0) > 0 AND COALESCE((SELECT SUM(G.GRA_QUANTIDADE) FROM GRADES G WHERE G.GRA_PRO = PRODUTOS.PRO_CODIGO), PRO_QUANTIDADE, 0) <= 5)');
     end;
 
     LWhereClause := '';
@@ -172,7 +182,23 @@ begin
     while not QueryData.Dataset.Eof do
     begin
       Produtos.BuscaDadosTabela(QueryData.Dataset.FieldByName('PRO_CODIGO').AsInteger);
-      aJson.Add(TJSONObject.ParseJSONValue(Produtos.ToJson) as TJSONObject);
+      LItemObj := TJSONObject.ParseJSONValue(Produtos.ToJson) as TJSONObject;
+      if Assigned(LItemObj) then
+      begin
+        // A quantidade final de cada produto é a somatória das GRADES dele (GRA_QUANTIDADE)
+        QueryCount.Clear;
+        QueryCount.Add('SELECT COALESCE(SUM(GRA_QUANTIDADE), 0) AS TOTAL_GRADE, COUNT(*) AS QTD_GRADES FROM GRADES WHERE GRA_PRO = ' + Produtos.Codigo.ToString);
+        QueryCount.Open;
+        if (QueryCount.Dataset.FieldByName('QTD_GRADES').AsInteger > 0) then
+        begin
+          LQtdGrades := QueryCount.Dataset.FieldByName('TOTAL_GRADE').AsFloat;
+          LItemObj.RemovePair('quantidade');
+          LItemObj.AddPair('quantidade', TJSONNumber.Create(LQtdGrades));
+          LItemObj.RemovePair('pro_quantidade');
+          LItemObj.AddPair('pro_quantidade', TJSONNumber.Create(LQtdGrades));
+        end;
+        aJson.Add(LItemObj);
+      end;
       QueryData.Dataset.Next;
     end;
 
@@ -204,15 +230,33 @@ end;
 class procedure TProdutosController.GetForID(Req: THorseRequest; Res: THorseResponse; Next: TProc);
 var
 	Produtos: TProdutos;
-	aJson   : TJSONArray;
 	id      : Integer;
+	LItemObj: TJSONObject;
+	LQueryGrades: iQuery;
+	LQtdGrades: Double;
 begin
-	aJson := TJSONArray.Create;
-	id    := Req.Params.Items['id'].ToInteger();
+	id := Req.Params.Items['id'].ToInteger();
 	try
 		Produtos := TProdutos.Create(TDatabase.Connection);
 		Produtos.BuscaDadosTabela(id);
-		Res.Send<TJSONObject>(TJSONObject.ParseJSONValue(Produtos.ToJson) as TJSONObject);
+		LItemObj := TJSONObject.ParseJSONValue(Produtos.ToJson) as TJSONObject;
+		if Assigned(LItemObj) then
+		begin
+			LQueryGrades := TDatabase.Query;
+			LQueryGrades.Add('SELECT COALESCE(SUM(GRA_QUANTIDADE), 0) AS TOTAL_GRADE, COUNT(*) AS QTD_GRADES FROM GRADES WHERE GRA_PRO = ' + id.ToString);
+			LQueryGrades.Open;
+			if LQueryGrades.Dataset.FieldByName('QTD_GRADES').AsInteger > 0 then
+			begin
+				LQtdGrades := LQueryGrades.Dataset.FieldByName('TOTAL_GRADE').AsFloat;
+				LItemObj.RemovePair('quantidade');
+				LItemObj.AddPair('quantidade', TJSONNumber.Create(LQtdGrades));
+				LItemObj.RemovePair('pro_quantidade');
+				LItemObj.AddPair('pro_quantidade', TJSONNumber.Create(LQtdGrades));
+			end;
+			Res.Send<TJSONObject>(LItemObj);
+		end
+		else
+			Res.Send<TJSONObject>(TJSONObject.Create);
 	finally
 		Produtos.DisposeOf;
 	end;
@@ -260,6 +304,27 @@ begin
 				Produtos.Gru := LBodyObj.GetValue<Integer>('gru')
 			else if LBodyObj.GetValue('subgrupoId') <> nil then
 				Produtos.Gru := LBodyObj.GetValue<Integer>('subgrupoId');
+
+			if LBodyObj.GetValue('pro_mar') <> nil then
+				Produtos.Mar := LBodyObj.GetValue<Integer>('pro_mar')
+			else if LBodyObj.GetValue('mar') <> nil then
+				Produtos.Mar := LBodyObj.GetValue<Integer>('mar')
+			else if LBodyObj.GetValue('modelo') <> nil then
+				Produtos.Mar := LBodyObj.GetValue<Integer>('modelo')
+			else if LBodyObj.GetValue('modelo_id') <> nil then
+				Produtos.Mar := LBodyObj.GetValue<Integer>('modelo_id');
+
+			if LBodyObj.GetValue('pro_cod_fiscal') <> nil then
+				Produtos.CodFiscal := LBodyObj.GetValue<Integer>('pro_cod_fiscal')
+			else if LBodyObj.GetValue('codFiscal') <> nil then
+				Produtos.CodFiscal := LBodyObj.GetValue<Integer>('codFiscal')
+			else if LBodyObj.GetValue('cod_fiscal') <> nil then
+				Produtos.CodFiscal := LBodyObj.GetValue<Integer>('cod_fiscal');
+
+			if LBodyObj.GetValue('pro_fiscal_gerar') <> nil then
+				Produtos.FiscalGerar := LBodyObj.GetValue<string>('pro_fiscal_gerar')
+			else if LBodyObj.GetValue('fiscalGerar') <> nil then
+				Produtos.FiscalGerar := LBodyObj.GetValue<string>('fiscalGerar');
 		end;
 		Produtos.Cadastrar := 'S';
 		Produtos.SalvaNoBanco(0);
@@ -435,10 +500,21 @@ begin
 			else if LBodyObj.GetValue('subgrupoId') <> nil then
 				Produtos.Gru := LBodyObj.GetValue<Integer>('subgrupoId');
 
+			if LBodyObj.GetValue('pro_mar') <> nil then
+				Produtos.Mar := LBodyObj.GetValue<Integer>('pro_mar')
+			else if LBodyObj.GetValue('mar') <> nil then
+				Produtos.Mar := LBodyObj.GetValue<Integer>('mar')
+			else if LBodyObj.GetValue('modelo') <> nil then
+				Produtos.Mar := LBodyObj.GetValue<Integer>('modelo')
+			else if LBodyObj.GetValue('modelo_id') <> nil then
+				Produtos.Mar := LBodyObj.GetValue<Integer>('modelo_id');
+
 			if LBodyObj.GetValue('pro_cod_fiscal') <> nil then
 				Produtos.CodFiscal := LBodyObj.GetValue<Integer>('pro_cod_fiscal')
 			else if LBodyObj.GetValue('codFiscal') <> nil then
-				Produtos.CodFiscal := LBodyObj.GetValue<Integer>('codFiscal');
+				Produtos.CodFiscal := LBodyObj.GetValue<Integer>('codFiscal')
+			else if LBodyObj.GetValue('cod_fiscal') <> nil then
+				Produtos.CodFiscal := LBodyObj.GetValue<Integer>('cod_fiscal');
 
 			if LBodyObj.GetValue('pro_fiscal_gerar') <> nil then
 				Produtos.FiscalGerar := LBodyObj.GetValue<string>('pro_fiscal_gerar')
@@ -511,8 +587,73 @@ begin
 	end
 	else
 	begin
-		Res.Send<TJSONObject>(TJSONObject.Create.AddPair('msg', 'N�o foi poss�vel criar a imagem!')).Status(THTTPStatus.BadRequest);
+		Res.Send<TJSONObject>(TJSONObject.Create.AddPair('msg', 'Nao foi possivel criar a imagem!')).Status(THTTPStatus.BadRequest);
 	end;
 end;
+
+initialization
+  Swagger
+    .BasePath('v1')
+      .Path('produtos')
+        .Tag('Produtos')
+        .GET('Lista Todos(as)', 'Lista todos(as) os(as) Produtos cadastrados com filtros e paginacao')
+          .AddResponse(200, 'Operacao bem Sucedida')
+            .Schema(TProdutos)
+            .IsArray(True)
+          .&End
+          .AddResponse(400, 'BadRequest').&End
+          .AddResponse(500, 'InternalServerError').&End
+        .&End
+        .POST('Criar Produto', 'Cria um novo Produto no CD')
+          .AddParamBody('Dados do Produto', 'Produtos')
+            .Required(True)
+            .Schema(TProdutos)
+          .&End
+          .AddResponse(201, 'Created')
+            .Schema(TProdutos)
+          .&End
+          .AddResponse(400, 'BadRequest').&End
+          .AddResponse(500, 'InternalServerError').&End
+        .&End
+        .PUT('Atualiza Produto', 'Atualiza os dados de um Produto existente')
+          .AddParamBody('Dados do Produto', 'Produtos')
+            .Required(True)
+            .Schema(TProdutos)
+          .&End
+          .AddResponse(200, 'Ok')
+            .Schema(TProdutos)
+          .&End
+          .AddResponse(400, 'BadRequest').&End
+          .AddResponse(500, 'InternalServerError').&End
+        .&End
+      .&End
+    .&End
+    .BasePath('v1')
+      .Path('produtos/{id}')
+        .Tag('Produtos')
+        .GET('Obtem um Produto', 'Busca dados completos do produto por ID')
+          .AddParamPath('id', 'Id do Produto para buscar')
+            .Required(True)
+            .Schema(SWAG_INTEGER)
+          .&End
+          .AddResponse(200, 'Operacao bem Sucedida')
+            .Schema(TProdutos)
+          .&End
+          .AddResponse(404, 'Produto nao encontrado').&End
+          .AddResponse(400, 'BadRequest').&End
+          .AddResponse(500, 'InternalServerError').&End
+        .&End
+        .DELETE('Apagar um Produto', 'Inativa o Produto')
+          .AddParamPath('id', 'id do Produto para deletar')
+            .Required(True)
+            .Schema(SWAG_INTEGER)
+          .&End
+          .AddResponse(204, 'No Content').&End
+          .AddResponse(404, 'Produto nao encontrado').&End
+          .AddResponse(400, 'BadRequest').&End
+          .AddResponse(500, 'InternalServerError').&End
+        .&End
+      .&End
+    .&End;
 
 end.

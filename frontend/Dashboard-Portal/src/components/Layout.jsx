@@ -43,7 +43,7 @@ export default function Layout() {
 
   // Unidade Logada / Selecionada
   const [activeCompany, setActiveCompany] = useState(() => {
-    const id = Number(localStorage.getItem('selected_company_id')) || 1;
+    const id = Number(localStorage.getItem('selected_company_id')) || 5;
     const storedName = localStorage.getItem('selected_company_name');
     return { id, storedName };
   });
@@ -51,15 +51,21 @@ export default function Layout() {
   useEffect(() => {
     const fetchCompanyData = async () => {
       try {
+        const storedId = Number(localStorage.getItem('selected_company_id')) || 5;
+        const storedName = localStorage.getItem('selected_company_name');
+        if (storedName) {
+          setActiveCompany({ id: storedId, storedName });
+        }
+
         const api = createApi(true);
         const res = await api.get('/v1/empresa');
-        if (Array.isArray(res.data)) {
-          const currentEmp = res.data.find(e => (e.codigo || e.Codigo || e.id) === activeCompany.id);
+        if (Array.isArray(res.data) && res.data.length > 0) {
+          const currentEmp = res.data.find(e => Number(e.codigo || e.Codigo || e.id) === storedId);
           if (currentEmp) {
             const realName = currentEmp.fantasia || currentEmp.Fantasia || currentEmp.razao_social || currentEmp.Razao_social;
             if (realName) {
               localStorage.setItem('selected_company_name', realName);
-              setActiveCompany(prev => ({ ...prev, storedName: realName }));
+              setActiveCompany({ id: storedId, storedName: realName });
             }
           }
         }
@@ -68,7 +74,7 @@ export default function Layout() {
       }
     };
     fetchCompanyData();
-  }, [activeCompany.id]);
+  }, []);
 
   const getCompanyDisplay = () => {
     const id = activeCompany.id;
@@ -76,16 +82,17 @@ export default function Layout() {
 
     if (!name) {
       const fallbackNames = {
-        1: 'CD DOURADINA',
-        2: 'ITAPORA',
-        3: 'MARACAJU',
+        5: 'CD DOURADINA',
+        6: 'RIO BRILHANTE',
+        7: 'ITAPORA',
         4: 'NOVA ALVORADA',
-        5: 'RIO BRILHANTE',
+        8: 'MARACAJU',
+        1: 'CD DOURADINA',
       };
       name = fallbackNames[id] || `Unidade #${id}`;
     }
 
-    const isMatriz = id === 1 || name.toUpperCase().includes('CD') || name.toUpperCase().includes('DOURADINA');
+    const isMatriz = id === 1 || id === 5 || name.toUpperCase().includes('CD') || name.toUpperCase().includes('DOURADINA');
     return { id, name, isMatriz };
   };
 

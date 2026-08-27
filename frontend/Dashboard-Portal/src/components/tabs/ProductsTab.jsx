@@ -21,7 +21,8 @@ export default function ProductsTab({ data, pages, searchTerms, setSearchTerms, 
   const [showProductModal, setShowProductModal] = useState(false);
   const [productToEditModal, setProductToEditModal] = useState(null);
 
-  // Saldo de Estoque Específico da Unidade Logada
+  // Saldo de Estoque Consolidado (Soma de Todas as Filiais)
+  const [consolidatedStocks, setConsolidatedStocks] = useState({});
   const [activeUnitStocks, setActiveUnitStocks] = useState({});
   const activeUnitId = Number(localStorage.getItem('selected_company_id')) || 1;
   const activeUnitName = localStorage.getItem('selected_company_name') || (activeUnitId === 1 ? 'CD DOURADINA' : `Unidade #${activeUnitId}`);
@@ -29,38 +30,55 @@ export default function ProductsTab({ data, pages, searchTerms, setSearchTerms, 
 
   const api = createApi(true);
 
-  useEffect(() => {
-    fetchActiveUnitStocks();
-  }, [activeUnitId]);
-
-  const fetchActiveUnitStocks = async () => {
+  const fetchStocks = async () => {
     try {
       const res = await api.get('/v1/estoque/posicao');
       let dataArr = [];
       if (Array.isArray(res.data)) dataArr = res.data;
       else if (res.data?.data && Array.isArray(res.data.data)) dataArr = res.data.data;
 
-      const map = {};
+      const consMap = {};
+      const unitMap = {};
+      const seenUnitsPerProduct = {};
+
       dataArr.forEach(st => {
-        if (Number(st.empresa_id) === activeUnitId) {
-          map[st.pro_codigo] = Number(st.quantidade) || 0;
+        const prodId = Number(st.pro_codigo || st.codigo || st.pro);
+        const qty = Number(st.quantidade) || 0;
+        const empId = Number(st.empresa_id);
+        const empName = (st.empresa_nome || '').toUpperCase();
+        let unitKey = String(empId);
+        if (unitKey === '1' || unitKey === '5' || empName.includes('DOURADINA') || empName.includes('CD')) {
+          unitKey = 'CD_DOURADINA';
+        }
+
+        if (prodId) {
+          if (!seenUnitsPerProduct[prodId]) seenUnitsPerProduct[prodId] = new Set();
+          if (!seenUnitsPerProduct[prodId].has(unitKey)) {
+            seenUnitsPerProduct[prodId].add(unitKey);
+            consMap[prodId] = (consMap[prodId] || 0) + qty;
+          }
+          if (empId === activeUnitId || (activeUnitId === 5 && (empId === 1 || empId === 5))) {
+            unitMap[prodId] = qty;
+          }
         }
       });
-      setActiveUnitStocks(map);
+      setConsolidatedStocks(consMap);
+      setActiveUnitStocks(unitMap);
     } catch (err) {
-      console.warn('Erro ao buscar saldos de estoque da unidade ativa:', err);
+      console.warn('Erro ao buscar saldos de estoque consolidados:', err);
     }
   };
 
-  const getProductStockForActiveUnit = (item) => {
-    const prodId = item.codigo || item.id || item.pro_codigo;
-    if (activeUnitStocks[prodId] !== undefined) {
-      return activeUnitStocks[prodId];
+  useEffect(() => {
+    fetchStocks();
+  }, [activeUnitId]);
+
+  const getProductConsolidatedStock = (item) => {
+    const prodId = Number(item.codigo || item.id || item.pro_codigo || item.PRO_CODIGO);
+    if (prodId && consolidatedStocks[prodId] !== undefined) {
+      return consolidatedStocks[prodId];
     }
-    if (isMatriz) {
-      return Number(item.quantidade) || 0;
-    }
-    return 0;
+    return Number(item.quantidade || item.pro_quantidade || item.PRO_QUANTIDADE) || 0;
   };
 
   // Formata datas para pt-BR e fuso horário UTC-4 (Mato Grosso do Sul / Campo Grande)
@@ -109,11 +127,14 @@ export default function ProductsTab({ data, pages, searchTerms, setSearchTerms, 
         stocks = Object.values(res.data).filter(item => typeof item === 'object');
       }
 
-      // Deduplica rigorosamente por nome normalizado da unidade (evita duplicações em tela)
+      // Deduplica rigorosamente por chave de unidade real (evita duplicar CD Douradina)
       const uniqueMap = new Map();
       stocks.forEach(st => {
         const rawName = st.empresa_nome || `Unidade #${st.empresa_id}`;
-        const key = rawName.trim().toUpperCase();
+        let key = rawName.trim().toUpperCase();
+        if (key.includes('DOURADINA') || key.includes('CD') || st.empresa_id === 5 || st.empresa_id === 1) {
+          key = 'CD_DOURADINA';
+        }
         if (key && !uniqueMap.has(key)) {
           uniqueMap.set(key, st);
         } else if (key && uniqueMap.has(key)) {
@@ -190,80 +211,90 @@ export default function ProductsTab({ data, pages, searchTerms, setSearchTerms, 
               <th scope="col">Nome</th>
               <th scope="col" style={{ width: '130px' }}>Fabricante</th>
               <th scope="col" style={{ width: '130px' }}>Cód. Barras</th>
-              <th scope="col" style={{ width: '90px', textAlign: 'center' }} title={`Estoque na unidade ${activeUnitName}`}>Estoque</th>
+              <th scope="col" style={{ width: '110px', textAlign: 'center' }} title="Estoque Total Consolidado (Soma de Todas as Filiais)">Estoque</th>
               <th scope="col" style={{ width: '100px', textAlign: 'right' }}>Valor</th>
               <th scope="col" style={{ width: '220px', textAlign: 'center' }}>Ações</th>
             </tr>
           </thead>
           <tbody>
-            {getFilteredData('produtos').map((item, idx) => (
-              <tr key={item.codigo || idx} className={prodFilter === 'sem_estoque' ? 'row-danger' : prodFilter === 'acabando' ? 'row-warning' : ''}>
-                <td data-label="Código">{item.codigo ? <span className="item-code">#{item.codigo}</span> : '-'}</td>
-                <td data-label="Nome">{item.nome}</td>
-                <td data-label="Fabricante">{item.fabricante}</td>
-                <td data-label="Cód. Barras">{item.codbarra}</td>
-                <td data-label="Estoque" style={{ textAlign: 'center' }}>
-                  <strong style={{ color: getProductStockForActiveUnit(item) > 0 ? '#10b981' : '#ef4444' }}>
-                    {getProductStockForActiveUnit(item)}
-                  </strong>
-                </td>
-                <td data-label="Valor" style={{ textAlign: 'right' }}>{formatCurrency(item.valorv)}</td>
-                <td data-label="Ações" style={{ textAlign: 'center' }}>
-                  <div style={{ display: 'inline-flex', gap: '4px', justifyContent: 'center' }}>
-                    <button 
-                      className="action-btn action-view" 
-                      onClick={() => handleOpenStockModal(item)}
-                      title="Ver posição por Filial"
-                      style={{ padding: '4px 8px', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
-                    >
-                      <Building2 size={13} /> Filiais
-                    </button>
+            {getFilteredData('produtos').map((item, idx) => {
+              const stockTotal = getProductConsolidatedStock(item);
+              return (
+                <tr key={item.codigo || idx} className={prodFilter === 'sem_estoque' ? 'row-danger' : prodFilter === 'acabando' ? 'row-warning' : ''}>
+                  <td data-label="Código">{item.codigo ? <span className="item-code">#{item.codigo}</span> : '-'}</td>
+                  <td data-label="Nome">{item.nome}</td>
+                  <td data-label="Fabricante">{item.fabricante}</td>
+                  <td data-label="Cód. Barras">{item.codbarra}</td>
+                  <td data-label="Estoque" style={{ textAlign: 'center' }}>
+                    <strong style={{ color: stockTotal > 0 ? '#10b981' : '#ef4444' }}>
+                      {stockTotal}
+                    </strong>
+                  </td>
+                  <td data-label="Valor" style={{ textAlign: 'right' }}>{formatCurrency(item.valorv)}</td>
+                  <td data-label="Ações" style={{ textAlign: 'center' }}>
+                    <div style={{ display: 'inline-flex', gap: '4px', justifyContent: 'center' }}>
+                      <button 
+                        className="action-btn action-view" 
+                        onClick={() => handleOpenStockModal(item)}
+                        title="Ver posição por Filial"
+                        style={{ padding: '4px 8px', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+                      >
+                        <Building2 size={13} /> Filiais
+                      </button>
 
-                    <button 
-                      className="action-btn" 
-                      onClick={() => { setProductToEditModal(item); setShowProductModal(true); }}
-                      title="Editar Produto (Pop-up)"
-                      style={{
-                        padding: '4px 8px',
-                        fontSize: '0.78rem',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '3px',
-                        background: 'rgba(37, 99, 235, 0.12)',
-                        color: '#2563eb',
-                        border: '1px solid rgba(37, 99, 235, 0.3)',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        fontWeight: 600
-                      }}
-                    >
-                      <Edit size={13} /> Editar
-                    </button>
+                      <button 
+                        className="action-btn" 
+                        onClick={() => { setProductToEditModal(item); setShowProductModal(true); }}
+                        title="Editar Produto (Pop-up)"
+                        style={{
+                          padding: '4px 8px',
+                          fontSize: '0.78rem',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '3px',
+                          background: 'rgba(37, 99, 235, 0.12)',
+                          color: '#2563eb',
+                          border: '1px solid rgba(37, 99, 235, 0.3)',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          fontWeight: 600
+                        }}
+                      >
+                        <Edit size={13} /> Editar
+                      </button>
 
-                    <button 
-                      className="action-btn" 
-                      onClick={() => handleOpenHistoryModal(item)}
-                      title="Ver Histórico (HIS_PRO)"
-                      style={{
-                        padding: '4px 8px',
-                        fontSize: '0.78rem',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '3px',
-                        background: 'rgba(99, 102, 241, 0.12)',
-                        color: '#6366f1',
-                        border: '1px solid rgba(99, 102, 241, 0.3)',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        fontWeight: 600
-                      }}
-                    >
-                      <History size={13} /> Histórico
-                    </button>
-                  </div>
+                      <button 
+                        className="action-btn" 
+                        onClick={() => handleOpenHistoryModal(item)}
+                        title="Ver Histórico (HIS_PRO)"
+                        style={{
+                          padding: '4px 8px',
+                          fontSize: '0.78rem',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '3px',
+                          background: 'rgba(99, 102, 241, 0.12)',
+                          color: '#6366f1',
+                          border: '1px solid rgba(99, 102, 241, 0.3)',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          fontWeight: 600
+                        }}
+                      >
+                        <History size={13} /> Histórico
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+            {getFilteredData('produtos').length === 0 && (
+              <tr>
+                <td colSpan="7" style={{ textAlign: 'center', padding: '2.5rem', color: '#64748b' }}>
+                  Nenhum produto cadastrado no catálogo. Clique em <strong>"+ Novo Produto"</strong> para cadastrar.
                 </td>
               </tr>
-            ))}
+            )}
           </tbody>
         </table>
       </div>

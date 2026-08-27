@@ -4,12 +4,14 @@ import {
   ShoppingCart, Upload, Plus, Eye, FileText, UserPlus, PackagePlus, 
   X, Save, AlertCircle, Building2, CheckCircle2, DollarSign, Calendar,
   TrendingUp, Search, Filter, AlertTriangle, RefreshCw, Trash2, ArrowRight, 
-  Package, Calculator, CreditCard, Sparkles, Check, ChevronRight
+  Package, Calculator, CreditCard, Sparkles, Check, ChevronRight,
+  Link2, Link, ShieldCheck, Edit2
 } from 'lucide-react';
 import { createApi } from '../../services/api';
 import Pagination from '../Pagination';
 import SearchBar from '../SearchBar';
 import LookupSelect from '../LookupSelect';
+import ProductFormModal from '../ProductFormModal';
 import { formatCurrency } from '../../utils/formatters';
 import './PurchasesTab.css';
 
@@ -39,6 +41,13 @@ export default function PurchasesTab() {
   const [showQuickVendorModal, setShowQuickVendorModal] = useState(false);
   const [showQuickProductModal, setShowQuickProductModal] = useState(false);
   const [quickProductTargetIndex, setQuickProductTargetIndex] = useState(null);
+
+  // Vínculos e Cadastro Completo de Produto a partir da Compra
+  const [showProductModal, setShowProductModal] = useState(false);
+  const [productToEditModal, setProductToEditModal] = useState(null);
+  const [targetItemIndex, setTargetItemIndex] = useState(null);
+  const [showLinkProductModal, setShowLinkProductModal] = useState(false);
+  const [showLinkFiscalModal, setShowLinkFiscalModal] = useState(false);
 
   // Estado do Formulário de Compra
   const [purchaseForm, setPurchaseForm] = useState({
@@ -273,6 +282,149 @@ export default function PurchasesTab() {
       ...prev,
       itens: prev.itens.filter((_, i) => i !== index)
     }));
+  };
+
+  // 1. Atualizar nome do produto no item
+  const handleUpdateItemName = (idx, newName) => {
+    setPurchaseForm(prev => {
+      const updated = [...prev.itens];
+      updated[idx] = { ...updated[idx], produto_nome: newName };
+      return { ...prev, itens: updated };
+    });
+  };
+
+  // 2. Vincular a produto existente no cadastro
+  const handleOpenLinkProduct = (idx) => {
+    setTargetItemIndex(idx);
+    setShowLinkProductModal(true);
+  };
+
+  const handleSelectLinkedProduct = (prod) => {
+    if (targetItemIndex === null || !prod) return;
+    const pId = prod.codigo || prod.PRO_CODIGO;
+    const pNome = prod.nome || prod.PRO_NOME;
+    const pCodFiscal = prod.pro_cod_fiscal || prod.codFiscal || prod.cod_fiscal || 0;
+
+    setPurchaseForm(prev => {
+      const updated = [...prev.itens];
+      updated[targetItemIndex] = {
+        ...updated[targetItemIndex],
+        produto_codigo: pId,
+        produto_nome: updated[targetItemIndex].produto_nome || pNome,
+        pro_cod_fiscal: pCodFiscal || updated[targetItemIndex].pro_cod_fiscal,
+        matched: true
+      };
+      return { ...prev, itens: updated };
+    });
+
+    setShowLinkProductModal(false);
+    setSuccessMsg(`Item vinculado com sucesso ao Produto #${pId} - ${pNome}!`);
+    setTimeout(() => setSuccessMsg(''), 4000);
+  };
+
+  const handleUnlinkProduct = (idx) => {
+    setPurchaseForm(prev => {
+      const updated = [...prev.itens];
+      updated[idx] = {
+        ...updated[idx],
+        produto_codigo: '',
+        matched: false
+      };
+      return { ...prev, itens: updated };
+    });
+  };
+
+  // 3. Cadastrar como novo produto
+  const handleOpenCreateNewProductFromItem = (idx) => {
+    setTargetItemIndex(idx);
+    const it = purchaseForm.itens[idx];
+    const vu = Number(it.valor_unitario) || 0;
+    const vVista = it.valor_vista > 0 ? it.valor_vista : (vu * 2);
+    const vDin = it.valor_dinheiro > 0 ? it.valor_dinheiro : vVista;
+    const vPrazo = it.valor_prazo > 0 ? it.valor_prazo : (vVista * 1.1);
+
+    setProductToEditModal({
+      codigo: 0,
+      nome: (it.produto_nome || '').toUpperCase(),
+      ncm: it.ncm || '6109.10.00',
+      cfop: it.cfop || '5102',
+      cest: it.cest || '',
+      um: it.um || 'UN',
+      custo: vu,
+      valorv: vVista,
+      pro_valor_dinheiro: vDin,
+      pro_valorv_prazo: vPrazo,
+      codbarra: it.codbarra || '',
+      pro_for: Number(purchaseForm.fornecedor_id) || 1,
+      pro_cod_fiscal: Number(it.pro_cod_fiscal) || 0
+    });
+    setShowProductModal(true);
+  };
+
+  const handleProductModalSuccess = (savedProd) => {
+    if (targetItemIndex !== null && savedProd) {
+      const pId = savedProd.codigo || savedProd.PRO_CODIGO || savedProd.id;
+      const pNome = savedProd.nome || savedProd.PRO_NOME || purchaseForm.itens[targetItemIndex].produto_nome;
+      const pFiscal = savedProd.pro_cod_fiscal || savedProd.codFiscal || 0;
+
+      setPurchaseForm(prev => {
+        const updated = [...prev.itens];
+        updated[targetItemIndex] = {
+          ...updated[targetItemIndex],
+          produto_codigo: pId,
+          produto_nome: pNome,
+          pro_cod_fiscal: pFiscal || updated[targetItemIndex].pro_cod_fiscal,
+          matched: true
+        };
+        return { ...prev, itens: updated };
+      });
+
+      setSuccessMsg(`Novo produto #${pId} cadastrado e vinculado à compra!`);
+      setTimeout(() => setSuccessMsg(''), 4000);
+    }
+    setShowProductModal(false);
+    fetchAuxiliaryData();
+  };
+
+  // 4. Vincular a produto fiscal
+  const handleOpenLinkFiscal = (idx) => {
+    setTargetItemIndex(idx);
+    setShowLinkFiscalModal(true);
+  };
+
+  const handleSelectLinkedFiscal = async (fiscalProd) => {
+    if (targetItemIndex === null || !fiscalProd) return;
+    const fId = fiscalProd.codigo || fiscalProd.PRO_CODIGO;
+    const fNome = fiscalProd.nome || fiscalProd.PRO_NOME;
+
+    setPurchaseForm(prev => {
+      const updated = [...prev.itens];
+      const it = updated[targetItemIndex];
+      updated[targetItemIndex] = {
+        ...it,
+        pro_cod_fiscal: fId,
+        ncm: fiscalProd.ncm || it.ncm,
+        cfop: fiscalProd.cfop || it.cfop,
+        cest: fiscalProd.cest || it.cest
+      };
+      return { ...prev, itens: updated };
+    });
+
+    const itCurrent = purchaseForm.itens[targetItemIndex];
+    if (itCurrent && itCurrent.produto_codigo && Number(itCurrent.produto_codigo) > 0) {
+      try {
+        await api.post('/v1/conciliacao/vincular', {
+          codigo: Number(itCurrent.produto_codigo),
+          codFiscal: Number(fId)
+        });
+      } catch (e) {
+        console.warn('Erro ao atualizar vínculo fiscal no banco:', e);
+      }
+    }
+
+    setShowLinkFiscalModal(false);
+    setSuccessMsg(`Vínculo fiscal com #${fId} - ${fNome} definido!`);
+    setTimeout(() => setSuccessMsg(''), 4000);
   };
 
   // =========================================================================
@@ -569,6 +721,10 @@ export default function PurchasesTab() {
           const cProd = getXmlText(prodNode, 'cProd');
           const xProd = getXmlText(prodNode, 'xProd');
           const cEAN = getXmlText(prodNode, 'cEAN');
+          const ncm = getXmlText(prodNode, 'NCM');
+          const cfop = getXmlText(prodNode, 'CFOP');
+          const cest = getXmlText(prodNode, 'CEST');
+          const uCom = getXmlText(prodNode, 'uCom') || 'UN';
           const qCom = parseFloat(getXmlText(prodNode, 'qCom')) || 0;
           const vUnCom = parseFloat(getXmlText(prodNode, 'vUnCom')) || 0;
           const vFrete = parseFloat(getXmlText(prodNode, 'vFrete')) || 0;
@@ -587,7 +743,13 @@ export default function PurchasesTab() {
           parsedItens.push({
             produto_codigo: matchedProd ? matchedProd.codigo : '',
             produto_nome: xProd,
-            codbarra: cEAN !== 'SEM GTIN' ? cEAN : '',
+            original_xml_nome: xProd,
+            ncm: ncm || (matchedProd ? matchedProd.ncm : '6109.10.00'),
+            cfop: cfop || (matchedProd ? matchedProd.cfop : '5102'),
+            cest: cest || (matchedProd ? matchedProd.cest : ''),
+            um: uCom,
+            codbarra: cEAN !== 'SEM GTIN' ? cEAN : (matchedProd?.codbarra || ''),
+            pro_cod_fiscal: matchedProd ? (matchedProd.pro_cod_fiscal || matchedProd.codFiscal || 0) : 0,
             quantidade: qCom,
             valor_unitario: vUnCom,
             valor_frete: vFrete,
@@ -1005,30 +1167,125 @@ export default function PurchasesTab() {
                 </div>
 
                 {/* TABELA DE ITENS DA COMPRA */}
-                <div className="table-responsive" style={{ maxHeight: '240px', overflowY: 'auto' }}>
+                <div className="table-responsive" style={{ maxHeight: '280px', overflowY: 'auto' }}>
                   <table className="data-table">
                     <thead>
                       <tr>
-                        <th>Código</th>
-                        <th>Descrição do Produto</th>
-                        <th style={{ textAlign: 'center' }}>Qtd</th>
-                        <th style={{ textAlign: 'right' }}>Vlr Unitário</th>
-                        <th style={{ textAlign: 'right' }}>Subtotal</th>
-                        <th style={{ textAlign: 'center' }}>Ações</th>
+                        <th style={{ width: '130px' }}>Código & Vínculo</th>
+                        <th>Descrição do Produto (Editável)</th>
+                        <th style={{ width: '150px' }}>Vínculo Fiscal</th>
+                        <th style={{ textAlign: 'center', width: '70px' }}>Qtd</th>
+                        <th style={{ textAlign: 'right', width: '100px' }}>Vlr Unitário</th>
+                        <th style={{ textAlign: 'right', width: '110px' }}>Subtotal</th>
+                        <th style={{ textAlign: 'center', width: '60px' }}>Ações</th>
                       </tr>
                     </thead>
                     <tbody>
                       {purchaseForm.itens.length === 0 ? (
                         <tr>
-                          <td colSpan="6" style={{ textAlign: 'center', padding: '1.5rem', color: '#94a3b8' }}>
+                          <td colSpan="7" style={{ textAlign: 'center', padding: '1.5rem', color: '#94a3b8' }}>
                             Nenhum item adicionado à compra ainda.
                           </td>
                         </tr>
                       ) : (
                         purchaseForm.itens.map((it, idx) => (
                           <tr key={idx}>
-                            <td><span className="item-code">#{it.produto_codigo || 'NOVO'}</span></td>
-                            <td><strong>{it.produto_nome}</strong></td>
+                            <td>
+                              {it.produto_codigo && Number(it.produto_codigo) > 0 ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                  <span className="item-code success" title={`Produto vinculado ID #${it.produto_codigo}`}>
+                                    #{it.produto_codigo}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    className="btn-secondary small"
+                                    onClick={() => handleOpenLinkProduct(idx)}
+                                    style={{ padding: '2px 6px', fontSize: '0.7rem' }}
+                                    title="Alterar produto vinculado"
+                                  >
+                                    <Link2 size={11} /> Alterar
+                                  </button>
+                                </div>
+                              ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                  <span className="badge badge-warning" style={{ fontSize: '0.72rem', fontWeight: 800 }}>
+                                    #NOVO
+                                  </span>
+                                  <div style={{ display: 'flex', gap: '4px' }}>
+                                    <button
+                                      type="button"
+                                      className="btn-secondary small"
+                                      onClick={() => handleOpenLinkProduct(idx)}
+                                      style={{ padding: '2px 6px', fontSize: '0.7rem', color: '#2563eb', borderColor: '#bfdbfe', background: '#eff6ff' }}
+                                      title="Vincular a um produto existente no catálogo"
+                                    >
+                                      <Link2 size={11} /> Vincular
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="btn-primary small"
+                                      onClick={() => handleOpenCreateNewProductFromItem(idx)}
+                                      style={{ padding: '2px 6px', fontSize: '0.7rem', background: '#059669', borderColor: '#059669' }}
+                                      title="Cadastrar como novo produto no catálogo"
+                                    >
+                                      <Plus size={11} /> + Novo
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                            </td>
+                            <td>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                <input
+                                  type="text"
+                                  value={it.produto_nome}
+                                  onChange={(e) => handleUpdateItemName(idx, e.target.value.toUpperCase())}
+                                  style={{
+                                    width: '100%',
+                                    padding: '0.35rem 0.5rem',
+                                    fontSize: '0.85rem',
+                                    fontWeight: 700,
+                                    borderRadius: '0.35rem',
+                                    border: '1px solid #cbd5e1',
+                                    textTransform: 'uppercase'
+                                  }}
+                                  title="Clique para editar o nome do produto no cadastro/compra"
+                                />
+                                {it.original_xml_nome && it.original_xml_nome.toUpperCase() !== it.produto_nome.toUpperCase() && (
+                                  <small style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                                    XML: {it.original_xml_nome}
+                                  </small>
+                                )}
+                              </div>
+                            </td>
+                            <td>
+                              {it.pro_cod_fiscal && Number(it.pro_cod_fiscal) > 0 ? (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                  <span className="badge badge-success" style={{ fontSize: '0.72rem' }} title={`Vinculado ao Produto Fiscal #${it.pro_cod_fiscal}`}>
+                                    <ShieldCheck size={11} /> #{it.pro_cod_fiscal}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    className="crud-row-btn edit"
+                                    onClick={() => handleOpenLinkFiscal(idx)}
+                                    title="Alterar vínculo fiscal"
+                                    style={{ padding: '2px' }}
+                                  >
+                                    <Edit2 size={11} />
+                                  </button>
+                                </div>
+                              ) : (
+                                <button
+                                  type="button"
+                                  className="btn-secondary small"
+                                  onClick={() => handleOpenLinkFiscal(idx)}
+                                  style={{ padding: '2px 6px', fontSize: '0.7rem', color: '#0284c7', borderColor: '#bae6fd', background: '#f0f9ff', width: '100%' }}
+                                  title="Vincular a um produto na base fiscal"
+                                >
+                                  <ShieldCheck size={11} /> + Vincular Fiscal
+                                </button>
+                              )}
+                            </td>
                             <td style={{ textAlign: 'center' }}>{it.quantidade}</td>
                             <td style={{ textAlign: 'right' }}>{formatCurrency(it.valor_unitario)}</td>
                             <td style={{ textAlign: 'right', fontWeight: 700 }}>{formatCurrency(it.quantidade * it.valor_unitario)}</td>
@@ -1508,6 +1765,141 @@ export default function PurchasesTab() {
 
           </div>
         </div>
+      )}
+      {showLinkProductModal && targetItemIndex !== null && (
+        <div className="product-form-modal-overlay" style={{ zIndex: 1000000 }}>
+          <div className="product-form-modal-container glass" style={{ maxWidth: '650px' }}>
+            <div className="product-modal-header">
+              <div className="product-modal-title-group">
+                <div className="product-modal-icon-badge" style={{ background: '#2563eb' }}>
+                  <Link2 size={20} color="#ffffff" />
+                </div>
+                <div>
+                  <h3>Vincular Item ao Catálogo Central</h3>
+                  <span className="product-modal-subtitle">
+                    Item: {purchaseForm.itens[targetItemIndex]?.produto_nome}
+                  </span>
+                </div>
+              </div>
+              <button className="btn-close" onClick={() => setShowLinkProductModal(false)}><X size={20} /></button>
+            </div>
+
+            <div className="product-modal-body">
+              <div className="form-group">
+                <label>Buscar Produto Existente:</label>
+                <LookupSelect
+                  value=""
+                  placeholder="Pesquise por nome, código, EAN ou referência..."
+                  title="Selecionar Produto do Catálogo"
+                  subtitle="Busca rápida no catálogo central de produtos"
+                  icon={Package}
+                  searchPlaceholder="Digite o nome ou código..."
+                  fetchData={async (termo, targetPage, limit) => {
+                    let url = `/v1/produtos?page=${targetPage}&limit=${limit}`;
+                    if (termo) url += `&busca=${encodeURIComponent(termo)}&termo=${encodeURIComponent(termo)}`;
+                    const res = await api.get(url);
+                    return res.data;
+                  }}
+                  columns={[
+                    { key: 'codigo', label: 'Código', width: '90px', render: (p) => <span className="item-code">#{p.codigo || p.PRO_CODIGO}</span> },
+                    { key: 'nome', label: 'Descrição do Produto', render: (p) => <strong>{p.nome || p.PRO_NOME}</strong> },
+                    { key: 'codbarra', label: 'Cód. Barras', render: (p) => <code>{p.codbarra || '-'}</code> },
+                    { key: 'valorv', label: 'Preço Venda', align: 'right', render: (p) => formatCurrency(p.valorv || 0) }
+                  ]}
+                  onSelect={(p) => handleSelectLinkedProduct(p)}
+                />
+              </div>
+
+              {purchaseForm.itens[targetItemIndex]?.produto_codigo && (
+                <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem', background: '#f8fafc', borderRadius: '0.5rem' }}>
+                  <span>Vinculado atualmente ao Produto #{purchaseForm.itens[targetItemIndex].produto_codigo}</span>
+                  <button 
+                    type="button" 
+                    className="btn-secondary small" 
+                    onClick={() => {
+                      handleUnlinkProduct(targetItemIndex);
+                      setShowLinkProductModal(false);
+                    }}
+                    style={{ color: '#dc2626' }}
+                  >
+                    Desvincular
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="product-modal-footer">
+              <button type="button" className="btn-secondary" onClick={() => setShowLinkProductModal(false)}>Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL DE VINCULAR PRODUTO FISCAL (PRO_COD_FISCAL)                          */}
+      {/* ========================================================================= */}
+      {showLinkFiscalModal && targetItemIndex !== null && (
+        <div className="product-form-modal-overlay" style={{ zIndex: 1000000 }}>
+          <div className="product-form-modal-container glass" style={{ maxWidth: '650px' }}>
+            <div className="product-modal-header">
+              <div className="product-modal-title-group">
+                <div className="product-modal-icon-badge" style={{ background: '#0284c7' }}>
+                  <ShieldCheck size={20} color="#ffffff" />
+                </div>
+                <div>
+                  <h3>Vincular Item a Produto Fiscal (PRO_COD_FISCAL)</h3>
+                  <span className="product-modal-subtitle">
+                    Item: {purchaseForm.itens[targetItemIndex]?.produto_nome}
+                  </span>
+                </div>
+              </div>
+              <button className="btn-close" onClick={() => setShowLinkFiscalModal(false)}><X size={20} /></button>
+            </div>
+
+            <div className="product-modal-body">
+              <div className="form-group">
+                <label>Buscar Produto Fiscal Mestre:</label>
+                <LookupSelect
+                  value=""
+                  placeholder="Pesquise por nome, código, EAN ou NCM na base fiscal..."
+                  title="Selecionar Produto Fiscal"
+                  subtitle="Busca na base fiscal unificada"
+                  icon={ShieldCheck}
+                  searchPlaceholder="Digite o nome, código ou NCM..."
+                  fetchData={async (termo, targetPage, limit) => {
+                    let url = `/v1/conciliacao/fiscais?page=${targetPage}&limit=${limit}`;
+                    if (termo) url += `&busca=${encodeURIComponent(termo)}&termo=${encodeURIComponent(termo)}`;
+                    const res = await api.get(url);
+                    return res.data;
+                  }}
+                  columns={[
+                    { key: 'codigo', label: 'Código Fiscal', width: '100px', render: (p) => <span className="item-code">#{p.codigo || p.PRO_CODIGO}</span> },
+                    { key: 'nome', label: 'Descrição Fiscal', render: (p) => <strong>{p.nome || p.PRO_NOME}</strong> },
+                    { key: 'codbarra', label: 'Cód. Barras', render: (p) => <code>{p.codbarra || '-'}</code> },
+                    { key: 'ncm', label: 'NCM', width: '90px' }
+                  ]}
+                  onSelect={(f) => handleSelectLinkedFiscal(f)}
+                />
+              </div>
+            </div>
+
+            <div className="product-modal-footer">
+              <button type="button" className="btn-secondary" onClick={() => setShowLinkFiscalModal(false)}>Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL DE CADASTRO COMPLETO DE NOVO PRODUTO                                */}
+      {/* ========================================================================= */}
+      {showProductModal && (
+        <ProductFormModal
+          isOpen={showProductModal}
+          onClose={() => setShowProductModal(false)}
+          productToEdit={productToEditModal}
+          onSaveSuccess={handleProductModalSuccess}
+        />
       )}
 
     </div>

@@ -275,9 +275,12 @@ export default function GradesModal({ isOpen, onClose, product, onGradesUpdated 
       <div className="legacy-modal-window gra-modal-window">
         {/* Header do Pop-up */}
         <div className="legacy-modal-header">
-          <div className="legacy-modal-title">
+          <div className="legacy-modal-title" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <Grid size={18} />
-            <span>Cadastro de Grades - {product ? `[${product.codigo}] ${product.nome}` : ''}</span>
+            <span>Cadastro de Grades - {product ? `[${product.codigo || product.id}] ${product.nome}` : ''}</span>
+            <span className="badge badge-success" style={{ fontSize: '0.85rem', fontWeight: 700, padding: '3px 8px' }} title="Somatória das quantidades das grades (GRA_QUANTIDADE)">
+              Total: {grades.reduce((acc, g) => acc + (Number(g.quantidade || g.gra_quantidade) || 0), 0)} UN
+            </span>
           </div>
           <button className="legacy-modal-close-btn" onClick={onClose}>
             <X size={18} />

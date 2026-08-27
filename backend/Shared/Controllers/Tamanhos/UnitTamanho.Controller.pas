@@ -1,4 +1,4 @@
-﻿unit UnitTamanho.Controller;
+unit UnitTamanho.Controller;
 
 interface
 uses
@@ -93,8 +93,8 @@ var Tamanho: TTamanho;
 begin
   try
     Tamanho := TTamanho.Create(TDatabase.Connection).fromJson<TTamanho>(Req.Body);
-    if Tamanho.Codigo = 0 then
-      Tamanho.Codigo := Tamanho.GeraCodigo('TAM_CODIGO');
+    if Tamanho.Codigo <= 0 then
+      Tamanho.Codigo := GeraCodigo('TAMANHOS', 'TAM_CODIGO');
     Tamanho.Cadastrar := 'S';
     Tamanho.SalvaNoBanco(0);
     Res.Send<TJSONObject>(TJSONObject.ParseJSONValue(Tamanho.ToJson) as TJSONObject).Status(THTTPStatus.Created);

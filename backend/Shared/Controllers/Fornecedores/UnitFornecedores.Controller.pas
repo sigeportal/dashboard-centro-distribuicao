@@ -4,9 +4,11 @@ interface
 uses
   Horse,
   Horse.Commons,
+  Horse.GBSwagger,
   Classes,
   SysUtils,
-  System.Json;
+  System.Json,
+  UnitConnection.Model.Interfaces;
 
 type
   TFornecedoresController = class
@@ -14,9 +16,9 @@ type
     class procedure Get(Req: THorseRequest; Res: THorseResponse; Next: TProc);
     class procedure GetForID(Req: THorseRequest; Res: THorseResponse; Next: TProc);
     class procedure Post(Req: THorseRequest; Res: THorseResponse; Next: TProc);
-    class procedure PostEmLote(Req: THorseRequest; Res: THorseResponse);
     class procedure Put(Req: THorseRequest; Res: THorseResponse; Next: TProc);
     class procedure Delete(Req: THorseRequest; Res: THorseResponse; Next: TProc);
+    class procedure PostEmLote(Req: THorseRequest; Res: THorseResponse);
   end;
 
 implementation
@@ -24,11 +26,10 @@ implementation
 { TFornecedoresController }
 
 uses
-  UnitConnection.Model.Interfaces,
-  UnitDatabase,
-  UnitFunctions,
   UnitFornecedores.Model,
-  UnitTabela.Helpers, FireDAC.Comp.Client;
+  UnitTabela.Helpers,
+  UnitDatabase,
+  FireDAC.Comp.Client;
 
 class procedure TFornecedoresController.Delete(Req: THorseRequest; Res: THorseResponse; Next: TProc);
 var Fornecedores: TFornecedores;
@@ -124,6 +125,8 @@ begin
     if Fornecedores.Codigo = 0 then
       Fornecedores.Codigo := Fornecedores.GeraCodigo('FOR_CODIGO');
     Fornecedores.Cadastrar := 'S';
+    Fornecedores.Datac := Date;
+    Fornecedores.Datau := Date;
     Fornecedores.SalvaNoBanco(0);
     Res.Send<TJSONObject>(TJSONObject.ParseJSONValue(Fornecedores.ToJson) as TJSONObject).Status(THTTPStatus.Created);
   finally
@@ -158,7 +161,7 @@ begin
   FDQuery.SQL.Add(':FOR_COMPLEMENTO, :FOR_COD_PAIS, :FOR_SUFRAMA, :FOR_INDIC_IE, :FOR_CID, :FOR_RAZAO_SOCIAL, :FOR_FANTASIA,');
   FDQuery.SQL.Add(':FOR_END_NUMERO, :FOR_TIPO, :FOR_INSC_MUNICIPAL, :FOR_CADASTRAR)');
   FDQuery.SQL.Add('MATCHING (FOR_CODIGO)');  
-	// preparando para usar inser��es via ArrayDML
+	// preparando para usar inserções via ArrayDML
 	FDQuery.Params.ArraySize := aJson.Count;
 	for i                    := 0 to Pred(aJson.Count) do
 	begin
@@ -196,7 +199,7 @@ begin
 			Itens.DisposeOf;
 		end;
 	end;
-	// Executa as inser��es em lote
+	// Executa as inserções em lote
 	FDQuery.Execute(aJson.Count, 0);
 	Res.Send<TJSONObject>(oJson);
 end;
@@ -207,6 +210,7 @@ begin
   try
     Fornecedores := TFornecedores.Create(TDatabase.Connection).fromJson<TFornecedores>(Req.Body);
     Fornecedores.Cadastrar := 'S';
+    Fornecedores.Datau := Date;
     Fornecedores.SalvaNoBanco(1);
     Res.Send<TJSONObject>(TJSONObject.ParseJSONValue(Fornecedores.ToJson) as TJSONObject);
   finally
@@ -216,21 +220,87 @@ end;
 
 class procedure TFornecedoresController.Router;
 begin
-  THorse.Group.Prefix('/v1')
-    .Route('/fornecedores')
-      .Get(Get)
-      .Post(Post)
-      .Put(Put)
-    .&End;
-  THorse.Group.Prefix('/v1')
-    .Route('/fornecedores/:id')
-      .Get(GetForID)
-      .Delete(Delete)
-    .&End;
-  THorse.Group.Prefix('/v1')
-  	.Route('/fornecedores/emLote')
-    	.Post(PostEmLote)
-	  .&End;
+  THorse.Group
+        .Prefix('/v1')
+        .Route('/fornecedores')
+          .Get(Get)
+          .Post(Post)
+          .Put(Put)
+        .&End
+        .Prefix('/v1')
+        .Route('/fornecedores/:id')
+          .Get(GetForID)
+          .Delete(Delete)
+        .&End
+        .Prefix('/v1')
+        .Route('/fornecedores/emLote')
+          .Post(PostEmLote)
+        .&End;
 end;
+
+initialization
+  Swagger
+    .BasePath('v1')
+      .Path('fornecedores')
+        .Tag('Fornecedores')
+        .GET('Lista Fornecedores', 'Lista todos os fornecedores cadastrados')
+          .AddResponse(200, 'Operacao bem Sucedida')
+            .Schema(TFornecedores)
+            .IsArray(True)
+          .&End
+          .AddResponse(400, 'BadRequest').&End
+          .AddResponse(500, 'InternalServerError').&End
+        .&End
+        .POST('Criar Fornecedor', 'Cria um novo fornecedor')
+          .AddParamBody('Dados do Fornecedor', 'Fornecedores')
+            .Required(True)
+            .Schema(TFornecedores)
+          .&End
+          .AddResponse(201, 'Created')
+            .Schema(TFornecedores)
+          .&End
+          .AddResponse(400, 'BadRequest').&End
+          .AddResponse(500, 'InternalServerError').&End
+        .&End
+        .PUT('Atualiza Fornecedor', 'Atualiza os dados de um fornecedor')
+          .AddParamBody('Dados do Fornecedor', 'Fornecedores')
+            .Required(True)
+            .Schema(TFornecedores)
+          .&End
+          .AddResponse(200, 'Ok')
+            .Schema(TFornecedores)
+          .&End
+          .AddResponse(400, 'BadRequest').&End
+          .AddResponse(500, 'InternalServerError').&End
+        .&End
+      .&End
+    .&End
+    .BasePath('v1')
+      .Path('fornecedores/{id}')
+        .Tag('Fornecedores')
+        .GET('Obtem um Fornecedor', 'Busca dados do fornecedor por ID')
+          .AddParamPath('id', 'Id do Fornecedor para buscar')
+            .Required(True)
+            .Schema(SWAG_INTEGER)
+          .&End
+          .AddResponse(200, 'Operacao bem Sucedida')
+            .Schema(TFornecedores)
+          .&End
+          .AddResponse(404, 'Fornecedor nao encontrado').&End
+          .AddResponse(400, 'BadRequest').&End
+          .AddResponse(500, 'InternalServerError').&End
+        .&End
+        .DELETE('Apagar um Fornecedor', 'Inativa o fornecedor')
+          .AddParamPath('id', 'id do Fornecedor para deletar')
+            .Required(True)
+            .Schema(SWAG_INTEGER)
+          .&End
+          .AddResponse(204, 'No Content').&End
+          .AddResponse(404, 'Fornecedor nao encontrado').&End
+          .AddResponse(400, 'BadRequest').&End
+          .AddResponse(500, 'InternalServerError').&End
+        .&End
+      .&End
+    .&End;
 
 end.

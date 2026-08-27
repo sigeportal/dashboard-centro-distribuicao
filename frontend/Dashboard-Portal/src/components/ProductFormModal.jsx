@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { 
-  Package, Plus, Trash2, Check, X, Edit2, Search, Grid, 
-  Image as ImageIcon, DollarSign, Layers, ShieldCheck, 
+import {
+  Package, Plus, Trash2, Check, X, Edit2, Search, Grid,
+  Image as ImageIcon, DollarSign, Layers, ShieldCheck,
   RefreshCw, Barcode, AlertCircle, TrendingUp, Sparkles,
-  CheckCircle2, FolderPlus, UserPlus, FileText, Printer
+  CheckCircle2, FolderPlus, UserPlus, FileText, Printer,
+  Tag, MapPin, Save
 } from 'lucide-react';
 import { createApi } from '../services/api';
 import GradesModal from './GradesModal';
@@ -13,14 +14,14 @@ import LookupSelect from './LookupSelect';
 import { formatCurrency } from '../utils/formatters';
 import './ProductFormModal.css';
 
-export default function ProductFormModal({ 
-  isOpen, 
-  onClose, 
-  productToEdit, 
-  onSaveSuccess, 
-  grupos = [], 
-  subgrupos = [], 
-  fornecedores = [] 
+export default function ProductFormModal({
+  isOpen,
+  onClose,
+  productToEdit,
+  onSaveSuccess,
+  grupos = [],
+  subgrupos = [],
+  fornecedores = []
 }) {
   if (!isOpen) return null;
 
@@ -36,6 +37,50 @@ export default function ProductFormModal({
   // Submodais
   const [showGradesModal, setShowGradesModal] = useState(false);
   const [showGruposSubgruposModal, setShowGruposSubgruposModal] = useState(false);
+  const [showQuickVendorModal, setShowQuickVendorModal] = useState(false);
+  const [showQuickModeloModal, setShowQuickModeloModal] = useState(false);
+
+  // Grupos, Subgrupos e Fornecedores autônomos
+  const [gruposList, setGruposList] = useState(grupos);
+  const [subgruposList, setSubgruposList] = useState(subgrupos);
+  const [fornecedoresList, setFornecedoresList] = useState(fornecedores);
+
+  // Sincroniza props se forem passadas ou atualizadas externamente
+  useEffect(() => {
+    if (grupos && grupos.length > 0) setGruposList(grupos);
+  }, [grupos]);
+
+  useEffect(() => {
+    if (subgrupos && subgrupos.length > 0) setSubgruposList(subgrupos);
+  }, [subgrupos]);
+
+  useEffect(() => {
+    if (fornecedores && fornecedores.length > 0) setFornecedoresList(fornecedores);
+  }, [fornecedores]);
+
+  // Modelos carregados do Backend
+  const [modelosList, setModelosList] = useState([]);
+  const [novoModeloNome, setNovoModeloNome] = useState('');
+
+  // Cidades e Estados para Fornecedor
+  const [cidadesList, setCidadesList] = useState([]);
+  const [estadosList, setEstadosList] = useState([]);
+
+  // Quick Vendor Form State com Máscara e FOR_CID
+  const [quickVendorForm, setQuickVendorForm] = useState({
+    nome: '',
+    fantasia: '',
+    cnpj: '',
+    inscricao: '',
+    telefone: '',
+    email: '',
+    endereco: '',
+    bairro: '',
+    for_cid: '',
+    cidade: '',
+    uf: 'PR',
+    contato: ''
+  });
 
   // Lista de grades do produto
   const [grades, setGrades] = useState([]);
@@ -75,9 +120,9 @@ export default function ProductFormModal({
     um: 'UN',
 
     // Fornecedor e Classificação
-    pro_for: fornecedores[0]?.codigo || 1,
-    pro_gru: subgrupos[0]?.codigo || 1,
-    grupo_id: grupos[0]?.codigo || 1,
+    pro_for: 1,
+    pro_gru: 1,
+    grupo_id: 1,
     modelo_id: '',
 
     // 3 Preços do Produto & Custos
@@ -106,94 +151,332 @@ export default function ProductFormModal({
     url_Imagem: ''
   });
 
+  // Flag se o usuário digitou manualmente o nome customizado
+  const [isNameManuallyEdited, setIsNameManuallyEdited] = useState(false);
+
   // Margem Calculada (%)
   const [margemCalculada, setMargemCalculada] = useState(0);
 
-  // Inicialização e Carga dos Dados
-  useEffect(() => {
-    fetchTamanhos();
-    if (productToEdit) {
-      const gCode = Number(productToEdit.pro_gru || productToEdit.subgrupoId || productToEdit.gru || 1);
-      const sg = subgrupos.find(s => Number(s.codigo) === gCode);
-      const gId = sg ? Number(sg.g1) : (Number(productToEdit.grupo_id || productToEdit.grupo || 1));
+  // Função utilitária de Máscara de CNPJ / CPF
+  const maskCnpjCpf = (value) => {
+    if (!value) return '';
+    const digits = value.replace(/\D/g, '').slice(0, 14);
+    if (digits.length <= 11) {
+      return digits
+        .replace(/(\d{3})(\d)/, '$1.$2')
+        .replace(/(\d{3})(\d)/, '$1.$2')
+        .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+    }
+    return digits
+      .replace(/^(\d{2})(\d)/, '$1.$2')
+      .replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3')
+      .replace(/\.(\d{3})(\d)/, '.$1/$2')
+      .replace(/(\d{4})(\d)/, '$1-$2');
+  };
 
-      const vVista = Number(productToEdit.valorv || productToEdit.valor || 0);
-      const vDinheiro = Number(productToEdit.pro_valor_dinheiro || productToEdit.valor_dinheiro || vVista);
-      const vPrazo = Number(productToEdit.pro_valorv_prazo || productToEdit.valorv_prazo || productToEdit.valorp || vVista);
-      const custoEntrada = Number(productToEdit.custo || productToEdit.valorc || productToEdit.valorf || 0);
+  // Função utilitária para sugestão inteligente de nome em CAIXA ALTA
+  const buildSuggestedProductName = (gId, sgId, mId, marcaText) => {
+    const grp = gruposList.find(g => Number(g.codigo) === Number(gId));
+    const sub = subgruposList.find(s => Number(s.codigo) === Number(sgId));
+    const mod = modelosList.find(m => Number(m.codigo) === Number(mId));
 
-      setForm({
-        codigo: productToEdit.codigo || productToEdit.id,
-        nome: productToEdit.nome || '',
-        marca: productToEdit.marca || productToEdit.fabricante || '',
-        fabricante: productToEdit.fabricante || productToEdit.marca || '',
-        cod_fabricante: productToEdit.cod_fabricante || productToEdit.codigo || '',
-        colecao: productToEdit.colecao || '',
-        referencia: productToEdit.referencia || '',
-        cor: productToEdit.cor || '',
-        codbarra: productToEdit.codbarra || '',
-        abc: productToEdit.abc || 'N',
-        local: productToEdit.local || 'GERAL',
-        ult_alteracao: productToEdit.ult_alteracao || new Date().toISOString().split('T')[0],
-        estado: productToEdit.estado || 'ATIVO',
-        um: productToEdit.um || productToEdit.embalagem || 'UN',
+    const gNome = grp ? grp.nome.replace(/^#\d+\s*-\s*/, '').trim() : '';
+    const sgNome = sub ? sub.nome.replace(/^#\d+\s*-\s*/, '').trim() : '';
+    const mNome = mod ? mod.nome.replace(/^#\d+\s*-\s*/, '').trim() : '';
+    const mrcNome = (marcaText || '').trim();
 
-        pro_for: productToEdit.pro_for || productToEdit.fornecedorId || fornecedores[0]?.codigo || 1,
-        pro_gru: gCode,
-        grupo_id: gId,
-        modelo_id: productToEdit.modelo || productToEdit.modelo_id || '',
+    const parts = [gNome, sgNome, mNome, mrcNome].filter(Boolean);
+    return parts.join(' ').toUpperCase();
+  };
 
-        pro_valor_dinheiro: vDinheiro,
-        valorv: vVista,
-        pro_valorv_prazo: vPrazo,
-        custo: custoEntrada,
-        custo_medio: Number(productToEdit.custo_medio || productToEdit.valorcm || 0),
-        preco_sugerido: Number(productToEdit.preco_sugerido || productToEdit.valors || 0),
-        quantidade: Number(productToEdit.quantidade || 0),
-        quant_min: Number(productToEdit.quant_min || productToEdit.quantidadem || 0),
-        dias_validade: Number(productToEdit.dias_validade || 0),
+  // Carregar lista de Grupos e Subgrupos caso não tenham sido passados
+  const fetchGruposESubgrupos = async () => {
+    try {
+      const [gRes, sRes] = await Promise.all([
+        api.get('/v1/grupos?limit=300').catch(() => ({ data: [] })),
+        api.get('/v1/subgrupos?limit=500').catch(() => ({ data: [] }))
+      ]);
+      const gData = Array.isArray(gRes.data) ? gRes.data : (gRes.data?.data || []);
+      const sData = Array.isArray(sRes.data) ? sRes.data : (sRes.data?.data || []);
+      setGruposList(gData);
+      setSubgruposList(sData);
+      return { grupos: gData, subgrupos: sData };
+    } catch (err) {
+      console.warn('Erro ao carregar grupos e subgrupos:', err);
+      return { grupos: [], subgrupos: [] };
+    }
+  };
 
-        ncm: productToEdit.ncm || '6109.10.00',
-        cfop: productToEdit.cfop || '5102',
-        cest: productToEdit.cest || '',
-        gtin: productToEdit.gtin || productToEdit.codbarra || 'SEM GTIN',
-        codTotalizador: Number(productToEdit.codTotalizador || productToEdit.totalizadorId || 1),
-        pro_cod_fiscal: productToEdit.pro_cod_fiscal || productToEdit.proCodFiscal || '',
-        pro_fiscal_gerar: productToEdit.pro_fiscal_gerar || productToEdit.proFiscalGerar || 'S',
-        pro_emitir_negativo: productToEdit.pro_emitir_negativo || productToEdit.proEmitirNegativo || 'N',
-        balanca: productToEdit.balanca || 'N',
+  // Carregar lista de Fornecedores caso não tenha sido passada
+  const fetchFornecedores = async () => {
+    try {
+      const res = await api.get('/v1/fornecedores?limit=300');
+      const items = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+      setFornecedoresList(items);
+      return items;
+    } catch (err) {
+      console.warn('Erro ao carregar fornecedores:', err);
+      return [];
+    }
+  };
 
-        url_Imagem: productToEdit.url_Imagem || ''
-      });
+  // Carregar lista de Modelos
+  const fetchModelos = async () => {
+    try {
+      const res = await api.get('/v1/modelos');
+      const items = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+      setModelosList(items);
+      return items;
+    } catch (err) {
+      console.warn('Erro ao carregar modelos:', err);
+      return [];
+    }
+  };
 
-      // Recalcular margem
-      if (custoEntrada > 0 && vVista > 0) {
-        setMargemCalculada(((vVista - custoEntrada) / custoEntrada) * 100);
-      } else {
-        setMargemCalculada(0);
+  // Carregar Cidades e Estados
+  const fetchCidadesEEstados = async () => {
+    try {
+      const [cRes, eRes] = await Promise.all([
+        api.get('/v1/cidades?limit=300').catch(() => ({ data: [] })),
+        api.get('/v1/estados').catch(() => ({ data: [] }))
+      ]);
+      const cItems = Array.isArray(cRes.data) ? cRes.data : (cRes.data?.data || []);
+      const eItems = Array.isArray(eRes.data) ? eRes.data : (eRes.data?.data || []);
+      setCidadesList(cItems);
+      setEstadosList(eItems);
+    } catch (err) {
+      console.warn('Erro ao carregar cidades e estados:', err);
+    }
+  };
+
+  // Buscar tamanhos disponíveis do banco de dados
+  const fetchTamanhos = async () => {
+    try {
+      const res = await api.get('/v1/tamanhos?limit=300');
+      const items = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+      setTamanhosList(items);
+      if (items.length > 0 && !gradeForm.tam) {
+        setGradeForm(prev => ({ ...prev, tam: items[0].codigo, tam_nome: items[0].tamanho || items[0].sigla }));
+      }
+      return items;
+    } catch (err) {
+      console.warn('Erro ao carregar tamanhos:', err);
+      return [];
+    }
+  };
+
+  // Buscar grades existentes do produto
+  const fetchGrades = async (prodCode, loadedTamanhos = tamanhosList) => {
+    if (!prodCode) return;
+    try {
+      let items = [];
+      try {
+        const resProd = await api.get(`/v1/grades/produto/${prodCode}`);
+        if (Array.isArray(resProd.data)) items = resProd.data;
+        else if (resProd.data?.data) items = resProd.data.data;
+      } catch (e1) {
+        const resAll = await api.get('/v1/grades?limit=500');
+        const all = Array.isArray(resAll.data) ? resAll.data : (resAll.data?.data || []);
+        items = all.filter(g => String(g.pro || g.gra_pro || g.produtoId) === String(prodCode));
       }
 
-      fetchGrades(productToEdit.codigo || productToEdit.id);
-      setMode('browse');
-    } else {
-      const nextCode = Math.floor(Math.random() * 90000) + 10000;
-      setForm(prev => ({
-        ...prev,
-        codigo: nextCode,
-        cod_fabricante: String(nextCode),
-        codbarra: `789${String(nextCode).padStart(9, '0')}1`
-      }));
-      setGrades([]);
-      setMode('insert');
+      const tList = (loadedTamanhos && loadedTamanhos.length > 0) ? loadedTamanhos : tamanhosList;
+      const normalized = (items || []).map(g => {
+        const tCod = Number(g.tam ?? g.gra_tam ?? g.tamanho?.codigo ?? 0);
+        const matchTam = (tList || []).find(t => Number(t.codigo) === tCod);
+        const tNome = g.tam_nome || (matchTam ? (matchTam.sigla || matchTam.tamanho) : (g.tamanho?.sigla || g.tamanho?.tamanho || `Tam #${tCod}`));
+        const vV = Number(g.valor ?? g.gra_valor ?? 0);
+        const vD = Number(g.valor_dinheiro ?? g.valorDinheiro ?? g.gra_valor_dinheiro ?? vV);
+        const vP = Number(g.valor_prazo ?? g.valorPrazo ?? g.gra_valor_prazo ?? vV);
+        const q = Number(g.quantidade ?? g.gra_quantidade ?? 0);
+
+        return {
+          codigo: Number(g.codigo ?? g.gra_codigo ?? 0),
+          gra_codigo: Number(g.codigo ?? g.gra_codigo ?? 0),
+          pro: Number(g.pro ?? g.gra_pro ?? prodCode),
+          gra_pro: Number(g.pro ?? g.gra_pro ?? prodCode),
+          tam: tCod,
+          gra_tam: tCod,
+          tam_nome: tNome,
+          tamanho: matchTam || g.tamanho || { codigo: tCod, tamanho: tNome, sigla: tNome },
+          cor: (g.cor || g.gra_cor || 'UNICA').toUpperCase(),
+          gra_cor: (g.cor || g.gra_cor || 'UNICA').toUpperCase(),
+          codbarra: g.codbarra || g.gra_codbarra || '',
+          gra_codbarra: g.codbarra || g.gra_codbarra || '',
+          quantidade: q,
+          gra_quantidade: q,
+          valor: vV,
+          gra_valor: vV,
+          valor_dinheiro: vD,
+          valorDinheiro: vD,
+          gra_valor_dinheiro: vD,
+          valor_prazo: vP,
+          valorPrazo: vP,
+          gra_valor_prazo: vP
+        };
+      });
+
+      setGrades(normalized);
+    } catch (err) {
+      console.warn('Erro ao carregar grades:', err);
     }
+  };
+
+  // Inicialização e Carga dos Dados
+  useEffect(() => {
+    const initData = async () => {
+      let currentGrupos = gruposList;
+      let currentSubgrupos = subgruposList;
+      let currentForns = fornecedoresList;
+
+      if (!currentGrupos || currentGrupos.length === 0 || !currentSubgrupos || currentSubgrupos.length === 0) {
+        const gs = await fetchGruposESubgrupos();
+        currentGrupos = gs.grupos;
+        currentSubgrupos = gs.subgrupos;
+      }
+
+      if (!currentForns || currentForns.length === 0) {
+        currentForns = await fetchFornecedores();
+      }
+
+      const [loadedTams, loadedMods] = await Promise.all([
+        fetchTamanhos(),
+        fetchModelos(),
+        fetchCidadesEEstados()
+      ]);
+
+      if (productToEdit) {
+        const prodId = productToEdit.codigo || productToEdit.id || productToEdit.pro_codigo;
+        const gCode = Number(productToEdit.pro_gru || productToEdit.subgrupoId || productToEdit.gru || 1);
+        const sg = (currentSubgrupos || []).find(s => Number(s.codigo) === gCode);
+        const gId = sg ? Number(sg.g1) : (Number(productToEdit.grupo_id || productToEdit.grupo || 1));
+
+        // Vinculação robusta de MODELO (pro_mar, mar, modelo, modelo_id)
+        const rawModelo = productToEdit.modelo_id ?? productToEdit.modelo ?? productToEdit.pro_mar ?? productToEdit.mar ?? '';
+        const modeloIdFinal = (rawModelo !== '' && rawModelo !== null && rawModelo !== undefined && Number(rawModelo) > 0) ? Number(rawModelo) : '';
+
+        const vVista = Number(productToEdit.valorv || productToEdit.valor || 0);
+        const vDinheiro = Number(productToEdit.pro_valor_dinheiro || productToEdit.valor_dinheiro || vVista);
+        const vPrazo = Number(productToEdit.pro_valorv_prazo || productToEdit.valorv_prazo || productToEdit.valorp || vVista);
+        const custoEntrada = Number(productToEdit.custo || productToEdit.valorc || productToEdit.valorf || 0);
+
+        setForm({
+          codigo: prodId,
+          nome: (productToEdit.nome || '').toUpperCase(),
+          marca: (productToEdit.marca || productToEdit.fabricante || '').toUpperCase(),
+          fabricante: (productToEdit.fabricante || productToEdit.marca || '').toUpperCase(),
+          cod_fabricante: productToEdit.cod_fabricante || productToEdit.codigo || '',
+          colecao: (productToEdit.colecao || '').toUpperCase(),
+          referencia: productToEdit.referencia || '',
+          cor: (productToEdit.cor || '').toUpperCase(),
+          codbarra: productToEdit.codbarra || '',
+          abc: productToEdit.abc || 'N',
+          local: productToEdit.local || 'GERAL',
+          ult_alteracao: productToEdit.ult_alteracao || new Date().toISOString().split('T')[0],
+          estado: productToEdit.estado || 'ATIVO',
+          um: productToEdit.um || productToEdit.embalagem || 'UN',
+
+          pro_for: productToEdit.pro_for || productToEdit.fornecedorId || currentForns[0]?.codigo || 1,
+          pro_gru: gCode,
+          grupo_id: gId,
+          modelo_id: modeloIdFinal,
+
+          pro_valor_dinheiro: vDinheiro,
+          valorv: vVista,
+          pro_valorv_prazo: vPrazo,
+          custo: custoEntrada,
+          custo_medio: Number(productToEdit.custo_medio || productToEdit.valorcm || 0),
+          preco_sugerido: Number(productToEdit.preco_sugerido || productToEdit.valors || 0),
+          quantidade: Number(productToEdit.quantidade || 0),
+          quant_min: Number(productToEdit.quant_min || productToEdit.quantidadem || 0),
+          dias_validade: Number(productToEdit.dias_validade || 0),
+
+          ncm: productToEdit.ncm || '6109.10.00',
+          cfop: productToEdit.cfop || '5102',
+          cest: productToEdit.cest || '',
+          gtin: productToEdit.gtin || productToEdit.codbarra || 'SEM GTIN',
+          codTotalizador: Number(productToEdit.codTotalizador || productToEdit.totalizadorId || 1),
+          pro_cod_fiscal: productToEdit.pro_cod_fiscal || productToEdit.proCodFiscal || '',
+          pro_fiscal_gerar: productToEdit.pro_fiscal_gerar || productToEdit.proFiscalGerar || 'S',
+          pro_emitir_negativo: productToEdit.pro_emitir_negativo || productToEdit.proEmitirNegativo || 'N',
+          balanca: productToEdit.balanca || 'N',
+
+          url_Imagem: productToEdit.url_Imagem || ''
+        });
+
+        setIsNameManuallyEdited(true);
+
+        if (custoEntrada > 0 && vVista > 0) {
+          setMargemCalculada(((vVista - custoEntrada) / custoEntrada) * 100);
+        } else {
+          setMargemCalculada(0);
+        }
+
+        await fetchGrades(prodId, loadedTams);
+        setMode('browse');
+      } else {
+        setForm(prev => ({
+          ...prev,
+          codigo: '',
+          cod_fabricante: '',
+          codbarra: '',
+          pro_for: currentForns[0]?.codigo || 1,
+          pro_gru: currentSubgrupos[0]?.codigo || 1,
+          grupo_id: currentGrupos[0]?.codigo || 1,
+          modelo_id: ''
+        }));
+        setIsNameManuallyEdited(false);
+        setGrades([]);
+        setMode('insert');
+      }
+    };
+
+    initData();
   }, [productToEdit]);
+
+  // Handler para atualizar campos de classificação e recalcular nome sugerido automaticamente
+  const handleClassificationChange = (field, value) => {
+    const updated = { ...form, [field]: value };
+
+    // Se for alteração de grupo, ajusta o primeiro subgrupo
+    if (field === 'grupo_id') {
+      const gId = Number(value);
+      const firstSg = (subgruposList || []).find(s => Number(s.g1) === gId);
+      if (firstSg) updated.pro_gru = firstSg.codigo;
+    }
+
+    // Se o usuário ainda não digitou um nome fixo manual ou se o nome estiver vazio, sugere automaticamente
+    if (!isNameManuallyEdited || !form.nome.trim()) {
+      const suggested = buildSuggestedProductName(
+        field === 'grupo_id' ? value : updated.grupo_id,
+        field === 'pro_gru' ? value : updated.pro_gru,
+        field === 'modelo_id' ? value : updated.modelo_id,
+        field === 'marca' || field === 'fabricante' ? value : updated.marca
+      );
+      if (suggested) {
+        updated.nome = suggested;
+      }
+    }
+
+    setForm(updated);
+  };
+
+  // Forçar aplicação da sugestão de nome
+  const handleApplySuggestedName = () => {
+    const suggested = buildSuggestedProductName(form.grupo_id, form.pro_gru, form.modelo_id, form.marca || form.fabricante);
+    if (suggested) {
+      setForm(prev => ({ ...prev, nome: suggested }));
+      setIsNameManuallyEdited(false);
+      setSuccessMsg(`Nome sugerido aplicado: "${suggested}"`);
+      setTimeout(() => setSuccessMsg(''), 3000);
+    }
+  };
 
   // Recalcula a margem de lucro ao alterar custo ou preço à vista
   const handlePrecoOuCustoChange = (field, value) => {
     const numVal = parseFloat(value) || 0;
     const updated = { ...form, [field]: numVal };
 
-    // Se estiver alterando preço à vista e dinheiro/prazo forem 0, sugere os 3
     if (field === 'valorv') {
       if (!updated.pro_valor_dinheiro || updated.pro_valor_dinheiro === 0) {
         updated.pro_valor_dinheiro = numVal;
@@ -215,63 +498,104 @@ export default function ProductFormModal({
     setForm(updated);
   };
 
-  // Buscar tamanhos disponíveis
-  const fetchTamanhos = async () => {
-    try {
-      const res = await api.get('/v1/tamanhos?limit=200');
-      const items = Array.isArray(res.data) ? res.data : (res.data?.data || []);
-      setTamanhosList(items);
-      if (items.length > 0 && !gradeForm.tam) {
-        setGradeForm(prev => ({ ...prev, tam: items[0].codigo, tam_nome: items[0].tamanho || items[0].sigla }));
-      }
-    } catch (err) {
-      console.warn('Erro ao carregar tamanhos:', err);
-    }
-  };
-
-  // Buscar grades existentes do produto
-  const fetchGrades = async (prodCode) => {
-    try {
-      let items = [];
-      try {
-        const resProd = await api.get(`/v1/grades/produto/${prodCode}`);
-        if (Array.isArray(resProd.data)) items = resProd.data;
-        else if (resProd.data?.data) items = resProd.data.data;
-      } catch (e1) {
-        const resAll = await api.get('/v1/grades?limit=500');
-        const all = Array.isArray(resAll.data) ? resAll.data : (resAll.data?.data || []);
-        items = all.filter(g => String(g.pro || g.gra_pro || g.produtoId) === String(prodCode));
-      }
-      setGrades(items);
-    } catch (err) {
-      console.warn('Erro ao carregar grades:', err);
-    }
-  };
-
-  // Atalhos de Teclado
+  // Atalhos de Teclado (F2, F4, F7, F10, Ctrl+S, ESC)
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (showGradesModal || showGruposSubgruposModal) return;
+      // Evita atalhos se algum modal secundário estiver aberto
+      if (showGradesModal || showGruposSubgruposModal || showQuickVendorModal || showQuickModeloModal) {
+        return;
+      }
 
+      // ESC: Fechar
       if (e.key === 'Escape') {
+        e.preventDefault();
         onClose();
-      } else if (e.key === 'F2') {
-        e.preventDefault();
-        setActiveTab('fiscal');
-      } else if (e.key === 'F4') {
-        e.preventDefault();
-        setShowGruposSubgruposModal(true);
-      } else if (e.key === 'F10') {
-        e.preventDefault();
-        handleGerarCodigosBarrasGrades();
-      } else if (e.ctrlKey && e.key.toLowerCase() === 's') {
+        return;
+      }
+
+      // Ctrl + S: Salvar
+      if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
         e.preventDefault();
         handleSave();
+        return;
+      }
+
+      // F2: Novo Produto
+      if (e.key === 'F2') {
+        e.preventDefault();
+        // F2: Limpar / Novo Formulário
+        setForm({
+          codigo: '',
+          nome: '',
+          marca: '',
+          fabricante: '',
+          cod_fabricante: '',
+          colecao: '',
+          referencia: '',
+          cor: '',
+          codbarra: '',
+          abc: 'N',
+          local: 'GERAL',
+          ult_alteracao: new Date().toISOString().split('T')[0],
+          estado: 'ATIVO',
+          um: 'UN',
+          pro_for: fornecedores[0]?.codigo || 1,
+          pro_gru: subgrupos[0]?.codigo || 1,
+          grupo_id: grupos[0]?.codigo || 1,
+          modelo_id: '',
+          pro_valor_dinheiro: 0,
+          valorv: 0,
+          pro_valorv_prazo: 0,
+          custo: 0,
+          custo_medio: 0,
+          preco_sugerido: 0,
+          quantidade: 0,
+          quant_min: 0,
+          dias_validade: 0,
+          ncm: '6109.10.00',
+          cfop: '5102',
+          cest: '',
+          gtin: 'SEM GTIN',
+          codTotalizador: 1,
+          pro_cod_fiscal: '',
+          pro_fiscal_gerar: 'S',
+          pro_emitir_negativo: 'N',
+          balanca: 'N',
+          url_Imagem: ''
+        });
+        setGrades([]);
+        setIsNameManuallyEdited(false);
+        setMode('insert');
+        setActiveTab('geral');
+        setSuccessMsg('Formulário pronto para novo cadastro!');
+        setTimeout(() => setSuccessMsg(''), 3000);
+        return;
+      }
+
+      // F4: Gerenciar Grupos/Subgrupos
+      if (e.key === 'F4') {
+        e.preventDefault();
+        setShowGruposSubgruposModal(true);
+        return;
+      }
+
+      // F7: Novo Fornecedor Rápido
+      if (e.key === 'F7') {
+        e.preventDefault();
+        setShowQuickVendorModal(true);
+        return;
+      }
+
+      // F10: Gerar EANs para as Grades
+      if (e.key === 'F10') {
+        e.preventDefault();
+        handleGerarCodigosBarrasGrades();
+        return;
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose, showGradesModal, showGruposSubgruposModal, form, grades]);
+  }, [onClose, showGradesModal, showGruposSubgruposModal, showQuickVendorModal, showQuickModeloModal, form, grades]);
 
   // Gerador de EAN13 para o Produto Principal
   const handleGerarEanPrincipal = () => {
@@ -312,15 +636,50 @@ export default function ProductFormModal({
     setTimeout(() => setSuccessMsg(''), 4000);
   };
 
-  // Gerador Rápido de Grades por Lista de Tamanhos (ex: P, M, G, GG ou 36..44)
+  // Gerador Rápido e Preciso de Grades Baseado nos TAMANHOS Reais do Banco
   const handleGerarGradeAutomatica = (tipo) => {
+    if (tamanhosList.length === 0) {
+      alert('Nenhum tamanho cadastrado no sistema central.');
+      return;
+    }
+
     let tamanhosGerar = [];
+
     if (tipo === 'letras') {
-      tamanhosGerar = ['P', 'M', 'G', 'GG'];
-    } else if (tipo === 'numeros') {
-      tamanhosGerar = ['34', '36', '38', '40', '42', '44'];
-    } else if (tipo === 'calcados') {
-      tamanhosGerar = ['35', '36', '37', '38', '39', '40'];
+      // Prioriza tamanhos em letras (PP, P, M, G, GG, XG, etc.) cadastrados no banco
+      const letrasOrdem = ['PP', 'P', 'M', 'G', 'GG', 'XG', 'XGG', 'EG', 'EGG', 'UN'];
+      tamanhosGerar = tamanhosList
+        .filter(t => {
+          const s = (t.sigla || t.tamanho || '').trim().toUpperCase();
+          return isNaN(Number(s));
+        })
+        .sort((a, b) => {
+          const sA = (a.sigla || a.tamanho || '').trim().toUpperCase();
+          const sB = (b.sigla || b.tamanho || '').trim().toUpperCase();
+          const idxA = letrasOrdem.indexOf(sA);
+          const idxB = letrasOrdem.indexOf(sB);
+          if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+          if (idxA !== -1) return -1;
+          if (idxB !== -1) return 1;
+          return sA.localeCompare(sB);
+        });
+      if (tamanhosGerar.length === 0) tamanhosGerar = tamanhosList.slice(0, 6);
+    } else if (tipo === 'calcados' || tipo === 'numeros') {
+      // Prioriza tamanhos numéricos (34, 35, 36, 37, 38, 39, 40, 42, 44, 46, 48) cadastrados no banco
+      tamanhosGerar = tamanhosList
+        .filter(t => {
+          const s = (t.sigla || t.tamanho || '').trim();
+          return !isNaN(Number(s));
+        })
+        .sort((a, b) => Number(a.sigla || a.tamanho) - Number(b.sigla || b.tamanho));
+      if (tamanhosGerar.length === 0) tamanhosGerar = tamanhosList;
+    } else {
+      tamanhosGerar = [...tamanhosList].sort((a, b) => {
+        const numA = Number(a.sigla || a.tamanho);
+        const numB = Number(b.sigla || b.tamanho);
+        if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+        return (a.sigla || a.tamanho || '').localeCompare(b.sigla || b.tamanho || '');
+      });
     }
 
     const prodCod = Number(form.codigo) || 1;
@@ -328,9 +687,9 @@ export default function ProductFormModal({
     const vDinheiro = Number(form.pro_valor_dinheiro || vVista);
     const vPrazo = Number(form.pro_valorv_prazo || vVista);
 
-    const newGrades = tamanhosGerar.map((sigla, idx) => {
-      const matchTam = tamanhosList.find(t => (t.sigla || t.tamanho || '').toUpperCase() === sigla.toUpperCase());
-      const tamId = matchTam ? matchTam.codigo : (idx + 1);
+    const newGrades = tamanhosGerar.map((t, idx) => {
+      const tamId = Number(t.codigo || (idx + 1));
+      const sigla = (t.sigla || t.tamanho || String(tamId)).toUpperCase();
       const base = `789${String(prodCod).padStart(6, '0')}${String(tamId).padStart(3, '0')}`;
       let sum = 0;
       for (let i = 0; i < 12; i++) {
@@ -338,24 +697,101 @@ export default function ProductFormModal({
       }
       const checkDigit = (10 - (sum % 10)) % 10;
 
+      const displayNome = t.sigla && t.tamanho && t.sigla.toUpperCase() !== t.tamanho.toUpperCase()
+        ? `${t.sigla} - ${t.tamanho}`
+        : (t.sigla || t.tamanho || sigla);
+
       return {
-        codigo: Math.floor(Math.random() * 900000) + 100000,
+        codigo: 0,
+        gra_codigo: 0,
         pro: prodCod,
+        gra_pro: prodCod,
         tam: tamId,
-        tam_nome: sigla,
-        tamanho: { codigo: tamId, tamanho: sigla, sigla: sigla },
+        gra_tam: tamId,
+        tam_nome: displayNome,
+        tamanho: t,
         cor: form.cor || 'UNICA',
+        gra_cor: form.cor || 'UNICA',
         codbarra: `${base.slice(0, 12)}${checkDigit}`,
+        gra_codbarra: `${base.slice(0, 12)}${checkDigit}`,
         quantidade: 0,
+        gra_quantidade: 0,
         valor: vVista,
+        gra_valor: vVista,
         valor_dinheiro: vDinheiro,
-        valor_prazo: vPrazo
+        valorDinheiro: vDinheiro,
+        gra_valor_dinheiro: vDinheiro,
+        valor_prazo: vPrazo,
+        valorPrazo: vPrazo,
+        gra_valor_prazo: vPrazo
       };
     });
 
-    setGrades(prev => [...prev, ...newGrades]);
-    setSuccessMsg(`Grade automática gerada com ${newGrades.length} variações!`);
+    setGrades(newGrades);
+    setSuccessMsg(`Grade gerada com ${newGrades.length} variações baseadas nos tamanhos cadastrados!`);
     setTimeout(() => setSuccessMsg(''), 4000);
+  };
+
+  // Salvar Rápido de Novo Modelo
+  const handleSaveQuickModelo = async (e) => {
+    e.preventDefault();
+    if (!novoModeloNome.trim()) return;
+    try {
+      const res = await api.post('/v1/modelos', {
+        codigo: 0,
+        nome: novoModeloNome.trim().toUpperCase()
+      });
+      const created = res.data;
+      await fetchModelos();
+      setForm(prev => ({ ...prev, modelo_id: created.codigo }));
+      setShowQuickModeloModal(false);
+      setNovoModeloNome('');
+      setSuccessMsg(`Modelo "${created.nome}" cadastrado com sucesso!`);
+      setTimeout(() => setSuccessMsg(''), 3000);
+    } catch (err) {
+      alert('Erro ao salvar modelo: ' + (err.response?.data?.error || err.message));
+    }
+  };
+
+  // Salvar Rápido de Novo Fornecedor com CNPJ Mask e FOR_CID
+  const handleSaveQuickVendor = async (e) => {
+    e.preventDefault();
+    if (!quickVendorForm.nome.trim()) {
+      alert('Informe o Nome / Razão Social do fornecedor.');
+      return;
+    }
+    try {
+      const payload = {
+        codigo: 0,
+        nome: quickVendorForm.nome.toUpperCase(),
+        razao_social: quickVendorForm.nome.toUpperCase(),
+        fantasia: quickVendorForm.fantasia.toUpperCase(),
+        cnpj_cpf: quickVendorForm.cnpj,
+        insc_estadual: quickVendorForm.inscricao,
+        fone: quickVendorForm.telefone,
+        email: quickVendorForm.email,
+        endereco: quickVendorForm.endereco,
+        bairro: quickVendorForm.bairro,
+        cid: Number(quickVendorForm.for_cid) || 0,
+        for_cid: Number(quickVendorForm.for_cid) || 0,
+        cidade: quickVendorForm.cidade,
+        uf: quickVendorForm.uf,
+        contato: quickVendorForm.contato
+      };
+
+      const res = await api.post('/v1/fornecedores', payload);
+      const created = res.data;
+      setForm(prev => ({
+        ...prev,
+        pro_for: created.codigo || created.FOR_CODIGO,
+        fabricante: prev.fabricante || created.nome || created.razao_social || ''
+      }));
+      setShowQuickVendorModal(false);
+      setSuccessMsg(`Fornecedor #${created.codigo} cadastrado com sucesso!`);
+      setTimeout(() => setSuccessMsg(''), 3000);
+    } catch (err) {
+      alert('Erro ao salvar fornecedor: ' + (err.response?.data?.error || err.message));
+    }
   };
 
   // Adicionar / Salvar Item na Grade
@@ -364,13 +800,21 @@ export default function ProductFormModal({
       alert('Selecione o tamanho.');
       return;
     }
-    const matchTam = tamanhosList.find(t => Number(t.codigo) === Number(gradeForm.tam));
-    const tamNome = matchTam ? (matchTam.sigla || matchTam.tamanho) : `Tam #${gradeForm.tam}`;
+    const matchTam = tamanhosList.find(t => 
+      Number(t.codigo) === Number(gradeForm.tam) ||
+      (t.sigla && String(t.sigla).trim().toUpperCase() === String(gradeForm.tam_nome || gradeForm.tam).trim().toUpperCase())
+    );
+    const tamNome = matchTam 
+      ? (matchTam.sigla && matchTam.tamanho && matchTam.sigla.toUpperCase() !== matchTam.tamanho.toUpperCase() 
+          ? `${matchTam.sigla} - ${matchTam.tamanho}` 
+          : (matchTam.sigla || matchTam.tamanho))
+      : (gradeForm.tam_nome || `Tam #${gradeForm.tam}`);
 
     const prodCod = Number(form.codigo) || 1;
+    const finalTamId = matchTam ? Number(matchTam.codigo) : Number(gradeForm.tam);
     let codbarraFinal = gradeForm.codbarra;
     if (!codbarraFinal) {
-      const base = `789${String(prodCod).padStart(6, '0')}${String(gradeForm.tam).padStart(3, '0')}`;
+      const base = `789${String(prodCod).padStart(6, '0')}${String(finalTamId).padStart(3, '0')}`;
       let sum = 0;
       for (let i = 0; i < 12; i++) sum += parseInt(base[i], 10) * (i % 2 === 0 ? 1 : 3);
       const checkDigit = (10 - (sum % 10)) % 10;
@@ -378,17 +822,28 @@ export default function ProductFormModal({
     }
 
     const itemGrade = {
-      codigo: gradeForm.codigo || (Math.floor(Math.random() * 900000) + 100000),
+      codigo: gradeForm.codigo || 0,
+      gra_codigo: gradeForm.codigo || 0,
       pro: prodCod,
-      tam: Number(gradeForm.tam),
+      gra_pro: prodCod,
+      tam: finalTamId,
+      gra_tam: finalTamId,
       tam_nome: tamNome,
-      tamanho: matchTam || { codigo: gradeForm.tam, tamanho: tamNome, sigla: tamNome },
-      cor: gradeForm.cor || 'UNICA',
+      tamanho: matchTam || { codigo: finalTamId, tamanho: tamNome, sigla: tamNome },
+      cor: (gradeForm.cor || form.cor || 'UNICA').toUpperCase(),
+      gra_cor: (gradeForm.cor || form.cor || 'UNICA').toUpperCase(),
       codbarra: codbarraFinal,
+      gra_codbarra: codbarraFinal,
       quantidade: Number(gradeForm.quantidade) || 0,
+      gra_quantidade: Number(gradeForm.quantidade) || 0,
       valor: Number(gradeForm.valor) || Number(form.valorv) || 0,
+      gra_valor: Number(gradeForm.valor) || Number(form.valorv) || 0,
       valor_dinheiro: Number(gradeForm.valor_dinheiro) || Number(form.pro_valor_dinheiro) || Number(form.valorv) || 0,
-      valor_prazo: Number(gradeForm.valor_prazo) || Number(form.pro_valorv_prazo) || Number(form.valorv) || 0
+      valorDinheiro: Number(gradeForm.valor_dinheiro) || Number(form.pro_valor_dinheiro) || Number(form.valorv) || 0,
+      gra_valor_dinheiro: Number(gradeForm.valor_dinheiro) || Number(form.pro_valor_dinheiro) || Number(form.valorv) || 0,
+      valor_prazo: Number(gradeForm.valor_prazo) || Number(form.pro_valorv_prazo) || Number(form.valorv) || 0,
+      valorPrazo: Number(gradeForm.valor_prazo) || Number(form.pro_valorv_prazo) || Number(form.valorv) || 0,
+      gra_valor_prazo: Number(gradeForm.valor_prazo) || Number(form.pro_valorv_prazo) || Number(form.valorv) || 0
     };
 
     if (editingGradeIndex !== null) {
@@ -417,16 +872,25 @@ export default function ProductFormModal({
   const handleEditGradeItem = (idx) => {
     const item = grades[idx];
     setEditingGradeIndex(idx);
+    
+    const matchTam = tamanhosList.find(t => 
+      Number(t.codigo) === Number(item.tam || item.gra_tam) ||
+      (t.sigla && String(t.sigla).trim().toUpperCase() === String(item.tam_nome || item.tam).trim().toUpperCase())
+    );
+
+    const tamId = matchTam ? matchTam.codigo : (item.tam || item.gra_tam || (item.tamanho?.codigo || ''));
+    const tamNome = item.tam_nome || (matchTam ? (matchTam.sigla || matchTam.tamanho) : (item.tamanho?.sigla || item.tamanho?.tamanho || ''));
+
     setGradeForm({
       codigo: item.codigo || item.gra_codigo || 0,
-      tam: item.tam || item.gra_tam || (item.tamanho?.codigo || ''),
-      tam_nome: item.tam_nome || item.tamanho?.sigla || item.tamanho?.tamanho || '',
+      tam: tamId,
+      tam_nome: tamNome,
       cor: item.cor || item.gra_cor || 'UNICA',
       codbarra: item.codbarra || item.gra_codbarra || '',
-      quantidade: item.quantidade || item.gra_quantidade || 0,
-      valor: item.valor || item.gra_valor || Number(form.valorv) || 0,
-      valor_dinheiro: item.valor_dinheiro || item.gra_valor_dinheiro || Number(form.pro_valor_dinheiro) || 0,
-      valor_prazo: item.valor_prazo || item.gra_valor_prazo || Number(form.pro_valorv_prazo) || 0
+      quantidade: item.quantidade ?? item.gra_quantidade ?? 0,
+      valor: item.valor ?? item.gra_valor ?? Number(form.valorv) ?? 0,
+      valor_dinheiro: item.valor_dinheiro ?? item.valorDinheiro ?? item.gra_valor_dinheiro ?? Number(form.pro_valor_dinheiro) ?? 0,
+      valor_prazo: item.valor_prazo ?? item.valorPrazo ?? item.gra_valor_prazo ?? Number(form.pro_valorv_prazo) ?? 0
     });
   };
 
@@ -451,14 +915,14 @@ export default function ProductFormModal({
       const vPrazo = Number(form.pro_valorv_prazo) || vVista;
 
       const payload = {
-        codigo: Number(form.codigo),
-        nome: form.nome,
-        marca: form.marca || form.fabricante || 'GENERICA',
-        fabricante: form.fabricante || form.marca || 'GENERICA',
-        cod_fabricante: form.cod_fabricante || String(form.codigo),
-        colecao: form.colecao || '',
+        codigo: Number(form.codigo) || 0,
+        nome: form.nome.toUpperCase(),
+        marca: (form.marca || form.fabricante || 'GENERICA').toUpperCase(),
+        fabricante: (form.fabricante || form.marca || 'GENERICA').toUpperCase(),
+        cod_fabricante: form.cod_fabricante || String(form.codigo || ''),
+        colecao: (form.colecao || '').toUpperCase(),
         referencia: form.referencia || '',
-        cor: form.cor || '',
+        cor: (form.cor || '').toUpperCase(),
         codbarra: form.codbarra,
         abc: form.abc || 'N',
         local: form.local || 'GERAL',
@@ -470,7 +934,10 @@ export default function ProductFormModal({
         forCodigo: Number(form.pro_for) || 1,
         pro_gru: Number(form.pro_gru) || 1,
         gru: Number(form.pro_gru) || 1,
+        mar: Number(form.modelo_id) || 0,
+        pro_mar: Number(form.modelo_id) || 0,
         modelo: Number(form.modelo_id) || 0,
+        modelo_id: Number(form.modelo_id) || 0,
 
         // 3 Preços do Produto
         valorv: vVista,
@@ -507,33 +974,65 @@ export default function ProductFormModal({
         cadastrar: 'S'
       };
 
+      let savedProd;
       if (mode === 'edit' || (productToEdit && mode !== 'insert')) {
-        await api.put('/v1/produtos', payload);
+        const res = await api.put('/v1/produtos', payload);
+        savedProd = res.data;
       } else {
-        await api.post('/v1/produtos', payload);
+        const res = await api.post('/v1/produtos', payload);
+        savedProd = res.data;
       }
+
+      const finalProdCod = savedProd?.codigo || Number(form.codigo) || 1;
 
       // Salva as Grades do Produto via Lote
       if (grades.length > 0) {
         const gradesPayload = {
-          itens: grades.map(g => ({
-            gra_codigo: Number(g.codigo || g.gra_codigo || (Math.floor(Math.random() * 900000) + 100000)),
-            gra_pro: Number(form.codigo),
-            gra_tam: Number(g.tam || g.gra_tam || g.tamanho?.codigo || 1),
-            gra_cor: g.cor || g.gra_cor || form.cor || 'UNICA',
-            gra_codbarra: g.codbarra || g.gra_codbarra || form.codbarra,
-            gra_quantidade: Number(g.quantidade || g.gra_quantidade || 0),
-            gra_valor: Number(g.valor || g.gra_valor || vVista),
-            gra_valor_dinheiro: Number(g.valor_dinheiro || g.gra_valor_dinheiro || vDinheiro),
-            gra_valor_prazo: Number(g.valor_prazo || g.gra_valor_prazo || vPrazo)
-          }))
+          itens: grades.map(g => {
+            const itemTam = Number(g.tam || g.gra_tam || g.tamanho?.codigo || 1);
+            const itemVista = Number(g.valor ?? g.gra_valor ?? vVista);
+            const itemDin = Number(g.valor_dinheiro ?? g.valorDinheiro ?? g.gra_valor_dinheiro ?? vDinheiro);
+            const itemPrz = Number(g.valor_prazo ?? g.valorPrazo ?? g.gra_valor_prazo ?? vPrazo);
+            const itemQtd = Number(g.quantidade ?? g.gra_quantidade ?? 0);
+            const itemCodBarra = g.codbarra || g.gra_codbarra || form.codbarra || '';
+            const itemCor = (g.cor || g.gra_cor || form.cor || 'UNICA').toUpperCase();
+
+            return {
+              codigo: Number(g.codigo || g.gra_codigo || 0),
+              gra_codigo: Number(g.codigo || g.gra_codigo || 0),
+              pro: Number(finalProdCod),
+              gra_pro: Number(finalProdCod),
+              tam: itemTam,
+              gra_tam: itemTam,
+              cor: itemCor,
+              gra_cor: itemCor,
+              codbarra: itemCodBarra,
+              gra_codbarra: itemCodBarra,
+              quantidade: itemQtd,
+              gra_quantidade: itemQtd,
+              valor: itemVista,
+              gra_valor: itemVista,
+              valor_dinheiro: itemDin,
+              valorDinheiro: itemDin,
+              gra_valor_dinheiro: itemDin,
+              valor_prazo: itemPrz,
+              valorPrazo: itemPrz,
+              gra_valor_prazo: itemPrz,
+              cadastrar: 'S',
+              gra_cadastrar: 'S'
+            };
+          })
         };
+
         try {
           await api.post('/v1/grades/lote', gradesPayload);
         } catch (errGrades) {
-          console.warn('Tentando salvar grades individualmente:', errGrades);
-          for (const g of gradesPayload.itens) {
-            await api.post('/v1/grades', g).catch(() => {});
+          try {
+            await api.post('/v1/grades/emLote', gradesPayload);
+          } catch (e2) {
+            for (const g of gradesPayload.itens) {
+              await api.post('/v1/grades', g).catch(() => { });
+            }
           }
         }
       }
@@ -554,7 +1053,7 @@ export default function ProductFormModal({
   return createPortal(
     <div className="product-form-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="product-form-modal-container glass">
-        
+
         {/* CABEÇALHO DO MODAL */}
         <div className="product-modal-header">
           <div className="product-modal-title-group">
@@ -563,10 +1062,10 @@ export default function ProductFormModal({
             </div>
             <div>
               <h3>{mode === 'insert' ? 'Novo Cadastro de Produto' : `Produto #${form.codigo} - ${form.nome || 'Edição'}`}</h3>
-              <span className="product-modal-subtitle">Padrão PDV Completo • 3 Valores de Preço • Matriz de Grades & Fiscal</span>
+              <span className="product-modal-subtitle">Padrão PDV Completo • Modelos & Marcas • Matriz de Grades & Fiscal</span>
             </div>
           </div>
-          
+
           <div className="product-modal-header-actions">
             <button className="btn-close" onClick={onClose} title="Fechar (ESC)"><X size={20} /></button>
           </div>
@@ -584,33 +1083,33 @@ export default function ProductFormModal({
           </div>
         )}
 
-        {/* BARRA DE NAVEGAÇÃO POR ABAS (PADRÃO PDV_NOVO) */}
+        {/* BARRA DE NAVEGAÇÃO POR ABAS */}
         <div className="product-modal-tabs">
-          <button 
+          <button
             type="button"
             className={`product-tab-btn ${activeTab === 'geral' ? 'active' : ''}`}
             onClick={() => setActiveTab('geral')}
           >
             <Layers size={18} /> Dados Gerais
           </button>
-          
-          <button 
+
+          <button
             type="button"
             className={`product-tab-btn ${activeTab === 'precos' ? 'active' : ''}`}
             onClick={() => setActiveTab('precos')}
           >
             <DollarSign size={18} /> Estoque & 3 Preços (Grades)
           </button>
-          
-          <button 
+
+          <button
             type="button"
             className={`product-tab-btn ${activeTab === 'imagens' ? 'active' : ''}`}
             onClick={() => setActiveTab('imagens')}
           >
             <ImageIcon size={18} /> Imagens
           </button>
-          
-          <button 
+
+          <button
             type="button"
             className={`product-tab-btn ${activeTab === 'fiscal' ? 'active' : ''}`}
             onClick={() => setActiveTab('fiscal')}
@@ -621,47 +1120,63 @@ export default function ProductFormModal({
 
         {/* CONTEÚDO DO FORMULÁRIO */}
         <div className="product-modal-body">
-          
+
           {/* ========================================================= */}
           {/* ABA 1: DADOS GERAIS                                       */}
           {/* ========================================================= */}
           {activeTab === 'geral' && (
             <div className="product-tab-content">
-              
-              {/* CLASSIFICAÇÃO HIERÁRQUICA & FORNECEDOR */}
+
+              {/* CLASSIFICAÇÃO HIERÁRQUICA, MODELOS, MARCA & FORNECEDOR */}
               <div className="product-section-card">
-                <div className="product-section-title">
-                  <Layers size={16} color="#2563eb" /> Classificação & Fornecedor
+                <div className="product-section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Layers size={16} color="#2563eb" /> Classificação & Fornecedor
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button
+                      type="button"
+                      className="btn-secondary small"
+                      onClick={() => setShowGruposSubgruposModal(true)}
+                      title="Atalho F4: Gerenciar Grupos e Subgrupos"
+                    >
+                      <FolderPlus size={14} /> F4 Grupos/Sub
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-secondary small"
+                      onClick={() => setShowQuickVendorModal(true)}
+                      title="Atalho F7: Cadastrar Novo Fornecedor Rápido"
+                      style={{ color: '#ea580c', borderColor: '#fed7aa', background: '#fff7ed' }}
+                    >
+                      <UserPlus size={14} /> F7 + Fornecedor
+                    </button>
+                  </div>
                 </div>
 
-                <div className="product-row-classification">
+                <div className="product-row-classification" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+
+                  {/* GRUPO */}
                   <div className="form-group">
                     <label>Grupo *</label>
-                    <select 
+                    <select
                       value={form.grupo_id}
-                      onChange={(e) => {
-                        const gId = Number(e.target.value);
-                        const firstSg = subgrupos.find(s => Number(s.g1) === gId);
-                        setForm(prev => ({ 
-                          ...prev, 
-                          grupo_id: gId, 
-                          pro_gru: firstSg ? firstSg.codigo : prev.pro_gru 
-                        }));
-                      }}
+                      onChange={(e) => handleClassificationChange('grupo_id', Number(e.target.value))}
                     >
-                      {grupos.map(g => (
+                      {gruposList.map(g => (
                         <option key={g.codigo} value={g.codigo}>#{g.codigo} - {g.nome}</option>
                       ))}
                     </select>
                   </div>
 
+                  {/* SUBGRUPO */}
                   <div className="form-group">
                     <label>Subgrupo *</label>
-                    <select 
+                    <select
                       value={form.pro_gru}
-                      onChange={(e) => setForm(prev => ({ ...prev, pro_gru: Number(e.target.value) }))}
+                      onChange={(e) => handleClassificationChange('pro_gru', Number(e.target.value))}
                     >
-                      {subgrupos
+                      {subgruposList
                         .filter(s => !form.grupo_id || Number(s.g1) === Number(form.grupo_id))
                         .map(s => (
                           <option key={s.codigo} value={s.codigo}>#{s.codigo} - {s.nome}</option>
@@ -669,12 +1184,54 @@ export default function ProductFormModal({
                     </select>
                   </div>
 
+                  {/* MODELO (AO LADO DE SUBGRUPO) */}
                   <div className="form-group">
+                    <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span>Modelo</span>
+                      <button
+                        type="button"
+                        onClick={() => setShowQuickModeloModal(true)}
+                        style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', padding: 0, fontSize: '0.75rem', fontWeight: 700 }}
+                        title="Adicionar Novo Modelo"
+                      >
+                        + Novo
+                      </button>
+                    </label>
+                    <select
+                      value={form.modelo_id || ''}
+                      onChange={(e) => handleClassificationChange('modelo_id', e.target.value ? Number(e.target.value) : '')}
+                    >
+                      <option value="">-- Selecione o Modelo --</option>
+                      {modelosList.map(m => (
+                        <option key={m.codigo} value={m.codigo}>
+                          {m.nome}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* MARCA / FABRICANTE */}
+                  <div className="form-group">
+                    <label>Marca / Fabricante</label>
+                    <input
+                      type="text"
+                      value={form.marca || form.fabricante}
+                      onChange={(e) => {
+                        const val = e.target.value.toUpperCase();
+                        handleClassificationChange('marca', val);
+                      }}
+                      placeholder="Ex: MOONCITY, NIKKE"
+                      style={{ textTransform: 'uppercase' }}
+                    />
+                  </div>
+
+                  {/* FORNECEDOR PRINCIPAL */}
+                  <div className="form-group" style={{ gridColumn: 'span 2' }}>
                     <label>Fornecedor Principal *</label>
                     <LookupSelect
                       value={form.pro_for}
                       displayValue={
-                        form.pro_for 
+                        form.pro_for
                           ? `#${form.pro_for} - ${fornecedores.find(f => Number(f.codigo) === Number(form.pro_for))?.nome || 'Fornecedor'}`
                           : ''
                       }
@@ -693,7 +1250,7 @@ export default function ProductFormModal({
                         { key: 'codigo', label: 'Código', width: '90px', render: (f) => <span className="item-code">#{f.codigo}</span> },
                         { key: 'nome', label: 'Razão Social / Nome', render: (f) => <strong>{f.nome || f.razao_social || '-'}</strong> },
                         { key: 'fantasia', label: 'Nome Fantasia' },
-                        { key: 'cnpj', label: 'CNPJ / CPF', render: (f) => <code>{f.cnpj || f.cpf || '-'}</code> },
+                        { key: 'cnpj', label: 'CNPJ / CPF', render: (f) => <code>{maskCnpjCpf(f.cnpj || f.cnpj_cpf || f.cpf_cnpj || '') || '-'}</code> },
                         { key: 'cidade', label: 'Cidade / UF', render: (f) => `${f.cidade || ''} - ${f.uf || ''}` }
                       ]}
                       onSelect={(forn) => {
@@ -708,84 +1265,96 @@ export default function ProductFormModal({
                       }}
                     />
                   </div>
+
                 </div>
               </div>
 
               {/* DADOS PRINCIPAIS DO PRODUTO */}
               <div className="product-section-card">
-                <div className="product-section-title">
-                  <Package size={16} color="#f97316" /> Identificação do Produto
+                <div className="product-section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Package size={16} color="#f97316" /> Identificação do Produto
+                  </div>
+                  <button
+                    type="button"
+                    className="btn-secondary small"
+                    onClick={handleApplySuggestedName}
+                    style={{ color: '#2563eb', borderColor: '#bfdbfe', background: '#eff6ff', display: 'flex', alignItems: 'center', gap: '4px' }}
+                    title="Recalcular e sugerir nome baseado em Grupo + Subgrupo + Modelo + Marca"
+                  >
+                    <Sparkles size={14} /> ✨ Sugerir Nome
+                  </button>
                 </div>
 
-                {/* LINHA 1: NOME (2 COLUNAS), MARCA (1 COLUNA), REFERENCIA (1 COLUNA) */}
-                <div className="product-row-ident-1">
+                {/* LINHA 1: NOME DO PRODUTO (DESTAQUE) */}
+                <div className="product-row-ident-1" style={{ display: 'grid', gridTemplateColumns: '2.5fr 1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
                   <div className="form-group">
-                    <label>Nome do Produto *</label>
-                    <input 
-                      type="text" 
-                      required 
-                      value={form.nome} 
-                      onChange={(e) => setForm({ ...form, nome: e.target.value })} 
-                      placeholder="Ex: CAMISETA POLO PIQUET PREMIUM" 
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label>Marca / Fabricante</label>
-                    <input 
-                      type="text" 
-                      value={form.marca || form.fabricante} 
-                      onChange={(e) => setForm({ ...form, marca: e.target.value, fabricante: e.target.value })} 
-                      placeholder="Ex: MOONCITY, NIKKE" 
+                    <label style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Nome do Produto (Caixa Alta) *</span>
+                      <small style={{ color: '#64748b' }}>Sugerido automaticamente</small>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={form.nome}
+                      onChange={(e) => {
+                        setIsNameManuallyEdited(true);
+                        setForm({ ...form, nome: e.target.value.toUpperCase() });
+                      }}
+                      placeholder="Ex: CALÇA MASCULINA JEANS SLIM MOONCITY"
+                      style={{ textTransform: 'uppercase', fontWeight: 600, fontSize: '0.95rem' }}
                     />
                   </div>
 
                   <div className="form-group">
                     <label>Referência Fabricante</label>
-                    <input 
-                      type="text" 
-                      value={form.referencia} 
-                      onChange={(e) => setForm({ ...form, referencia: e.target.value })} 
-                      placeholder="Ex: 72110" 
+                    <input
+                      type="text"
+                      value={form.referencia}
+                      onChange={(e) => setForm({ ...form, referencia: e.target.value.toUpperCase() })}
+                      placeholder="Ex: 72110"
+                      style={{ textTransform: 'uppercase' }}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Coleção</label>
+                    <input
+                      type="text"
+                      value={form.colecao}
+                      onChange={(e) => setForm({ ...form, colecao: e.target.value.toUpperCase() })}
+                      placeholder="Ex: INVERNO 2026"
+                      style={{ textTransform: 'uppercase' }}
                     />
                   </div>
                 </div>
 
-                {/* LINHA 2: COLEÇÃO (1 COLUNA), COR (1 COLUNA), CODIGO DE BARRAS + GERAR (2 COLUNAS) */}
-                <div className="product-row-ident-2">
-                  <div className="form-group">
-                    <label>Coleção</label>
-                    <input 
-                      type="text" 
-                      value={form.colecao} 
-                      onChange={(e) => setForm({ ...form, colecao: e.target.value })} 
-                      placeholder="Ex: INVERNO 2026" 
-                    />
-                  </div>
-
+                {/* LINHA 2: COR, CODIGO DE BARRAS + GERAR EAN */}
+                <div className="product-row-ident-2" style={{ display: 'grid', gridTemplateColumns: '1fr 2fr 1fr', gap: '1rem' }}>
                   <div className="form-group">
                     <label>Cor Padrão</label>
-                    <input 
-                      type="text" 
-                      value={form.cor} 
-                      onChange={(e) => setForm({ ...form, cor: e.target.value })} 
-                      placeholder="Ex: PRETA, AZUL MARINHO" 
+                    <input
+                      type="text"
+                      value={form.cor}
+                      onChange={(e) => setForm({ ...form, cor: e.target.value.toUpperCase() })}
+                      placeholder="Ex: PRETA, AZUL"
+                      style={{ textTransform: 'uppercase' }}
                     />
                   </div>
 
                   <div className="form-group">
-                    <label>Código de Barras (EAN-13)</label>
+                    <label>Código de Barras Principal (EAN-13)</label>
                     <div style={{ display: 'flex', gap: '6px' }}>
-                      <input 
-                        type="text" 
-                        value={form.codbarra} 
-                        onChange={(e) => setForm({ ...form, codbarra: e.target.value, gtin: e.target.value })} 
-                        placeholder="789..." 
+                      <input
+                        type="text"
+                        value={form.codbarra}
+                        onChange={(e) => setForm({ ...form, codbarra: e.target.value, gtin: e.target.value })}
+                        placeholder="789..."
                         style={{ flex: 1 }}
                       />
-                      <button 
-                        type="button" 
-                        className="btn-secondary" 
+                      <button
+                        type="button"
+                        className="btn-secondary"
                         onClick={handleGerarEanPrincipal}
                         title="Gerar Código EAN-13 Oficial"
                         style={{ display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}
@@ -794,352 +1363,291 @@ export default function ProductFormModal({
                       </button>
                     </div>
                   </div>
-                </div>
-
-                {/* LINHA 3: UNIDADE, CLASSIFICAÇÃO ABC, LOCALIZAÇÃO, ESTADO */}
-                <div className="product-row-ident-3">
-                  <div className="form-group">
-                    <label>Unidade de Medida</label>
-                    <select 
-                      value={form.um} 
-                      onChange={(e) => setForm({ ...form, um: e.target.value })}
-                    >
-                      <option value="UN">UN - Unidade</option>
-                      <option value="PC">PC - Peça</option>
-                      <option value="PAR">PAR - Par</option>
-                      <option value="KG">KG - Quilograma</option>
-                      <option value="CX">CX - Caixa</option>
-                      <option value="MT">MT - Metro</option>
-                      <option value="L">L - Litro</option>
-                    </select>
-                  </div>
-
-                  <div className="form-group">
-                    <label>Classificação ABC</label>
-                    <select 
-                      value={form.abc} 
-                      onChange={(e) => setForm({ ...form, abc: e.target.value })}
-                    >
-                      <option value="A">A - Alta Rotatividade</option>
-                      <option value="B">B - Média Rotatividade</option>
-                      <option value="C">C - Baixa Rotatividade</option>
-                      <option value="N">N - Normal / Não Definido</option>
-                    </select>
-                  </div>
-
-                  <div className="form-group">
-                    <label>Localização Estoque</label>
-                    <input 
-                      type="text" 
-                      value={form.local} 
-                      onChange={(e) => setForm({ ...form, local: e.target.value })} 
-                      placeholder="Ex: GERAL, CORREDOR A" 
-                    />
-                  </div>
 
                   <div className="form-group">
                     <label>Estado do Produto</label>
-                    <select 
-                      value={form.estado} 
+                    <select
+                      value={form.estado}
                       onChange={(e) => setForm({ ...form, estado: e.target.value })}
                     >
                       <option value="ATIVO">🟢 ATIVO</option>
                       <option value="INATIVO">🔴 INATIVO</option>
+                      <option value="FORA_LINHA">⚪ FORA DE LINHA</option>
                     </select>
                   </div>
                 </div>
+
               </div>
 
             </div>
           )}
 
           {/* ========================================================= */}
-          {/* ABA 2: ESTOQUE & 3 PREÇOS (PRODUTO E GRADES)              */}
+          {/* ABA 2: ESTOQUE & 3 PREÇOS (GRADES)                        */}
           {/* ========================================================= */}
           {activeTab === 'precos' && (
             <div className="product-tab-content">
-              
-              {/* CARD DOS 3 PREÇOS DE VENDA */}
-              <div className="product-section-card highlight-prices">
-                <div className="product-section-title" style={{ color: '#ea580c' }}>
-                  <DollarSign size={18} /> Os 3 Valores de Preço de Venda do Produto
-                </div>
 
-                <div className="product-grid-3">
-                  <div className="price-box money">
-                    <span className="price-box-label">💵 PREÇO DINHEIRO (R$)</span>
-                    <input 
-                      type="number" 
-                      step="0.01" 
-                      value={form.pro_valor_dinheiro} 
-                      onChange={(e) => handlePrecoOuCustoChange('pro_valor_dinheiro', e.target.value)} 
-                      placeholder="0.00"
-                    />
-                    <small>Preço especial para pagamento em dinheiro / PIX</small>
-                  </div>
-
-                  <div className="price-box vista">
-                    <span className="price-box-label">💳 PREÇO À VISTA / PADRÃO (R$) *</span>
-                    <input 
-                      type="number" 
-                      step="0.01" 
-                      value={form.valorv} 
-                      onChange={(e) => handlePrecoOuCustoChange('valorv', e.target.value)} 
-                      placeholder="0.00"
-                    />
-                    <small>Preço tabela padrão (Débito / 1x Cartão)</small>
-                  </div>
-
-                  <div className="price-box prazo">
-                    <span className="price-box-label">📅 PREÇO A PRAZO (R$)</span>
-                    <input 
-                      type="number" 
-                      step="0.01" 
-                      value={form.pro_valorv_prazo} 
-                      onChange={(e) => handlePrecoOuCustoChange('pro_valorv_prazo', e.target.value)} 
-                      placeholder="0.00"
-                    />
-                    <small>Preço a prazo / crediário / parcelado</small>
-                  </div>
-                </div>
-              </div>
-
-              {/* CARD DE CUSTOS & MARGEM */}
+              {/* CARD DE FORMAÇÃO DOS 3 PREÇOS E CUSTO */}
               <div className="product-section-card">
-                <div className="product-section-title">
-                  <TrendingUp size={16} color="#059669" /> Custos de Aquisição & Margem de Lucro
-                </div>
-
-                <div className="product-grid-4">
-                  <div className="form-group">
-                    <label>Custo de Entrada / Compra (R$)</label>
-                    <input 
-                      type="number" 
-                      step="0.01" 
-                      value={form.custo} 
-                      onChange={(e) => handlePrecoOuCustoChange('custo', e.target.value)} 
-                    />
+                <div className="product-section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <DollarSign size={16} color="#16a34a" /> Formação dos 3 Preços & Custos
                   </div>
-
-                  <div className="form-group">
-                    <label>Custo Médio Ponderado (R$)</label>
-                    <input 
-                      type="number" 
-                      step="0.01" 
-                      value={form.custo_medio} 
-                      onChange={(e) => setForm({ ...form, custo_medio: parseFloat(e.target.value) || 0 })} 
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label>Preço Sugerido (R$)</label>
-                    <input 
-                      type="number" 
-                      step="0.01" 
-                      value={form.preco_sugerido} 
-                      onChange={(e) => setForm({ ...form, preco_sugerido: parseFloat(e.target.value) || 0 })} 
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label>Margem de Lucro Atual</label>
-                    <div className={`margin-badge ${margemCalculada >= 30 ? 'positive' : 'warning'}`}>
-                      <TrendingUp size={14} /> {margemCalculada.toFixed(2)}%
+                  {margemCalculada > 0 && (
+                    <div style={{ fontSize: '0.85rem', color: '#16a34a', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(22, 163, 74, 0.1)', padding: '0.25rem 0.65rem', borderRadius: '0.5rem' }}>
+                      <TrendingUp size={15} /> Margem de Lucro sobre Custo: {margemCalculada.toFixed(2)}%
                     </div>
-                  </div>
+                  )}
+                </div>
 
+                <div className="product-grid-precos">
                   <div className="form-group">
-                    <label>Estoque Geral Atual</label>
-                    <input 
-                      type="number" 
-                      step="0.01" 
-                      value={form.quantidade} 
-                      onChange={(e) => setForm({ ...form, quantidade: parseFloat(e.target.value) || 0 })} 
+                    <label>Custo Entrada (R$)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={form.custo}
+                      onChange={(e) => handlePrecoOuCustoChange('custo', e.target.value)}
+                      placeholder="0.00"
                     />
                   </div>
 
                   <div className="form-group">
-                    <label>Estoque Mínimo</label>
-                    <input 
-                      type="number" 
-                      step="1" 
-                      value={form.quant_min} 
-                      onChange={(e) => setForm({ ...form, quant_min: parseFloat(e.target.value) || 0 })} 
+                    <label style={{ color: '#16a34a' }}>Vlr Dinheiro (R$)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={form.pro_valor_dinheiro}
+                      onChange={(e) => handlePrecoOuCustoChange('pro_valor_dinheiro', e.target.value)}
+                      placeholder="0.00"
                     />
                   </div>
 
                   <div className="form-group">
-                    <label>Dias de Validade</label>
-                    <input 
-                      type="number" 
-                      step="1" 
-                      value={form.dias_validade} 
-                      onChange={(e) => setForm({ ...form, dias_validade: parseInt(e.target.value, 10) || 0 })} 
+                    <label style={{ color: '#ea580c' }}>Vlr à Vista (Débito/PIX) (R$) *</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      required
+                      value={form.valorv}
+                      onChange={(e) => handlePrecoOuCustoChange('valorv', e.target.value)}
+                      placeholder="0.00"
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label style={{ color: '#2563eb' }}>Vlr a Prazo (Cartão Prazo) (R$)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={form.pro_valorv_prazo}
+                      onChange={(e) => handlePrecoOuCustoChange('pro_valorv_prazo', e.target.value)}
+                      placeholder="0.00"
                     />
                   </div>
                 </div>
               </div>
 
-              {/* CARD DE GRADES E VARIAÇÕES COM OS 3 PREÇOS */}
+              {/* CARD DE MATRIZ DE GRADES DO PRODUTO */}
               <div className="product-section-card">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.8rem', marginBottom: '1rem' }}>
-                  <div className="product-section-title" style={{ margin: 0 }}>
-                    <Grid size={16} color="#7c3aed" /> Grade de Variações (Tamanhos, Cores e os 3 Preços)
+                <div className="product-section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Grid size={16} color="#f59e0b" /> Grade de Variações (Tamanhos, Cores e os 3 Preços)
                   </div>
 
-                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                    <button 
-                      type="button" 
-                      className="btn-secondary small" 
+                  {/* BOTÕES DE SUGESTÃO PRECISA BASEADA EM TAMANHOS REAIS */}
+                  <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      className="btn-secondary small"
                       onClick={() => handleGerarGradeAutomatica('letras')}
-                      title="Gerar P, M, G, GG"
+                      title="Gerar variações com tamanhos de confecção cadastrados (ex: P, M, G, GG)"
                     >
-                      <Sparkles size={14} /> Grade P-GG
+                      <Sparkles size={14} /> ✨ Grade P-GG
                     </button>
-
-                    <button 
-                      type="button" 
-                      className="btn-secondary small" 
-                      onClick={() => handleGerarGradeAutomatica('numeros')}
-                      title="Gerar 34 a 44"
+                    <button
+                      type="button"
+                      className="btn-secondary small"
+                      onClick={() => handleGerarGradeAutomatica('calcados')}
+                      title="Gerar variações com tamanhos numéricos cadastrados (ex: 34..44)"
                     >
-                      <Sparkles size={14} /> Grade 34..44
+                      <Sparkles size={14} /> ✨ Grade 34..44
                     </button>
-
-                    <button 
-                      type="button" 
-                      className="btn-secondary small" 
+                    <button
+                      type="button"
+                      className="btn-secondary small"
+                      onClick={() => handleGerarGradeAutomatica('todos')}
+                      title="Gerar variações com todos os tamanhos cadastrados no banco"
+                    >
+                      <Layers size={14} /> ✨ Todos Tamanhos
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-secondary small"
                       onClick={handleGerarCodigosBarrasGrades}
                       title="Atalho F10: Gerar EAN13 para todas as grades"
+                      style={{ color: '#2563eb' }}
                     >
-                      <Barcode size={14} /> F10 - Gerar EANs
+                      <Barcode size={14} /> F10 Gerar EANs
                     </button>
                   </div>
                 </div>
 
                 {/* FORMULÁRIO DE INCLUSÃO RÁPIDA DE ITEM NA GRADE */}
-                <div className="grade-quick-form">
+                <div className="product-grade-quick-add" style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr 1.5fr 1fr 1fr 1fr auto', gap: '0.5rem', alignItems: 'end', marginBottom: '1rem' }}>
                   <div className="form-group">
                     <label>Tamanho *</label>
-                    <select 
+                    <select
                       value={gradeForm.tam}
-                      onChange={(e) => setGradeForm({ ...gradeForm, tam: e.target.value })}
+                      onChange={(e) => {
+                        const selectedVal = e.target.value;
+                        const match = tamanhosList.find(t => String(t.codigo) === String(selectedVal));
+                        const label = match
+                          ? (match.sigla && match.tamanho && match.sigla.toUpperCase() !== match.tamanho.toUpperCase()
+                            ? `${match.sigla} - ${match.tamanho}`
+                            : (match.sigla || match.tamanho))
+                          : '';
+                        setGradeForm({ ...gradeForm, tam: selectedVal, tam_nome: label });
+                      }}
                     >
-                      {tamanhosList.map(t => (
-                        <option key={t.codigo} value={t.codigo}>{t.sigla || t.tamanho} (#{t.codigo})</option>
-                      ))}
+                      {tamanhosList.map(t => {
+                        const label = t.sigla && t.tamanho && t.sigla.toUpperCase() !== t.tamanho.toUpperCase()
+                          ? `${t.sigla} - ${t.tamanho}`
+                          : (t.sigla || t.tamanho);
+                        return (
+                          <option key={t.codigo} value={t.codigo}>
+                            {label}
+                          </option>
+                        );
+                      })}
                     </select>
                   </div>
 
                   <div className="form-group">
                     <label>Cor</label>
-                    <input 
-                      type="text" 
-                      value={gradeForm.cor} 
-                      onChange={(e) => setGradeForm({ ...gradeForm, cor: e.target.value })} 
-                      placeholder="Ex: PRETA" 
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label>Cód. Barras</label>
-                    <input 
-                      type="text" 
-                      value={gradeForm.codbarra} 
-                      onChange={(e) => setGradeForm({ ...gradeForm, codbarra: e.target.value })} 
-                      placeholder="EAN13" 
+                    <input
+                      type="text"
+                      value={gradeForm.cor}
+                      onChange={(e) => setGradeForm({ ...gradeForm, cor: e.target.value.toUpperCase() })}
+                      placeholder="Cor"
+                      style={{ textTransform: 'uppercase' }}
                     />
                   </div>
 
                   <div className="form-group">
                     <label>Qtd</label>
-                    <input 
-                      type="number" 
-                      value={gradeForm.quantidade} 
-                      onChange={(e) => setGradeForm({ ...gradeForm, quantidade: parseFloat(e.target.value) || 0 })} 
+                    <input
+                      type="number"
+                      value={gradeForm.quantidade}
+                      onChange={(e) => setGradeForm({ ...gradeForm, quantidade: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Cód. Barras</label>
+                    <input
+                      type="text"
+                      value={gradeForm.codbarra}
+                      onChange={(e) => setGradeForm({ ...gradeForm, codbarra: e.target.value })}
+                      placeholder="EAN específico"
                     />
                   </div>
 
                   <div className="form-group">
                     <label>Vlr Dinheiro</label>
-                    <input 
-                      type="number" 
-                      step="0.01" 
-                      value={gradeForm.valor_dinheiro} 
-                      onChange={(e) => setGradeForm({ ...gradeForm, valor_dinheiro: parseFloat(e.target.value) || 0 })} 
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={gradeForm.valor_dinheiro}
+                      onChange={(e) => setGradeForm({ ...gradeForm, valor_dinheiro: e.target.value })}
                     />
                   </div>
 
                   <div className="form-group">
                     <label>Vlr Vista</label>
-                    <input 
-                      type="number" 
-                      step="0.01" 
-                      value={gradeForm.valor} 
-                      onChange={(e) => setGradeForm({ ...gradeForm, valor: parseFloat(e.target.value) || 0 })} 
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={gradeForm.valor}
+                      onChange={(e) => setGradeForm({ ...gradeForm, valor: e.target.value })}
                     />
                   </div>
 
                   <div className="form-group">
                     <label>Vlr Prazo</label>
-                    <input 
-                      type="number" 
-                      step="0.01" 
-                      value={gradeForm.valor_prazo} 
-                      onChange={(e) => setGradeForm({ ...gradeForm, valor_prazo: parseFloat(e.target.value) || 0 })} 
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={gradeForm.valor_prazo}
+                      onChange={(e) => setGradeForm({ ...gradeForm, valor_prazo: e.target.value })}
                     />
                   </div>
 
-                  <div>
-                    <button 
-                      type="button" 
-                      className="btn-primary" 
-                      onClick={handleAddOrUpdateGradeItem}
-                      style={{ height: '38px', padding: '0 1rem', whiteSpace: 'nowrap' }}
-                    >
-                      {editingGradeIndex !== null ? 'Salvar Variação' : '+ Incluir'}
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    onClick={handleAddOrUpdateGradeItem}
+                    style={{ height: '40px', padding: '0 1rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                  >
+                    {editingGradeIndex !== null ? <Save size={16} /> : <Plus size={16} />}
+                    {editingGradeIndex !== null ? 'Atualizar' : 'Adicionar'}
+                  </button>
                 </div>
 
                 {/* TABELA DE GRADES CADASTRADAS */}
-                <div className="table-responsive" style={{ maxHeight: '240px', overflowY: 'auto' }}>
+                <div className="table-responsive" style={{ maxHeight: '300px', overflowY: 'auto' }}>
                   <table className="data-table">
                     <thead>
                       <tr>
                         <th>Tamanho</th>
                         <th>Cor</th>
-                        <th>Cód. Barras</th>
                         <th style={{ textAlign: 'center' }}>Qtd</th>
-                        <th style={{ textAlign: 'right' }}>Vlr Dinheiro</th>
-                        <th style={{ textAlign: 'right' }}>Vlr Vista</th>
-                        <th style={{ textAlign: 'right' }}>Vlr Prazo</th>
+                        <th>Cód. Barras</th>
+                        <th style={{ textAlign: 'right', color: '#16a34a' }}>Dinheiro</th>
+                        <th style={{ textAlign: 'right', color: '#ea580c' }}>À Vista</th>
+                        <th style={{ textAlign: 'right', color: '#2563eb' }}>A Prazo</th>
                         <th style={{ textAlign: 'center' }}>Ações</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {grades.length === 0 ? (
-                        <tr>
-                          <td colSpan="8" style={{ textAlign: 'center', padding: '1.5rem', color: '#94a3b8' }}>
-                            Nenhuma variação ou grade adicionada ainda. Clique nos botões acima para gerar automaticamente.
-                          </td>
-                        </tr>
-                      ) : (
-                        grades.map((g, idx) => (
+                      {grades.map((g, idx) => {
+                        const tamObj = tamanhosList.find(t =>
+                          Number(t.codigo) === Number(g.tam || g.gra_tam) ||
+                          (t.sigla && String(t.sigla).trim().toUpperCase() === String(g.tam_nome || g.tam).trim().toUpperCase())
+                        );
+
+                        let tamNome = g.tam_nome || '';
+                        if (tamObj) {
+                          tamNome = tamObj.sigla && tamObj.tamanho && tamObj.sigla.toUpperCase() !== tamObj.tamanho.toUpperCase()
+                            ? `${tamObj.sigla} - ${tamObj.tamanho}`
+                            : (tamObj.sigla || tamObj.tamanho);
+                        } else if (!tamNome || tamNome.startsWith('Tam #')) {
+                          tamNome = g.tamanho?.sigla || g.tamanho?.tamanho || `Tam #${g.tam || g.gra_tam}`;
+                        }
+
+                        return (
                           <tr key={idx}>
-                            <td><strong>{g.tam_nome || g.tamanho?.sigla || g.tamanho?.tamanho || `Tam #${g.tam || g.gra_tam}`}</strong></td>
-                            <td>{g.cor || g.gra_cor || 'UNICA'}</td>
-                            <td style={{ fontFamily: 'monospace' }}>{g.codbarra || g.gra_codbarra || '-'}</td>
-                            <td style={{ textAlign: 'center' }}><strong>{g.quantidade || g.gra_quantidade || 0}</strong></td>
-                            <td style={{ textAlign: 'right', color: '#16a34a' }}>{formatCurrency(g.valor_dinheiro || g.gra_valor_dinheiro || g.valor || form.pro_valor_dinheiro)}</td>
-                            <td style={{ textAlign: 'right', fontWeight: 700 }}>{formatCurrency(g.valor || g.gra_valor || form.valorv)}</td>
-                            <td style={{ textAlign: 'right', color: '#2563eb' }}>{formatCurrency(g.valor_prazo || g.gra_valor_prazo || g.valor || form.pro_valorv_prazo)}</td>
-                            <td style={{ textAlign: 'center' }}>
-                              <button className="crud-row-btn edit" onClick={() => handleEditGradeItem(idx)} title="Editar Grade"><Edit2 size={14} /></button>
-                              <button className="crud-row-btn delete" onClick={() => handleDeleteGradeItem(idx)} title="Excluir Grade"><Trash2 size={14} /></button>
+                            <td><strong>{tamNome}</strong></td>
+                            <td>{g.cor || 'UNICA'}</td>
+                            <td style={{ textAlign: 'center' }}><strong>{g.quantidade || 0}</strong></td>
+                            <td><code>{g.codbarra || '-'}</code></td>
+                            <td style={{ textAlign: 'right' }}>{formatCurrency(g.valor_dinheiro ?? g.valorDinheiro ?? form.pro_valor_dinheiro ?? form.valorv ?? 0)}</td>
+                            <td style={{ textAlign: 'right', fontWeight: 700 }}>{formatCurrency(g.valor ?? form.valorv ?? 0)}</td>
+                            <td style={{ textAlign: 'right' }}>{formatCurrency(g.valor_prazo ?? g.valorPrazo ?? form.pro_valorv_prazo ?? form.valorv ?? 0)}</td>
+                            <td className="actions-cell" style={{ textAlign: 'center' }}>
+                              <button type="button" className="crud-row-btn edit" onClick={() => handleEditGradeItem(idx)}><Edit2 size={14} /></button>
+                              <button type="button" className="crud-row-btn delete" onClick={() => handleDeleteGradeItem(idx)}><Trash2 size={14} /></button>
                             </td>
                           </tr>
-                        ))
+                        );
+                      })}
+                      {grades.length === 0 && (
+                        <tr>
+                          <td colSpan="8" style={{ textAlign: 'center', padding: '1.5rem', color: '#64748b' }}>
+                            Nenhuma grade cadastrada. Use os botões acima para sugestões rápidas ou adicione manualmente.
+                          </td>
+                        </tr>
                       )}
                     </tbody>
                   </table>
@@ -1157,199 +1665,388 @@ export default function ProductFormModal({
             <div className="product-tab-content">
               <div className="product-section-card">
                 <div className="product-section-title">
-                  <ImageIcon size={16} color="#2563eb" /> Foto Principal do Produto
+                  <ImageIcon size={16} color="#8b5cf6" /> Imagem do Produto
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(200px, 300px) 1fr', gap: '1.5rem', alignItems: 'start' }}>
-                  
-                  {/* PREVIEW DA FOTO */}
-                  <div className="product-photo-preview-box">
-                    {form.url_Imagem ? (
-                      <img src={form.url_Imagem} alt="Preview do Produto" className="product-photo-img" />
-                    ) : (
-                      <div className="product-photo-placeholder">
-                        <ImageIcon size={48} color="#94a3b8" />
-                        <span>Sem imagem vinculada</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* CAMPOS DE URL / UPLOAD */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                    <div className="form-group">
-                      <label>URL Direta da Imagem</label>
-                      <input 
-                        type="url" 
-                        value={form.url_Imagem} 
-                        onChange={(e) => setForm({ ...form, url_Imagem: e.target.value })} 
-                        placeholder="https://exemplo.com/imagem.jpg" 
-                      />
-                    </div>
-
-                    <div style={{ display: 'flex', gap: '0.6rem' }}>
-                      {form.url_Imagem && (
-                        <button 
-                          type="button" 
-                          className="btn-secondary" 
-                          onClick={() => setForm({ ...form, url_Imagem: '' })}
-                          style={{ color: '#dc2626' }}
-                        >
-                          <Trash2 size={16} /> Remover Foto
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
+                <div className="form-group">
+                  <label>URL da Imagem</label>
+                  <input
+                    type="text"
+                    value={form.url_Imagem}
+                    onChange={(e) => setForm({ ...form, url_Imagem: e.target.value })}
+                    placeholder="https://..."
+                  />
                 </div>
+
+                {form.url_Imagem && (
+                  <div style={{ marginTop: '1rem', textAlign: 'center', padding: '1rem', background: '#f8fafc', borderRadius: '0.5rem' }}>
+                    <img
+                      src={form.url_Imagem}
+                      alt="Preview"
+                      style={{ maxHeight: '200px', maxWidth: '100%', objectFit: 'contain', borderRadius: '0.5rem' }}
+                      onError={(e) => { e.target.style.display = 'none'; }}
+                    />
+                  </div>
+                )}
               </div>
             </div>
           )}
 
           {/* ========================================================= */}
-          {/* ABA 4: OUTROS & FISCAL                                    */}
+          {/* ABA 4: FISCAL                                             */}
           {/* ========================================================= */}
           {activeTab === 'fiscal' && (
             <div className="product-tab-content">
-              
-              {/* VÍNCULO FISCAL & TOTALIZADOR */}
               <div className="product-section-card">
                 <div className="product-section-title">
-                  <ShieldCheck size={16} color="#059669" /> Parâmetros Fiscais & Conciliação Contábil
+                  <ShieldCheck size={16} color="#0284c7" /> Classificação Fiscal & PAF-ECF
                 </div>
 
                 <div className="product-grid-3">
                   <div className="form-group">
                     <label>NCM (Classificação Fiscal) *</label>
-                    <input 
-                      type="text" 
-                      required 
-                      value={form.ncm} 
-                      onChange={(e) => setForm({ ...form, ncm: e.target.value })} 
-                      placeholder="Ex: 6109.10.00" 
+                    <input
+                      type="text"
+                      value={form.ncm}
+                      onChange={(e) => setForm({ ...form, ncm: e.target.value })}
+                      placeholder="6109.10.00"
+                      required
                     />
                   </div>
 
                   <div className="form-group">
                     <label>CFOP Padrão</label>
-                    <input 
-                      type="text" 
-                      value={form.cfop} 
-                      onChange={(e) => setForm({ ...form, cfop: e.target.value })} 
-                      placeholder="5102" 
+                    <input
+                      type="text"
+                      value={form.cfop}
+                      onChange={(e) => setForm({ ...form, cfop: e.target.value })}
+                      placeholder="5102"
                     />
                   </div>
 
                   <div className="form-group">
                     <label>CEST</label>
-                    <input 
-                      type="text" 
-                      value={form.cest} 
-                      onChange={(e) => setForm({ ...form, cest: e.target.value })} 
-                      placeholder="Ex: 28.038.00" 
+                    <input
+                      type="text"
+                      value={form.cest}
+                      onChange={(e) => setForm({ ...form, cest: e.target.value })}
+                      placeholder="Código CEST"
                     />
                   </div>
 
                   <div className="form-group">
-                    <label>Totalizador Fiscal (ICMS / ECF) *</label>
-                    <select 
-                      value={form.codTotalizador} 
+                    <label>Unidade de Medida</label>
+                    <select
+                      value={form.um}
+                      onChange={(e) => setForm({ ...form, um: e.target.value })}
+                    >
+                      <option value="UN">UN - Unidade</option>
+                      <option value="PC">PC - Peça</option>
+                      <option value="PAR">PAR - Par</option>
+                      <option value="KG">KG - Quilograma</option>
+                      <option value="MT">MT - Metro</option>
+                      <option value="CX">CX - Caixa</option>
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label>Totalizador Fiscal</label>
+                    <select
+                      value={form.codTotalizador}
                       onChange={(e) => setForm({ ...form, codTotalizador: Number(e.target.value) })}
                     >
-                      <option value={1}>#1 - 01T1700 (Tributado ICMS 17%)</option>
-                      <option value={2}>#2 - 02T1200 (Tributado ICMS 12%)</option>
-                      <option value={3}>#3 - 03T2500 (Tributado ICMS 25%)</option>
-                      <option value={4}>#4 - F1 (Substituição Tributária / ST)</option>
-                      <option value={5}>#5 - I1 (Isento / Não Tributado)</option>
-                      <option value={6}>#6 - N1 (Não Incidência)</option>
-                    </select>
-                  </div>
-
-                  <div className="form-group">
-                    <label>Cód. Produto Fiscal Mestre (Vínculo)</label>
-                    <input 
-                      type="number" 
-                      value={form.pro_cod_fiscal} 
-                      onChange={(e) => setForm({ ...form, pro_cod_fiscal: e.target.value })} 
-                      placeholder="Ex: 85 (ID Fiscal)" 
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label>Gerar NF Fiscal nesta Saída?</label>
-                    <select 
-                      value={form.pro_fiscal_gerar} 
-                      onChange={(e) => setForm({ ...form, pro_fiscal_gerar: e.target.value })}
-                    >
-                      <option value="S">🟢 Sim (Emitir NF-e/NFC-e)</option>
-                      <option value="N">🟡 Não (Venda Não Fiscal / Operacional)</option>
-                    </select>
-                  </div>
-
-                  <div className="form-group">
-                    <label>Permitir Estoque Negativo?</label>
-                    <select 
-                      value={form.pro_emitir_negativo} 
-                      onChange={(e) => setForm({ ...form, pro_emitir_negativo: e.target.value })}
-                    >
-                      <option value="N">Não (Bloquear venda sem saldo)</option>
-                      <option value="S">Sim (Permitir venda sem saldo)</option>
-                    </select>
-                  </div>
-
-                  <div className="form-group">
-                    <label>Produto Pesável (Balança)?</label>
-                    <select 
-                      value={form.balanca} 
-                      onChange={(e) => setForm({ ...form, balanca: e.target.value })}
-                    >
-                      <option value="N">Não</option>
-                      <option value="S">Sim (Etiqueta de Balança)</option>
+                      <option value="1">01T1700 - ICMS 17%</option>
+                      <option value="2">02T1200 - ICMS 12%</option>
+                      <option value="3">03T2500 - ICMS 25%</option>
+                      <option value="4">F1 - Substituição Tributária</option>
+                      <option value="5">I1 - Isento / Não Trib</option>
+                      <option value="6">N1 - Não Incidência</option>
                     </select>
                   </div>
                 </div>
               </div>
 
+              {/* VÍNCULO COM A BASE FISCAL (PRO_COD_FISCAL) */}
+              <div className="product-section-card">
+                <div className="product-section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <ShieldCheck size={16} color="#059669" /> Vínculo com a Base Fiscal (PRO_COD_FISCAL)
+                  </div>
+                  {form.pro_cod_fiscal && Number(form.pro_cod_fiscal) > 0 ? (
+                    <span className="badge badge-success" style={{ fontSize: '0.8rem' }}>
+                      Vinculado ao Fiscal #{form.pro_cod_fiscal}
+                    </span>
+                  ) : (
+                    <span className="badge badge-info" style={{ fontSize: '0.8rem' }}>
+                      Próprio Mestre Fiscal (Sem Vínculo Externo)
+                    </span>
+                  )}
+                </div>
+
+                <div className="product-grid-3">
+                  <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                    <label>Produto Fiscal Vinculado (Código Fiscal Mestre)</label>
+                    <LookupSelect
+                      value={form.pro_cod_fiscal}
+                      displayValue={
+                        form.pro_cod_fiscal && Number(form.pro_cod_fiscal) > 0
+                          ? `#${form.pro_cod_fiscal}`
+                          : ''
+                      }
+                      placeholder="Buscar Produto na Base Fiscal para Vincular..."
+                      title="Selecionar Produto Fiscal (PRO_COD_FISCAL)"
+                      subtitle="Busca na base fiscal por código, descrição ou código de barras"
+                      icon={ShieldCheck}
+                      searchPlaceholder="Digite o nome, código ou código de barras do produto fiscal..."
+                      fetchData={async (termo, targetPage, limit) => {
+                        let url = `/v1/conciliacao/fiscais?page=${targetPage}&limit=${limit}`;
+                        if (termo) url += `&busca=${encodeURIComponent(termo)}&termo=${encodeURIComponent(termo)}`;
+                        const res = await api.get(url);
+                        return res.data;
+                      }}
+                      columns={[
+                        { key: 'codigo', label: 'Código Fiscal', width: '100px', render: (p) => <span className="item-code">#{p.codigo || p.PRO_CODIGO}</span> },
+                        { key: 'nome', label: 'Descrição Fiscal', render: (p) => <strong>{p.nome || p.PRO_NOME}</strong> },
+                        { key: 'codbarra', label: 'Cód. Barras', render: (p) => <code>{p.codbarra || p.PRO_CODBARRA || '-'}</code> },
+                        { key: 'ncm', label: 'NCM', width: '90px' },
+                        { key: 'quantidade', label: 'Estoque Fiscal', align: 'center', width: '100px' }
+                      ]}
+                      onSelect={(fiscProd) => {
+                        const fId = fiscProd.codigo || fiscProd.PRO_CODIGO;
+                        setForm(prev => ({
+                          ...prev,
+                          pro_cod_fiscal: Number(fId),
+                          ncm: fiscProd.ncm || prev.ncm,
+                          cfop: fiscProd.cfop || prev.cfop,
+                          cest: fiscProd.cest || prev.cest
+                        }));
+                      }}
+                      onClear={() => {
+                        setForm(prev => ({ ...prev, pro_cod_fiscal: 0 }));
+                      }}
+                    />
+                    <small style={{ color: '#64748b', marginTop: '4px', display: 'block' }}>
+                      Se este produto for vinculado a outro produto fiscal, as baixas contábeis/fiscais serão unificadas no código mestre.
+                    </small>
+                  </div>
+
+                  <div className="form-group">
+                    <label>Gerar Cupom/Nota Fiscal (PRO_FISCAL_GERAR)</label>
+                    <select
+                      value={form.pro_fiscal_gerar || 'S'}
+                      onChange={(e) => setForm({ ...form, pro_fiscal_gerar: e.target.value })}
+                    >
+                      <option value="S">🟢 Sim (Gerar Documento Fiscal)</option>
+                      <option value="N">🔴 Não (Apenas Controle Físico)</option>
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label>Venda c/ Estoque Negativo</label>
+                    <select
+                      value={form.pro_emitir_negativo || 'N'}
+                      onChange={(e) => setForm({ ...form, pro_emitir_negativo: e.target.value })}
+                    >
+                      <option value="N">🔴 Não (Bloquear Negativo)</option>
+                      <option value="S">🟢 Sim (Permitir Venda Negativa)</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
         </div>
 
-        {/* RODAPÉ COM AÇÕES */}
-        <div className="product-modal-footer">
-          <div className="product-modal-footer-info">
-            <span className="shortcut-hint"><strong>ESC</strong> Fechar</span>
-            <span className="shortcut-hint"><strong>F4</strong> Grupos/Subgrupos</span>
-            <span className="shortcut-hint"><strong>F10</strong> Gerar EANs</span>
-            <span className="shortcut-hint"><strong>Ctrl+S</strong> Salvar</span>
+        {/* RODAPÉ DO MODAL COM ATALHOS */}
+        <div className="product-modal-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.75rem', background: '#ffffff', borderTop: '1px solid rgba(0,0,0,0.06)' }}>
+          <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>Atalhos:</span>
+            <span className="badge badge-info" style={{ fontSize: '0.75rem' }}>F2 Novo</span>
+            <span className="badge badge-info" style={{ fontSize: '0.75rem' }}>F4 Grupos</span>
+            <span className="badge badge-info" style={{ fontSize: '0.75rem' }}>F7 Fornecedor</span>
+            <span className="badge badge-info" style={{ fontSize: '0.75rem' }}>F10 EANs</span>
+            <span className="badge badge-info" style={{ fontSize: '0.75rem' }}>Ctrl+S Salvar</span>
+            <span className="badge badge-info" style={{ fontSize: '0.75rem' }}>ESC Fechar</span>
           </div>
 
-          <div style={{ display: 'flex', gap: '0.8rem' }}>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
             <button type="button" className="btn-secondary" onClick={onClose}>Cancelar</button>
-            <button 
-              type="button" 
-              className="btn-primary" 
-              onClick={handleSave} 
-              disabled={loading}
-              style={{ minWidth: '160px' }}
-            >
-              {loading ? <RefreshCw size={18} className="spinner" /> : <Check size={18} />} Salvar Produto
+            <button type="button" className="btn-primary" onClick={handleSave} disabled={loading} style={{ minWidth: '150px' }}>
+              {loading ? <RefreshCw size={18} className="spinner" /> : <Save size={18} />} Salvar Produto
             </button>
           </div>
         </div>
 
       </div>
 
-      {/* SUBMODAIS */}
+      {/* ========================================================================= */}
+      {/* MODAL POPUP: NOVO MODELO RÁPIDO                                           */}
+      {/* ========================================================================= */}
+      {showQuickModeloModal && (
+        <div className="product-form-modal-overlay" style={{ zIndex: 1000001 }}>
+          <div className="product-form-modal-container glass" style={{ maxWidth: '460px' }}>
+            <div className="product-modal-header">
+              <div className="product-modal-title-group">
+                <Tag size={20} color="var(--accent)" />
+                <div>
+                  <h4 style={{ margin: 0 }}>Cadastrar Novo Modelo</h4>
+                  <span className="product-modal-subtitle">Gera sugestão automática de produto</span>
+                </div>
+              </div>
+              <button className="btn-close" onClick={() => setShowQuickModeloModal(false)}><X size={18} /></button>
+            </div>
+            <form onSubmit={handleSaveQuickModelo} style={{ padding: '1.25rem' }}>
+              <div className="form-group">
+                <label>Nome do Modelo *</label>
+                <input
+                  type="text"
+                  required
+                  autoFocus
+                  value={novoModeloNome}
+                  onChange={(e) => setNovoModeloNome(e.target.value.toUpperCase())}
+                  placeholder="Ex: SLIM, FLARE, POLO, REGATA"
+                  style={{ textTransform: 'uppercase' }}
+                />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1.25rem' }}>
+                <button type="button" className="btn-secondary" onClick={() => setShowQuickModeloModal(false)}>Cancelar</button>
+                <button type="submit" className="btn-primary"><Save size={16} /> Salvar Modelo</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL POPUP: NOVO FORNECEDOR COM MÁSCARA CNPJ & DROPDOWN CIDADES VIA FOR_CID*/}
+      {/* ========================================================================= */}
+      {showQuickVendorModal && (
+        <div className="product-form-modal-overlay" style={{ zIndex: 1000001 }}>
+          <div className="product-form-modal-container glass" style={{ maxWidth: '650px' }}>
+            <div className="product-modal-header">
+              <div className="product-modal-title-group">
+                <UserPlus size={20} color="var(--accent)" />
+                <div>
+                  <h4 style={{ margin: 0 }}>Novo Fornecedor Rápido</h4>
+                  <span className="product-modal-subtitle">Com máscara CNPJ e vínculo de Cidade/UF (FOR_CID)</span>
+                </div>
+              </div>
+              <button className="btn-close" onClick={() => setShowQuickVendorModal(false)}><X size={18} /></button>
+            </div>
+            <form onSubmit={handleSaveQuickVendor} style={{ padding: '1.25rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                  <label>Razão Social / Nome *</label>
+                  <input
+                    type="text"
+                    required
+                    autoFocus
+                    value={quickVendorForm.nome}
+                    onChange={(e) => setQuickVendorForm({ ...quickVendorForm, nome: e.target.value.toUpperCase() })}
+                    placeholder="Ex: CONFECÇÕES ESTRELA LTDA"
+                    style={{ textTransform: 'uppercase' }}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Nome Fantasia</label>
+                  <input
+                    type="text"
+                    value={quickVendorForm.fantasia}
+                    onChange={(e) => setQuickVendorForm({ ...quickVendorForm, fantasia: e.target.value.toUpperCase() })}
+                    placeholder="Ex: ESTRELA MODAS"
+                    style={{ textTransform: 'uppercase' }}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>CNPJ / CPF (com máscara) *</label>
+                  <input
+                    type="text"
+                    value={quickVendorForm.cnpj}
+                    onChange={(e) => setQuickVendorForm({ ...quickVendorForm, cnpj: maskCnpjCpf(e.target.value) })}
+                    placeholder="00.000.000/0000-00"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Telefone / Celular</label>
+                  <input
+                    type="text"
+                    value={quickVendorForm.telefone}
+                    onChange={(e) => setQuickVendorForm({ ...quickVendorForm, telefone: e.target.value })}
+                    placeholder="(00) 00000-0000"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>E-mail</label>
+                  <input
+                    type="email"
+                    value={quickVendorForm.email}
+                    onChange={(e) => setQuickVendorForm({ ...quickVendorForm, email: e.target.value })}
+                    placeholder="contato@empresa.com"
+                  />
+                </div>
+
+                {/* SELETOR DE CIDADE VINCULANDO FOR_CID E UF */}
+                <div className="form-group">
+                  <label>Cidade (FOR_CID) *</label>
+                  <select
+                    value={quickVendorForm.for_cid}
+                    onChange={(e) => {
+                      const cidId = Number(e.target.value);
+                      const matchCid = cidadesList.find(c => Number(c.codigo) === cidId);
+                      setQuickVendorForm(prev => ({
+                        ...prev,
+                        for_cid: cidId,
+                        cidade: matchCid ? matchCid.nome : prev.cidade,
+                        uf: matchCid ? matchCid.uf : prev.uf
+                      }));
+                    }}
+                  >
+                    <option value="">Selecione a Cidade...</option>
+                    {cidadesList.map(c => (
+                      <option key={c.codigo} value={c.codigo}>
+                        {c.nome} ({c.uf})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Estado (UF)</label>
+                  <input
+                    type="text"
+                    maxLength={2}
+                    value={quickVendorForm.uf}
+                    onChange={(e) => setQuickVendorForm({ ...quickVendorForm, uf: e.target.value.toUpperCase() })}
+                    placeholder="UF"
+                    style={{ textTransform: 'uppercase' }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1.25rem' }}>
+                <button type="button" className="btn-secondary" onClick={() => setShowQuickVendorModal(false)}>Cancelar</button>
+                <button type="submit" className="btn-primary"><Save size={16} /> Salvar Fornecedor</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAIS ADICIONAIS */}
       {showGruposSubgruposModal && (
-        <GruposSubgruposModal 
-          isOpen={showGruposSubgruposModal} 
-          onClose={() => setShowGruposSubgruposModal(false)}
-          onSelect={(data) => {
-            setForm(prev => ({ ...prev, pro_gru: data.subgrupo?.codigo || prev.pro_gru }));
+        <GruposSubgruposModal
+          isOpen={showGruposSubgruposModal}
+          onClose={() => {
             setShowGruposSubgruposModal(false);
           }}
         />
       )}
+
     </div>,
     document.body
   );

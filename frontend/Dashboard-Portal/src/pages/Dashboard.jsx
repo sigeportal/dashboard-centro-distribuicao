@@ -1,4 +1,4 @@
-import { useOutletContext, useSearchParams } from 'react-router-dom';
+import { useOutletContext, useSearchParams, useNavigate } from 'react-router-dom';
 import useDashboardData from '../hooks/useDashboardData';
 import OverviewTab from '../components/tabs/OverviewTab';
 import { useAuth } from '../contexts/AuthContext';
@@ -18,6 +18,7 @@ import ConciliacaoFiscalModal from '../components/ConciliacaoFiscalModal';
 
 export default function Dashboard() {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const { showServiceOrders = false } = useOutletContext() || {};
   const activeTab = searchParams.get('tab') || 'geral';
   const { userRole } = useAuth();

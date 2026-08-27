@@ -1,4 +1,4 @@
-﻿unit UnitSync.Controller;
+unit UnitSync.Controller;
 
 interface
 
@@ -39,6 +39,7 @@ type
     class procedure EstoquePosicao(Req: THorseRequest; Res: THorseResponse);
     class procedure EnsureEstoqueEmpresaTable;
     class procedure EnsureDashboardTables;
+    class procedure SincronizaCadastroEmpresa(AEmpresaObj: TJSONObject; ADefaultEmpresaId: Integer);
   end;
 
 implementation
@@ -131,7 +132,7 @@ end;
 
 class procedure TSyncController.SyncDashboard(Req: THorseRequest; Res: THorseResponse);
 var
-  LBody, LObj: TJSONObject;
+  LBody, LObj, LEmpresaObj: TJSONObject;
   LArrDiario, LArrPag, LArrGrupo, LArrCidade, LArrHora, LArrEstoque: TJSONArray;
   LQuery: iQuery;
   LEmpresaId, I, cod: Integer;
@@ -429,6 +430,18 @@ begin
       end;
     end;
 
+    // 7. Dados Cadastrais da Empresa (Identificado e comparado pelo EMP_CNPJ)
+    LEmpresaObj := LBody.GetValue<TJSONObject>('empresa', nil);
+    if Assigned(LEmpresaObj) then
+    begin
+      try
+        SincronizaCadastroEmpresa(LEmpresaObj, LEmpresaId);
+      except
+        on E: Exception do
+          Writeln('-> Erro ao sincronizar dados da EMPRESA no CD: ' + E.Message);
+      end;
+    end;
+
     Writeln(Format('[CD Server] SyncDashboard: Dados do dashboard salvos com sucesso para a Empresa EMP_ID = %d.', [LEmpresaId]));
     Res.Status(THTTPStatus.OK).Send('{"status": "ok"}');
   except
@@ -437,6 +450,175 @@ begin
       Writeln('-> Erro no SyncDashboard: ' + E.Message);
       Res.Status(THTTPStatus.InternalServerError).Send('{"error": "' + E.Message + '"}');
     end;
+  end;
+end;
+
+class procedure TSyncController.SincronizaCadastroEmpresa(AEmpresaObj: TJSONObject; ADefaultEmpresaId: Integer);
+var
+  LQuery: iQuery;
+  LCNPJ, LCNPJLimpo: string;
+  LEmpCodigo: Integer;
+
+  function ValStr(const AKey: string; const AMaxLen: Integer = 0): string;
+  var
+    S: string;
+  begin
+    S := '';
+    if Assigned(AEmpresaObj.GetValue(AKey)) and not AEmpresaObj.GetValue(AKey).InheritsFrom(TJSONNull) then
+      S := AEmpresaObj.GetValue<string>(AKey, '')
+    else if Assigned(AEmpresaObj.GetValue(LowerCase(AKey))) and not AEmpresaObj.GetValue(LowerCase(AKey)).InheritsFrom(TJSONNull) then
+      S := AEmpresaObj.GetValue<string>(LowerCase(AKey), '')
+    else if Assigned(AEmpresaObj.GetValue(UpperCase(AKey))) and not AEmpresaObj.GetValue(UpperCase(AKey)).InheritsFrom(TJSONNull) then
+      S := AEmpresaObj.GetValue<string>(UpperCase(AKey), '');
+
+    if (AMaxLen > 0) and (Length(S) > AMaxLen) then
+      S := Copy(S, 1, AMaxLen);
+    Result := S;
+  end;
+
+  function ValInt(const AKey: string; ADefault: Integer = 0): Integer;
+  begin
+    Result := ADefault;
+    if Assigned(AEmpresaObj.GetValue(AKey)) and not AEmpresaObj.GetValue(AKey).InheritsFrom(TJSONNull) then
+      Result := AEmpresaObj.GetValue<Integer>(AKey, ADefault)
+    else if Assigned(AEmpresaObj.GetValue(LowerCase(AKey))) and not AEmpresaObj.GetValue(LowerCase(AKey)).InheritsFrom(TJSONNull) then
+      Result := AEmpresaObj.GetValue<Integer>(LowerCase(AKey), ADefault);
+  end;
+
+begin
+  if not Assigned(AEmpresaObj) then Exit;
+
+  LCNPJ := ValStr('emp_cnpj', 18);
+  if LCNPJ.IsEmpty then
+    LCNPJ := ValStr('cnpj', 18);
+
+  if LCNPJ.IsEmpty then Exit;
+
+  LCNPJLimpo := LCNPJ.Replace('.', '').Replace('/', '').Replace('-', '').Replace(' ', '');
+  
+  LQuery := TDatabase.Query;
+  LEmpCodigo := 0;
+
+  // Busca se a empresa já existe no CD pelo EMP_CNPJ (formatado ou limpo)
+  LQuery.Clear;
+  LQuery.Add(Format(
+    'SELECT FIRST 1 EMP_CODIGO, EMP_CNPJ FROM EMPRESA ' +
+    'WHERE EMP_CNPJ = %s OR REPLACE(REPLACE(REPLACE(REPLACE(EMP_CNPJ, ''.'', ''''), ''/'', ''''), ''-'', ''''), '' '', '''') = %s',
+    [QuotedStr(LCNPJ), QuotedStr(LCNPJLimpo)]
+  ));
+  LQuery.Open;
+
+  if not LQuery.DataSet.Eof then
+    LEmpCodigo := LQuery.DataSet.FieldByName('EMP_CODIGO').AsInteger;
+
+  if LEmpCodigo > 0 then
+  begin
+    // UPDATE por EMP_CODIGO / EMP_CNPJ
+    LQuery.Clear;
+    LQuery.Add('UPDATE EMPRESA SET ');
+    LQuery.Add('  EMP_CNPJ = ' + QuotedStr(LCNPJ) + ', ');
+    LQuery.Add('  EMP_INSCEST = ' + QuotedStr(ValStr('emp_inscest', 20)) + ', ');
+    LQuery.Add('  EMP_RAZAO_SOCIAL = ' + QuotedStr(ValStr('emp_razao_social', 50)) + ', ');
+    LQuery.Add('  EMP_MUNICIPIO = ' + QuotedStr(ValStr('emp_municipio', 50)) + ', ');
+    LQuery.Add('  EMP_UF = ' + QuotedStr(ValStr('emp_uf', 2)) + ', ');
+    LQuery.Add('  EMP_FONE = ' + QuotedStr(ValStr('emp_fone', 13)) + ', ');
+    LQuery.Add('  EMP_FAX = ' + QuotedStr(ValStr('emp_fax', 13)) + ', ');
+    LQuery.Add('  EMP_LOGRADOURO = ' + QuotedStr(ValStr('emp_logradouro', 50)) + ', ');
+    LQuery.Add('  EMP_NUMERO = ' + QuotedStr(ValStr('emp_numero', 10)) + ', ');
+    LQuery.Add('  EMP_COMPLEMENTO = ' + QuotedStr(ValStr('emp_complemento', 50)) + ', ');
+    LQuery.Add('  EMP_BAIRRO = ' + QuotedStr(ValStr('emp_bairro', 30)) + ', ');
+    LQuery.Add('  EMP_CEP = ' + QuotedStr(ValStr('emp_cep', 10)) + ', ');
+    LQuery.Add('  EMP_CONTATO = ' + QuotedStr(ValStr('emp_contato', 30)) + ', ');
+    LQuery.Add('  EMP_CODMUN_IBGE = ' + QuotedStr(ValStr('emp_codmun_ibge', 10)) + ', ');
+    LQuery.Add('  EMP_CODUF_IBGE = ' + QuotedStr(ValStr('emp_coduf_ibge', 10)) + ', ');
+    LQuery.Add('  EMP_FANTASIA = ' + QuotedStr(ValStr('emp_fantasia', 100)) + ', ');
+    LQuery.Add('  EMP_CRT = ' + QuotedStr(ValStr('emp_crt', 1)) + ', ');
+    LQuery.Add('  EMP_SUFRAMA = ' + QuotedStr(ValStr('emp_suframa', 9)) + ', ');
+    LQuery.Add('  EMP_PERFIL = ' + QuotedStr(ValStr('emp_perfil', 1)) + ', ');
+    LQuery.Add('  EMP_ATIVIDADE = ' + QuotedStr(ValStr('emp_atividade', 1)) + ', ');
+    LQuery.Add('  EMP_EMAIL = ' + QuotedStr(ValStr('emp_email', 50)) + ', ');
+    LQuery.Add('  EMP_TITULO1 = ' + QuotedStr(ValStr('emp_titulo1', 100)) + ', ');
+    LQuery.Add('  EMP_TITULO2 = ' + QuotedStr(ValStr('emp_titulo2', 100)) + ', ');
+    LQuery.Add('  EMP_TITULO3 = ' + QuotedStr(ValStr('emp_titulo3', 100)) + ', ');
+    LQuery.Add('  EMP_MD5 = ' + QuotedStr(ValStr('emp_md5', 50)) + ', ');
+    LQuery.Add('  EMP_LICENCA = ' + QuotedStr(ValStr('emp_licenca', 20)) + ', ');
+    LQuery.Add('  EMP_LICENCA_DLL_NFE = ' + QuotedStr(ValStr('emp_licenca_dll_nfe', 200)) + ', ');
+    LQuery.Add('  EMP_ID_CSC = ' + QuotedStr(ValStr('emp_id_csc', 10)) + ', ');
+    LQuery.Add('  EMP_CSC = ' + QuotedStr(ValStr('emp_csc', 50)) + ', ');
+    LQuery.Add('  EMP_INSCMUN = ' + QuotedStr(ValStr('emp_inscmun', 20)) + ', ');
+    LQuery.Add('  EMP_RNTRC = ' + QuotedStr(ValStr('emp_rntrc', 10)) + ', ');
+    LQuery.Add('  EMP_LICENCA_DLL_MDF = ' + QuotedStr(ValStr('emp_licenca_dll_mdf', 200)) + ', ');
+    LQuery.Add('  EMP_TIPO_ATIVIDADE = ' + QuotedStr(ValStr('emp_tipo_atividade', 2)) + ', ');
+    LQuery.Add('  EMP_IND_NAT_PJ = ' + QuotedStr(ValStr('emp_ind_nat_pj', 2)) + ', ');
+    LQuery.Add('  EMP_LOGO = ' + QuotedStr(ValStr('emp_logo', 1000)) + ', ');
+    LQuery.Add('  EMP_CNAE = ' + QuotedStr(ValStr('emp_cnae', 10)) + ', ');
+    LQuery.Add('  EMP_CC_CODIGO = ' + ValInt('emp_cc_codigo', 0).ToString + ' ');
+    LQuery.Add('WHERE EMP_CODIGO = ' + LEmpCodigo.ToString);
+    LQuery.ExecSQL;
+    Writeln(Format('[CD Server] Empresa CNPJ %s atualizada com sucesso no CD (EMP_CODIGO = %d).', [LCNPJ, LEmpCodigo]));
+  end
+  else
+  begin
+    // INSERT novo registro
+    if ADefaultEmpresaId > 0 then
+      LEmpCodigo := ADefaultEmpresaId
+    else
+      LEmpCodigo := GeraCodigo('EMPRESA', 'EMP_CODIGO');
+
+    LQuery.Clear;
+    LQuery.Add('INSERT INTO EMPRESA (');
+    LQuery.Add('  EMP_CODIGO, EMP_CNPJ, EMP_INSCEST, EMP_RAZAO_SOCIAL, EMP_MUNICIPIO, EMP_UF, ');
+    LQuery.Add('  EMP_FONE, EMP_FAX, EMP_LOGRADOURO, EMP_NUMERO, EMP_COMPLEMENTO, EMP_BAIRRO, ');
+    LQuery.Add('  EMP_CEP, EMP_CONTATO, EMP_CODMUN_IBGE, EMP_CODUF_IBGE, EMP_FANTASIA, EMP_CRT, ');
+    LQuery.Add('  EMP_SUFRAMA, EMP_PERFIL, EMP_ATIVIDADE, EMP_EMAIL, EMP_TITULO1, EMP_TITULO2, ');
+    LQuery.Add('  EMP_TITULO3, EMP_MD5, EMP_LICENCA, EMP_LICENCA_DLL_NFE, EMP_ID_CSC, EMP_CSC, ');
+    LQuery.Add('  EMP_INSCMUN, EMP_RNTRC, EMP_LICENCA_DLL_MDF, EMP_TIPO_ATIVIDADE, EMP_IND_NAT_PJ, ');
+    LQuery.Add('  EMP_LOGO, EMP_CNAE, EMP_CC_CODIGO');
+    LQuery.Add(') VALUES (');
+    LQuery.Add(Format(
+      '  %d, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %d',
+      [LEmpCodigo,
+       QuotedStr(LCNPJ),
+       QuotedStr(ValStr('emp_inscest', 20)),
+       QuotedStr(ValStr('emp_razao_social', 50)),
+       QuotedStr(ValStr('emp_municipio', 50)),
+       QuotedStr(ValStr('emp_uf', 2)),
+       QuotedStr(ValStr('emp_fone', 13)),
+       QuotedStr(ValStr('emp_fax', 13)),
+       QuotedStr(ValStr('emp_logradouro', 50)),
+       QuotedStr(ValStr('emp_numero', 10)),
+       QuotedStr(ValStr('emp_complemento', 50)),
+       QuotedStr(ValStr('emp_bairro', 30)),
+       QuotedStr(ValStr('emp_cep', 10)),
+       QuotedStr(ValStr('emp_contato', 30)),
+       QuotedStr(ValStr('emp_codmun_ibge', 10)),
+       QuotedStr(ValStr('emp_coduf_ibge', 10)),
+       QuotedStr(ValStr('emp_fantasia', 100)),
+       QuotedStr(ValStr('emp_crt', 1)),
+       QuotedStr(ValStr('emp_suframa', 9)),
+       QuotedStr(ValStr('emp_perfil', 1)),
+       QuotedStr(ValStr('emp_atividade', 1)),
+       QuotedStr(ValStr('emp_email', 50)),
+       QuotedStr(ValStr('emp_titulo1', 100)),
+       QuotedStr(ValStr('emp_titulo2', 100)),
+       QuotedStr(ValStr('emp_titulo3', 100)),
+       QuotedStr(ValStr('emp_md5', 50)),
+       QuotedStr(ValStr('emp_licenca', 20)),
+       QuotedStr(ValStr('emp_licenca_dll_nfe', 200)),
+       QuotedStr(ValStr('emp_id_csc', 10)),
+       QuotedStr(ValStr('emp_csc', 50)),
+       QuotedStr(ValStr('emp_inscmun', 20)),
+       QuotedStr(ValStr('emp_rntrc', 10)),
+       QuotedStr(ValStr('emp_licenca_dll_mdf', 200)),
+       QuotedStr(ValStr('emp_tipo_atividade', 2)),
+       QuotedStr(ValStr('emp_ind_nat_pj', 2)),
+       QuotedStr(ValStr('emp_logo', 1000)),
+       QuotedStr(ValStr('emp_cnae', 10)),
+       ValInt('emp_cc_codigo', 0)]
+    ));
+    LQuery.Add(')');
+    LQuery.ExecSQL;
+    Writeln(Format('[CD Server] Nova empresa cadastrada no CD via sync CNPJ %s (EMP_CODIGO = %d).', [LCNPJ, LEmpCodigo]));
   end;
 end;
 
@@ -474,21 +656,40 @@ var
   LObj, LItemObj: TJSONObject;
   LArrItens: TJSONArray;
   LTransfId, LEmpresaId: Integer;
-  LSubgrupos, LGrades, LTamanhos: TJSONArray;
+  LSubgrupos, LGrades, LTamanhos, LModelos: TJSONArray;
+  LCargaInicial, LLastSync: string;
+  LIsCargaInicial: Boolean;
 begin
   EnsureSyncControlColumns;
   LEmpresaId := ObterEmpresaId(Req);
-  Writeln(Format('[CD Server] SyncPending: Pendencias enviadas para a Empresa EMP_ID = %d.', [LEmpresaId]));
+  
+  LCargaInicial := '';
+  if Req.Query.ContainsKey('carga_inicial') then
+    LCargaInicial := Req.Query.Items['carga_inicial'];
+    
+  LLastSync := '';
+  if Req.Query.ContainsKey('last_sync') then
+    LLastSync := Req.Query.Items['last_sync'];
+
+  LIsCargaInicial := (LCargaInicial = 'S') or (LCargaInicial = 's') or (LCargaInicial = '1') or (LLastSync = '') or (Req.Query.ContainsKey('full') and (Req.Query.Items['full'] = 'S'));
+
+  Writeln(Format('[CD Server] SyncPending: Pendencias enviadas para Empresa EMP_ID = %d (CargaInicial = %s).', [LEmpresaId, BoolToStr(LIsCargaInicial, True)]));
+  
   LResponse := TJSONObject.Create;
   LGrupos := TJSONArray.Create;
   LFornecedores := TJSONArray.Create;
   LProdutos := TJSONArray.Create;
   LTransferencias := TJSONArray.Create;
+  LModelos := TJSONArray.Create;
 
   LQuery := TDatabase.Query;
   try
-    // 1. Grupos (GRUPO_1) - Apenas pendentes (CADASTRAR = 'S')
-    LQuery.Open('SELECT G1_CODIGO, G1_NOME FROM GRUPO_1 WHERE G1_CADASTRAR IS NULL OR G1_CADASTRAR = ''S'' ORDER BY G1_CODIGO');
+    // 1. Grupos (GRUPO_1)
+    LQuery.Clear;
+    if LIsCargaInicial then
+      LQuery.Open('SELECT G1_CODIGO, G1_NOME FROM GRUPO_1 ORDER BY G1_CODIGO')
+    else
+      LQuery.Open('SELECT G1_CODIGO, G1_NOME FROM GRUPO_1 WHERE G1_CADASTRAR IS NULL OR G1_CADASTRAR = ''S'' ORDER BY G1_CODIGO');
     while not LQuery.DataSet.Eof do
     begin
       LObj := TJSONObject.Create;
@@ -498,9 +699,12 @@ begin
       LQuery.DataSet.Next;
     end;
 
-    // 2. Fornecedores - Apenas pendentes (CADASTRAR = 'S')
+    // 2. Fornecedores
     LQuery.Clear;
-    LQuery.Open('SELECT FOR_CODIGO, FOR_NOME, FOR_FANTASIA, FOR_CNPJ_CPF, FOR_INSC_ESTADUAL FROM FORNECEDORES WHERE FOR_CADASTRAR IS NULL OR FOR_CADASTRAR = ''S'' ORDER BY FOR_CODIGO');
+    if LIsCargaInicial then
+      LQuery.Open('SELECT FOR_CODIGO, FOR_NOME, FOR_FANTASIA, FOR_CNPJ_CPF, FOR_INSC_ESTADUAL, FOR_FONE, FOR_EMAIL, FOR_ENDERECO, FOR_BAIRRO, FOR_CID, FOR_UF, FOR_CONTATO FROM FORNECEDORES ORDER BY FOR_CODIGO')
+    else
+      LQuery.Open('SELECT FOR_CODIGO, FOR_NOME, FOR_FANTASIA, FOR_CNPJ_CPF, FOR_INSC_ESTADUAL, FOR_FONE, FOR_EMAIL, FOR_ENDERECO, FOR_BAIRRO, FOR_CID, FOR_UF, FOR_CONTATO FROM FORNECEDORES WHERE FOR_CADASTRAR IS NULL OR FOR_CADASTRAR = ''S'' ORDER BY FOR_CODIGO');
     while not LQuery.DataSet.Eof do
     begin
       LObj := TJSONObject.Create;
@@ -509,14 +713,44 @@ begin
       LObj.AddPair('for_nomefantasia', LQuery.DataSet.FieldByName('FOR_FANTASIA').AsString);
       LObj.AddPair('for_cnpj_cpf', LQuery.DataSet.FieldByName('FOR_CNPJ_CPF').AsString);
       LObj.AddPair('for_insc_estadual', LQuery.DataSet.FieldByName('FOR_INSC_ESTADUAL').AsString);
+      LObj.AddPair('for_fone', LQuery.DataSet.FieldByName('FOR_FONE').AsString);
+      LObj.AddPair('for_email', LQuery.DataSet.FieldByName('FOR_EMAIL').AsString);
+      LObj.AddPair('for_endereco', LQuery.DataSet.FieldByName('FOR_ENDERECO').AsString);
+      LObj.AddPair('for_bairro', LQuery.DataSet.FieldByName('FOR_BAIRRO').AsString);
+      LObj.AddPair('for_cid', TJSONNumber.Create(LQuery.DataSet.FieldByName('FOR_CID').AsInteger));
+      LObj.AddPair('for_uf', LQuery.DataSet.FieldByName('FOR_UF').AsString);
+      LObj.AddPair('for_contato', LQuery.DataSet.FieldByName('FOR_CONTATO').AsString);
       LFornecedores.AddElement(LObj);
       LQuery.DataSet.Next;
     end;
 
-    // 3. Produtos - Apenas pendentes (CADASTRAR = 'S')
+    // 3. Modelos
     LQuery.Clear;
-    LQuery.Add('SELECT PRO_CODIGO, PRO_NOME, PRO_DESCRICAO, PRO_CODBARRA, PRO_VALORV, PRO_VALOR_DINHEIRO, PRO_VALORV_PRAZO, PRO_VALORC, PRO_EMBALAGEM, PRO_FABRICANTE, PRO_GRU, PRO_FOR,');
-    LQuery.Add('PRO_EMP, PRO_TOTALIZADOR, PRO_NCM, PRO_UM, PRO_DATAUA FROM PRODUTOS WHERE PRO_CADASTRAR IS NULL OR PRO_CADASTRAR = ''S'' ORDER BY PRO_CODIGO');
+    try
+      if LIsCargaInicial then
+        LQuery.Open('SELECT MOD_CODIGO, MOD_NOME FROM MODELOS ORDER BY MOD_CODIGO')
+      else
+        LQuery.Open('SELECT MOD_CODIGO, MOD_NOME FROM MODELOS WHERE MOD_CADASTRAR IS NULL OR MOD_CADASTRAR = ''S'' ORDER BY MOD_CODIGO');
+      while not LQuery.DataSet.Eof do
+      begin
+        LObj := TJSONObject.Create;
+        LObj.AddPair('codigo', TJSONNumber.Create(LQuery.DataSet.FieldByName('MOD_CODIGO').AsInteger));
+        LObj.AddPair('nome', LQuery.DataSet.FieldByName('MOD_NOME').AsString);
+        LModelos.AddElement(LObj);
+        LQuery.DataSet.Next;
+      end;
+    except
+      // Se tabela modelos não existir no momento
+    end;
+
+    // 4. Produtos
+    LQuery.Clear;
+    LQuery.Add('SELECT P.PRO_CODIGO, P.PRO_NOME, P.PRO_DESCRICAO, P.PRO_CODBARRA, P.PRO_VALORV, P.PRO_VALOR_DINHEIRO, P.PRO_VALORV_PRAZO, P.PRO_VALORC, P.PRO_EMBALAGEM, P.PRO_FABRICANTE, P.PRO_GRU, P.PRO_FOR,');
+    LQuery.Add('P.PRO_EMP, P.PRO_TOTALIZADOR, P.PRO_NCM, P.PRO_UM, COALESCE((SELECT SUM(G.GRA_QUANTIDADE) FROM GRADES G WHERE G.GRA_PRO = P.PRO_CODIGO), P.PRO_QUANTIDADE, 0) AS PRO_QUANTIDADE, P.PRO_DATAUA FROM PRODUTOS P ');
+    if LIsCargaInicial then
+      LQuery.Add('WHERE P.PRO_ESTADO = ''ATIVO'' OR P.PRO_ESTADO IS NULL ORDER BY P.PRO_CODIGO')
+    else
+      LQuery.Add('WHERE P.PRO_CADASTRAR IS NULL OR P.PRO_CADASTRAR = ''S'' ORDER BY P.PRO_CODIGO');
     LQuery.Open();
     while not LQuery.DataSet.Eof do
     begin
@@ -540,7 +774,8 @@ begin
       LObj.AddPair('ncm', LQuery.DataSet.FieldByName('PRO_NCM').AsString);
       LObj.AddPair('pro_um', TJSONNumber.Create(LQuery.DataSet.FieldByName('PRO_UM').AsInteger));
       LObj.AddPair('um', TJSONNumber.Create(LQuery.DataSet.FieldByName('PRO_UM').AsInteger));
-      LObj.AddPair('preservar_estoque_local', TJSONBool.Create(True)); // Regra: Mudanças cadastrais do CD não alteram o estoque físico local das filiais
+      LObj.AddPair('pro_quantidade', TJSONNumber.Create(LQuery.DataSet.FieldByName('PRO_QUANTIDADE').AsFloat));
+      LObj.AddPair('preservar_estoque_local', TJSONBool.Create(not LIsCargaInicial));
       if LQuery.DataSet.FieldByName('PRO_DATAUA').IsNull then
         LObj.AddPair('pro_dataua', '')
       else
@@ -549,9 +784,12 @@ begin
       LQuery.DataSet.Next;
     end;
 
-    // 4. Transferencias - Apenas pendentes (CADASTRAR = 'S')
+    // 5. Transferencias
     LQuery.Clear;
-    LQuery.Open('SELECT TR_ID, TR_STATUS, TR_DATA, TR_DATA_RECEBIMENTO, TR_OBS FROM TRANSFERENCIA WHERE TR_CADASTRAR IS NULL OR TR_CADASTRAR = ''S'' ORDER BY TR_ID');
+    if LIsCargaInicial then
+      LQuery.Open('SELECT TR_ID, TR_STATUS, TR_DATA, TR_DATA_RECEBIMENTO, TR_OBS FROM TRANSFERENCIA ORDER BY TR_ID')
+    else
+      LQuery.Open('SELECT TR_ID, TR_STATUS, TR_DATA, TR_DATA_RECEBIMENTO, TR_OBS FROM TRANSFERENCIA WHERE TR_CADASTRAR IS NULL OR TR_CADASTRAR = ''S'' ORDER BY TR_ID');
     LQueryItens := TDatabase.Query;
     try
       while not LQuery.DataSet.Eof do
@@ -600,13 +838,16 @@ begin
 
     LResponse.AddPair('grupos', LGrupos);
     LResponse.AddPair('fornecedores', LFornecedores);
+    LResponse.AddPair('modelos', LModelos);
     LResponse.AddPair('produtos', LProdutos);
     LResponse.AddPair('transferencias', LTransferencias);
 
-    // 5. Subgrupos - Apenas pendentes (CADASTRAR = 'S')
+    // 6. Subgrupos
     LQuery.Clear;
-    LQuery.Open('SELECT GRU_CODIGO, GRU_NOME, GRU_G1, GRU_TR FROM GRUPOS WHERE GRU_CADASTRAR IS NULL OR GRU_CADASTRAR = ''S'' ORDER BY GRU_CODIGO');
-    LObj := TJSONObject.Create;
+    if LIsCargaInicial then
+      LQuery.Open('SELECT GRU_CODIGO, GRU_NOME, GRU_G1, GRU_TR FROM GRUPOS ORDER BY GRU_CODIGO')
+    else
+      LQuery.Open('SELECT GRU_CODIGO, GRU_NOME, GRU_G1, GRU_TR FROM GRUPOS WHERE GRU_CADASTRAR IS NULL OR GRU_CADASTRAR = ''S'' ORDER BY GRU_CODIGO');
     LSubgrupos := TJSONArray.Create;
     while not LQuery.DataSet.Eof do
     begin
@@ -620,9 +861,12 @@ begin
     end;
     LResponse.AddPair('subgrupos', LSubgrupos);
 
-    // 6. Grades - Apenas pendentes (CADASTRAR = 'S')
+    // 7. Grades
     LQuery.Clear;
-    LQuery.Open('SELECT GRA_CODIGO, GRA_PRO, GRA_VALOR, GRA_VALOR_DINHEIRO, GRA_VALOR_PRAZO, GRA_TAM, GRA_QUANTIDADE, GRA_CODBARRA, GRA_COR FROM GRADES WHERE GRA_CADASTRAR IS NULL OR GRA_CADASTRAR = ''S'' ORDER BY GRA_CODIGO');
+    if LIsCargaInicial then
+      LQuery.Open('SELECT GRA_CODIGO, GRA_PRO, GRA_VALOR, GRA_VALOR_DINHEIRO, GRA_VALOR_PRAZO, GRA_TAM, GRA_QUANTIDADE, GRA_CODBARRA, GRA_COR FROM GRADES ORDER BY GRA_CODIGO')
+    else
+      LQuery.Open('SELECT GRA_CODIGO, GRA_PRO, GRA_VALOR, GRA_VALOR_DINHEIRO, GRA_VALOR_PRAZO, GRA_TAM, GRA_QUANTIDADE, GRA_CODBARRA, GRA_COR FROM GRADES WHERE GRA_CADASTRAR IS NULL OR GRA_CADASTRAR = ''S'' ORDER BY GRA_CODIGO');
     LGrades := TJSONArray.Create;
     while not LQuery.DataSet.Eof do
     begin
@@ -641,9 +885,12 @@ begin
     end;
     LResponse.AddPair('grades', LGrades);
 
-    // 7. Tamanhos - Apenas pendentes (CADASTRAR = 'S')
+    // 8. Tamanhos
     LQuery.Clear;
-    LQuery.Open('SELECT TAM_CODIGO, TAM_PRO, TAM_TAMANHO, TAM_SIGLA, TAM_VALOR FROM TAMANHOS WHERE TAM_CADASTRAR IS NULL OR TAM_CADASTRAR = ''S'' ORDER BY TAM_CODIGO');
+    if LIsCargaInicial then
+      LQuery.Open('SELECT TAM_CODIGO, TAM_PRO, TAM_TAMANHO, TAM_SIGLA, TAM_VALOR FROM TAMANHOS ORDER BY TAM_CODIGO')
+    else
+      LQuery.Open('SELECT TAM_CODIGO, TAM_PRO, TAM_TAMANHO, TAM_SIGLA, TAM_VALOR FROM TAMANHOS WHERE TAM_CADASTRAR IS NULL OR TAM_CADASTRAR = ''S'' ORDER BY TAM_CODIGO');
     LTamanhos := TJSONArray.Create;
     while not LQuery.DataSet.Eof do
     begin
@@ -658,10 +905,13 @@ begin
     end;
     LResponse.AddPair('tamanhos', LTamanhos);
 
-    // 8. Clientes - Apenas pendentes (CADASTRAR = 'S')
+    // 9. Clientes
     LQuery.Clear;
-    LQuery.Open('SELECT CLI_CODIGO, CLI_NOME, CLI_CELULAR, CLI_FONE, CLI_EMAIL, CLI_CIDADE, CLI_UF, CLI_ENDERECO, CLI_BAIRRO, CLI_CEP, CLI_CNPJ_CPF, CLI_RG, CLI_LIMITE FROM CLIENTES WHERE CLI_CADASTRAR IS NULL OR CLI_CADASTRAR = ''S'' ORDER BY CLI_CODIGO');
-    LSubgrupos := TJSONArray.Create; // Reusing JSON array variable
+    if LIsCargaInicial then
+      LQuery.Open('SELECT CLI_CODIGO, CLI_NOME, CLI_CELULAR, CLI_FONE, CLI_EMAIL, CLI_CIDADE, CLI_UF, CLI_ENDERECO, CLI_BAIRRO, CLI_CEP, CLI_CNPJ_CPF, CLI_RG, CLI_LIMITE FROM CLIENTES ORDER BY CLI_CODIGO')
+    else
+      LQuery.Open('SELECT CLI_CODIGO, CLI_NOME, CLI_CELULAR, CLI_FONE, CLI_EMAIL, CLI_CIDADE, CLI_UF, CLI_ENDERECO, CLI_BAIRRO, CLI_CEP, CLI_CNPJ_CPF, CLI_RG, CLI_LIMITE FROM CLIENTES WHERE CLI_CADASTRAR IS NULL OR CLI_CADASTRAR = ''S'' ORDER BY CLI_CODIGO');
+    LSubgrupos := TJSONArray.Create;
     while not LQuery.DataSet.Eof do
     begin
       LItemObj := TJSONObject.Create;
@@ -685,17 +935,21 @@ begin
 
     LResponse.AddPair('timestamp', FormatDateTime('yyyy-mm-dd hh:nn:ss', Now));
 
-    // Baixa/limpa a flag de pendência (marcando 'N') para que na próxima chamada retorne 0 itens duplicados
-    try
-      LQuery.Clear; LQuery.Add('UPDATE PRODUTOS SET PRO_CADASTRAR = ''N'' WHERE PRO_CADASTRAR = ''S'' OR PRO_CADASTRAR IS NULL'); LQuery.ExecSQL;
-      LQuery.Clear; LQuery.Add('UPDATE GRUPO_1 SET G1_CADASTRAR = ''N'' WHERE G1_CADASTRAR = ''S'' OR G1_CADASTRAR IS NULL'); LQuery.ExecSQL;
-      LQuery.Clear; LQuery.Add('UPDATE GRUPOS SET GRU_CADASTRAR = ''N'' WHERE GRU_CADASTRAR = ''S'' OR GRU_CADASTRAR IS NULL'); LQuery.ExecSQL;
-      LQuery.Clear; LQuery.Add('UPDATE FORNECEDORES SET FOR_CADASTRAR = ''N'' WHERE FOR_CADASTRAR = ''S'' OR FOR_CADASTRAR IS NULL'); LQuery.ExecSQL;
-      LQuery.Clear; LQuery.Add('UPDATE GRADES SET GRA_CADASTRAR = ''N'' WHERE GRA_CADASTRAR = ''S'' OR GRA_CADASTRAR IS NULL'); LQuery.ExecSQL;
-      LQuery.Clear; LQuery.Add('UPDATE TAMANHOS SET TAM_CADASTRAR = ''N'' WHERE TAM_CADASTRAR = ''S'' OR TAM_CADASTRAR IS NULL'); LQuery.ExecSQL;
-      LQuery.Clear; LQuery.Add('UPDATE TRANSFERENCIA SET TR_CADASTRAR = ''N'' WHERE TR_CADASTRAR = ''S'' OR TR_CADASTRAR IS NULL'); LQuery.ExecSQL;
-      LQuery.Clear; LQuery.Add('UPDATE CLIENTES SET CLI_CADASTRAR = ''N'' WHERE CLI_CADASTRAR = ''S'' OR CLI_CADASTRAR IS NULL'); LQuery.ExecSQL;
-    except end;
+    // Apenas baixa/limpa a flag se NÃO for carga inicial
+    if not LIsCargaInicial then
+    begin
+      try
+        LQuery.Clear; LQuery.Add('UPDATE PRODUTOS SET PRO_CADASTRAR = ''N'' WHERE PRO_CADASTRAR = ''S'' OR PRO_CADASTRAR IS NULL'); LQuery.ExecSQL;
+        LQuery.Clear; LQuery.Add('UPDATE GRUPO_1 SET G1_CADASTRAR = ''N'' WHERE G1_CADASTRAR = ''S'' OR G1_CADASTRAR IS NULL'); LQuery.ExecSQL;
+        LQuery.Clear; LQuery.Add('UPDATE GRUPOS SET GRU_CADASTRAR = ''N'' WHERE GRU_CADASTRAR = ''S'' OR GRU_CADASTRAR IS NULL'); LQuery.ExecSQL;
+        LQuery.Clear; LQuery.Add('UPDATE FORNECEDORES SET FOR_CADASTRAR = ''N'' WHERE FOR_CADASTRAR = ''S'' OR FOR_CADASTRAR IS NULL'); LQuery.ExecSQL;
+        LQuery.Clear; LQuery.Add('UPDATE MODELOS SET MOD_CADASTRAR = ''N'' WHERE MOD_CADASTRAR = ''S'' OR MOD_CADASTRAR IS NULL'); LQuery.ExecSQL;
+        LQuery.Clear; LQuery.Add('UPDATE GRADES SET GRA_CADASTRAR = ''N'' WHERE GRA_CADASTRAR = ''S'' OR GRA_CADASTRAR IS NULL'); LQuery.ExecSQL;
+        LQuery.Clear; LQuery.Add('UPDATE TAMANHOS SET TAM_CADASTRAR = ''N'' WHERE TAM_CADASTRAR = ''S'' OR TAM_CADASTRAR IS NULL'); LQuery.ExecSQL;
+        LQuery.Clear; LQuery.Add('UPDATE TRANSFERENCIA SET TR_CADASTRAR = ''N'' WHERE TR_CADASTRAR = ''S'' OR TR_CADASTRAR IS NULL'); LQuery.ExecSQL;
+        LQuery.Clear; LQuery.Add('UPDATE CLIENTES SET CLI_CADASTRAR = ''N'' WHERE CLI_CADASTRAR = ''S'' OR CLI_CADASTRAR IS NULL'); LQuery.ExecSQL;
+      except end;
+    end;
 
     Res.Status(THTTPStatus.OK).Send<TJSONObject>(LResponse);
   except
@@ -1314,6 +1568,7 @@ end;
 class procedure TSyncController.EnsureEstoqueEmpresaTable;
 var
   LEstoqueEmpresa: TEstoqueEmpresa;
+  LQuery: iQuery;
 begin
   try
     LEstoqueEmpresa := TEstoqueEmpresa.Create(TDatabase.Connection);
@@ -1321,6 +1576,15 @@ begin
       LEstoqueEmpresa.CriaTabela;
     finally
       LEstoqueEmpresa.DisposeOf;
+    end;
+
+    // Limpa registro fantasma/duplicado de EMP_CODIGO = 1 caso exista a empresa real sincronizada (EMP_CODIGO = 5)
+    try
+      LQuery := TDatabase.Query;
+      LQuery.Clear;
+      LQuery.Add('DELETE FROM EMPRESA WHERE EMP_CODIGO = 1 AND EXISTS (SELECT 1 FROM EMPRESA E5 WHERE E5.EMP_CODIGO = 5)');
+      LQuery.ExecSQL;
+    except
     end;
   except
     on E: Exception do
@@ -1356,32 +1620,26 @@ begin
       begin
         LSQL := Format(
           'SELECT ' +
-          '  U.EMP_ID AS EE_EMPRESA_ID, ' +
-          '  MAX(COALESCE(EMP.EMP_FANTASIA, EMP.EMP_RAZAO_SOCIAL)) AS EMP_NOME, ' +
+          '  EMP.EMP_CODIGO AS EE_EMPRESA_ID, ' +
+          '  COALESCE(NULLIF(TRIM(EMP.EMP_FANTASIA), ''''), NULLIF(TRIM(EMP.EMP_RAZAO_SOCIAL), ''''), ''Unidade #'' || EMP.EMP_CODIGO) AS EMP_NOME, ' +
+          '  EMP.EMP_CNPJ, ' +
           '  %d AS EE_PRO_CODIGO, ' +
-          '  MAX(P.PRO_NOME) AS PRO_NOME, ' +
+          '  P.PRO_NOME AS PRO_NOME, ' +
           '  COALESCE( ' +
-          '    NULLIF(MAX(E.EE_QUANTIDADE), 0), ' +
-          '    CASE WHEN U.EMP_ID IN (1, 5) THEN MAX(P.PRO_QUANTIDADE) ELSE NULL END, ' +
-          '    (SELECT COALESCE(SUM(TRI.TRI_QUANTIDADE), 0) ' +
-          '     FROM TRANSFERENCIA_ITEM TRI ' +
-          '     JOIN TRANSFERENCIA TR ON TR.TR_ID = TRI.TRI_TRANSFERENCIA_ID ' +
-          '     WHERE TRI.TRI_PRODUTO_ID = %d AND TR.TR_DESTINO = U.EMP_ID AND (TR.TR_STATUS = ''Conferido/Aprovado'' OR TR.TR_STATUS = ''Em Trânsito'')), ' +
-          '    MAX(E.EE_QUANTIDADE), ' +
+          '    E.EE_QUANTIDADE, ' +
+          '    CASE WHEN (EMP.EMP_CODIGO = 5 OR EMP.EMP_CODIGO = 1 OR ' +
+          '               UPPER(COALESCE(EMP.EMP_FANTASIA, EMP.EMP_RAZAO_SOCIAL, '''')) LIKE ''%%CD%%'' OR ' +
+          '               UPPER(COALESCE(EMP.EMP_FANTASIA, EMP.EMP_RAZAO_SOCIAL, '''')) LIKE ''%%DOURADINA%%'' OR ' +
+          '               UPPER(COALESCE(EMP.EMP_FANTASIA, EMP.EMP_RAZAO_SOCIAL, '''')) LIKE ''%%MATRIZ%%'') THEN ' +
+          '      COALESCE((SELECT SUM(G.GRA_QUANTIDADE) FROM GRADES G WHERE G.GRA_PRO = %d), P.PRO_QUANTIDADE, 0) ' +
+          '    ELSE 0 END, ' +
           '    0) AS EE_QUANTIDADE, ' +
-          '  MAX(E.EE_DATA_ATUALIZACAO) AS EE_DATA_ATUALIZACAO ' +
-          'FROM (' +
-          '  SELECT 1 AS EMP_ID FROM RDB$DATABASE ' +
-          '  UNION SELECT 2 FROM RDB$DATABASE ' +
-          '  UNION SELECT 3 FROM RDB$DATABASE ' +
-          '  UNION SELECT 4 FROM RDB$DATABASE ' +
-          '  UNION SELECT 5 FROM RDB$DATABASE ' +
-          ') U ' +
-          'LEFT JOIN EMPRESA EMP ON EMP.EMP_CODIGO = U.EMP_ID ' +
+          '  E.EE_DATA_ATUALIZACAO AS EE_DATA_ATUALIZACAO ' +
+          'FROM EMPRESA EMP ' +
           'LEFT JOIN PRODUTOS P ON P.PRO_CODIGO = %d ' +
-          'LEFT JOIN ESTOQUE_EMPRESA E ON E.EE_EMPRESA_ID = U.EMP_ID AND E.EE_PRO_CODIGO = %d ' +
-          'GROUP BY U.EMP_ID ' +
-          'ORDER BY U.EMP_ID',
+          'LEFT JOIN ESTOQUE_EMPRESA E ON E.EE_EMPRESA_ID = EMP.EMP_CODIGO AND E.EE_PRO_CODIGO = %d ' +
+          'WHERE EMP.EMP_CODIGO IS NOT NULL AND (EMP.EMP_CODIGO <> 1 OR NOT EXISTS (SELECT 1 FROM EMPRESA E5 WHERE E5.EMP_CODIGO = 5)) ' +
+          'ORDER BY EMP.EMP_CODIGO',
           [LProCodigo, LProCodigo, LProCodigo, LProCodigo]
         );
       end
@@ -1389,16 +1647,26 @@ begin
       begin
         LSQL := 
           'SELECT ' +
-          '  E.EE_EMPRESA_ID, ' +
-          '  COALESCE(EMP.EMP_FANTASIA, EMP.EMP_RAZAO_SOCIAL) AS EMP_NOME, ' +
-          '  E.EE_PRO_CODIGO, ' +
+          '  EMP.EMP_CODIGO AS EE_EMPRESA_ID, ' +
+          '  COALESCE(NULLIF(TRIM(EMP.EMP_FANTASIA), ''''), NULLIF(TRIM(EMP.EMP_RAZAO_SOCIAL), ''''), ''Unidade #'' || EMP.EMP_CODIGO) AS EMP_NOME, ' +
+          '  EMP.EMP_CNPJ, ' +
+          '  P.PRO_CODIGO AS EE_PRO_CODIGO, ' +
           '  P.PRO_NOME, ' +
-          '  E.EE_QUANTIDADE, ' +
+          '  COALESCE( ' +
+          '    E.EE_QUANTIDADE, ' +
+          '    CASE WHEN (EMP.EMP_CODIGO = 5 OR EMP.EMP_CODIGO = 1 OR ' +
+          '               UPPER(COALESCE(EMP.EMP_FANTASIA, EMP.EMP_RAZAO_SOCIAL, '''')) LIKE ''%%CD%%'' OR ' +
+          '               UPPER(COALESCE(EMP.EMP_FANTASIA, EMP.EMP_RAZAO_SOCIAL, '''')) LIKE ''%%DOURADINA%%'' OR ' +
+          '               UPPER(COALESCE(EMP.EMP_FANTASIA, EMP.EMP_RAZAO_SOCIAL, '''')) LIKE ''%%MATRIZ%%'') THEN ' +
+          '      COALESCE((SELECT SUM(G.GRA_QUANTIDADE) FROM GRADES G WHERE G.GRA_PRO = P.PRO_CODIGO), P.PRO_QUANTIDADE, 0) ' +
+          '    ELSE 0 END, ' +
+          '    0) AS EE_QUANTIDADE, ' +
           '  E.EE_DATA_ATUALIZACAO ' +
-          'FROM ESTOQUE_EMPRESA E ' +
-          'LEFT JOIN PRODUTOS P ON P.PRO_CODIGO = E.EE_PRO_CODIGO ' +
-          'LEFT JOIN EMPRESA EMP ON EMP.EMP_CODIGO = E.EE_EMPRESA_ID ' +
-          'ORDER BY E.EE_PRO_CODIGO, E.EE_EMPRESA_ID';
+          'FROM EMPRESA EMP ' +
+          'CROSS JOIN PRODUTOS P ' +
+          'LEFT JOIN ESTOQUE_EMPRESA E ON E.EE_EMPRESA_ID = EMP.EMP_CODIGO AND E.EE_PRO_CODIGO = P.PRO_CODIGO ' +
+          'WHERE EMP.EMP_CODIGO IS NOT NULL AND (EMP.EMP_CODIGO <> 1 OR NOT EXISTS (SELECT 1 FROM EMPRESA E5 WHERE E5.EMP_CODIGO = 5)) ' +
+          'ORDER BY P.PRO_CODIGO, EMP.EMP_CODIGO';
       end;
 
       LQuery.Open(LSQL);
@@ -1408,17 +1676,7 @@ begin
         LEmpId := LQuery.DataSet.FieldByName('EE_EMPRESA_ID').AsInteger;
         LEmpNome := LQuery.DataSet.FieldByName('EMP_NOME').AsString;
         if LEmpNome.Trim.IsEmpty then
-        begin
-          case LEmpId of
-            1: LEmpNome := 'CD DOURADINA';
-            2: LEmpNome := 'ITAPORA';
-            3: LEmpNome := 'MARACAJU';
-            4: LEmpNome := 'NOVA ALVORADA';
-            5: LEmpNome := 'RIO BRILHANTE';
-          else
-            LEmpNome := 'Unidade #' + IntToStr(LEmpId);
-          end;
-        end;
+          LEmpNome := 'Unidade #' + IntToStr(LEmpId);
 
         LItem.AddPair('empresa_id', TJSONNumber.Create(LEmpId));
         LItem.AddPair('empresa_nome', LEmpNome);
@@ -1439,23 +1697,27 @@ begin
       on E: Exception do
       begin
         Writeln('-> Fallback EstoquePosicao: ' + E.Message);
-        for LEmpId := 1 to 5 do
-        begin
-          LItem := TJSONObject.Create;
-          case LEmpId of
-            1: LEmpNome := 'CD DOURADINA';
-            2: LEmpNome := 'ITAPORA';
-            3: LEmpNome := 'MARACAJU';
-            4: LEmpNome := 'NOVA ALVORADA';
-            5: LEmpNome := 'RIO BRILHANTE';
+        try
+          LQuery.Clear;
+          LQuery.Add('SELECT EMP_CODIGO, COALESCE(EMP_FANTASIA, EMP_RAZAO_SOCIAL) AS EMP_NOME FROM EMPRESA WHERE EMP_CODIGO IS NOT NULL ORDER BY EMP_CODIGO');
+          LQuery.Open;
+          while not LQuery.DataSet.Eof do
+          begin
+            LItem := TJSONObject.Create;
+            LEmpId := LQuery.DataSet.FieldByName('EMP_CODIGO').AsInteger;
+            LEmpNome := LQuery.DataSet.FieldByName('EMP_NOME').AsString;
+            if LEmpNome.Trim.IsEmpty then
+              LEmpNome := 'Unidade #' + IntToStr(LEmpId);
+            LItem.AddPair('empresa_id', TJSONNumber.Create(LEmpId));
+            LItem.AddPair('empresa_nome', LEmpNome);
+            LItem.AddPair('pro_codigo', TJSONNumber.Create(LProCodigo));
+            LItem.AddPair('pro_nome', '');
+            LItem.AddPair('quantidade', TJSONNumber.Create(0));
+            LItem.AddPair('data_atualizacao', '');
+            LArr.AddElement(LItem);
+            LQuery.DataSet.Next;
           end;
-          LItem.AddPair('empresa_id', TJSONNumber.Create(LEmpId));
-          LItem.AddPair('empresa_nome', LEmpNome);
-          LItem.AddPair('pro_codigo', TJSONNumber.Create(LProCodigo));
-          LItem.AddPair('pro_nome', '');
-          LItem.AddPair('quantidade', TJSONNumber.Create(0));
-          LItem.AddPair('data_atualizacao', '');
-          LArr.AddElement(LItem);
+        except
         end;
       end;
     end;

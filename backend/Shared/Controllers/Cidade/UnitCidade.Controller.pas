@@ -131,6 +131,17 @@ begin
           .Get(GetForID)
           .Delete(Delete)
         .&End
+        .Prefix('/v1')
+        .Route('/cidades')
+          .Get(Get)
+          .Post(Post)
+          .Put(Put)
+        .&End
+        .Prefix('/v1')
+        .Route('/cidades/:id')
+          .Get(GetForID)
+          .Delete(Delete)
+        .&End;
 end;
 
 end.

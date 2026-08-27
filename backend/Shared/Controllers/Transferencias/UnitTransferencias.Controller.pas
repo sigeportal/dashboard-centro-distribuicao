@@ -1,10 +1,11 @@
-﻿unit UnitTransferencias.Controller;
+unit UnitTransferencias.Controller;
 
 interface
 
 uses
   Horse,
   Horse.Commons,
+  Horse.GBSwagger,
   Classes,
   SysUtils,
   System.Json,
@@ -218,13 +219,49 @@ end;
 class procedure TTransferenciasController.Post(Req: THorseRequest; Res: THorseResponse; Next: TProc);
 var
   Transferencia: TTransferencia;
-  LResObj: TJSONObject;
+  LResObj, LBodyObj, LItemObj: TJSONObject;
+  LItensArr: TJSONArray;
+  LItemVal: TJSONValue;
+  LItem: TTransferenciaItem;
+  i, LTrId: Integer;
 begin
   try
+    LBodyObj := Req.Body<TJSONObject>;
     Transferencia := TTransferencia.Create(TDatabase.Connection).fromJson<TTransferencia>(Req.Body);
     if Transferencia.Id <= 0 then
       Transferencia.Id := GeraCodigo('TRANSFERENCIA', 'TR_ID');
+    if Transferencia.Status.IsEmpty then
+      Transferencia.Status := 'Em Trânsito';
+    if Transferencia.Data = 0 then
+      Transferencia.Data := Date;
     Transferencia.SalvaNoBanco(1);
+    LTrId := Transferencia.Id;
+
+    // Se vierem itens no payload, salva automaticamente em lote
+    if Assigned(LBodyObj) and (LBodyObj.TryGetValue<TJSONArray>('itens', LItensArr) or LBodyObj.TryGetValue<TJSONArray>('items', LItensArr)) then
+    begin
+      for i := 0 to Pred(LItensArr.Count) do
+      begin
+        LItemVal := LItensArr.Items[i];
+        if LItemVal is TJSONObject then
+        begin
+          LItemObj := TJSONObject(LItemVal);
+          LItem := TTransferenciaItem.Create(TDatabase.Connection);
+          try
+            LItem.Id := GeraCodigo('TRANSFERENCIA_ITEM', 'TRI_ID');
+            LItem.TransferenciaId := LTrId;
+            LItem.ProdutoId := LItemObj.GetValue<Integer>('produto_id', LItemObj.GetValue<Integer>('produtoId', 0));
+            LItem.Quantidade := LItemObj.GetValue<Double>('quantidade', 1);
+            LItem.Valor := LItemObj.GetValue<Double>('valor', 0);
+            LItem.QuantidadeConferida := LItem.Quantidade;
+            LItem.Justificativa := LItemObj.GetValue<string>('justificativa', '');
+            LItem.SalvaNoBanco(1);
+          finally
+            LItem.DisposeOf;
+          end;
+        end;
+      end;
+    end;
 
     LResObj := TJSONObject.ParseJSONValue(Transferencia.ToJson) as TJSONObject;
     if Assigned(LResObj) then
@@ -306,6 +343,8 @@ var TransferenciaItem: TTransferenciaItem;
 begin
   try
     TransferenciaItem := TTransferenciaItem.Create(TDatabase.Connection).fromJson<TTransferenciaItem>(Req.Body);
+    if TransferenciaItem.Id <= 0 then
+      TransferenciaItem.Id := GeraCodigo('TRANSFERENCIA_ITEM', 'TRI_ID');
     TransferenciaItem.SalvaNoBanco(1);
     Res.Send<TJSONObject>(TJSONObject.ParseJSONValue(TransferenciaItem.ToJson) as TJSONObject);
   finally
@@ -350,7 +389,10 @@ begin
       oJsonValue := aJson.Items[i];
       Itens      := TTransferenciaItem.Create(TDatabase.Connection).fromJson<TTransferenciaItem>(oJsonValue.ToJson);
       try
-        FDQuery.ParamByName('TRI_ID').AsIntegers[i] := Itens.Id;
+        if Itens.Id <= 0 then
+          FDQuery.ParamByName('TRI_ID').AsIntegers[i] := GeraCodigo('TRANSFERENCIA_ITEM', 'TRI_ID')
+        else
+          FDQuery.ParamByName('TRI_ID').AsIntegers[i] := Itens.Id;
         FDQuery.ParamByName('TRI_TRANSFERENCIA_ID').AsIntegers[i] := Itens.TransferenciaId;
         FDQuery.ParamByName('TRI_PRODUTO_ID').AsIntegers[i] := Itens.ProdutoId;
         FDQuery.ParamByName('TRI_QUANTIDADE').AsFloats[i] := Itens.Quantidade;
@@ -439,8 +481,8 @@ begin
                 LQueryUpsert.ExecSQL;
               end;
 
-              // Se a origem for a Matriz (PRODUTOS principal), também atualiza PRODUTOS
-              if LOrigemId = 1 then
+              // Se a origem for a Matriz (CD Douradina / Principal), também atualiza PRODUTOS
+              if (LOrigemId = 1) or (LOrigemId = 5) then
               begin
                 LQueryUpsert.Clear;
                 LQueryUpsert.Add(Format(
@@ -475,8 +517,8 @@ begin
                 LQueryUpsert.ExecSQL;
               end;
 
-              // Se o destino for a Matriz (1), também incrementa em PRODUTOS
-              if LDestinoId = 1 then
+              // Se o destino for a Matriz (CD Douradina / Principal), também incrementa em PRODUTOS
+              if (LDestinoId = 1) or (LDestinoId = 5) then
               begin
                 LQueryUpsert.Clear;
                 LQueryUpsert.Add(Format(
@@ -634,5 +676,94 @@ begin
           .Post(PostEmLote)
         .&End;
 end;
+
+initialization
+  Swagger
+    .BasePath('v1')
+      .Path('transferencias')
+        .Tag('Transferencias')
+        .GET('Lista Transferencias', 'Lista todas as transferencias e romaneios de carga com filtros e status')
+          .AddResponse(200, 'Operacao bem Sucedida')
+            .Schema(TTransferencia)
+            .IsArray(True)
+          .&End
+          .AddResponse(400, 'BadRequest').&End
+          .AddResponse(500, 'InternalServerError').&End
+        .&End
+        .POST('Criar Transferencia', 'Cria um novo envio / romaneio de transferencia entre o CD e filiais')
+          .AddParamBody('Dados da Transferencia', 'Transferencias')
+            .Required(True)
+            .Schema(TTransferencia)
+          .&End
+          .AddResponse(201, 'Created')
+            .Schema(TTransferencia)
+          .&End
+          .AddResponse(400, 'BadRequest').&End
+          .AddResponse(500, 'InternalServerError').&End
+        .&End
+        .PUT('Atualiza Transferencia', 'Atualiza os dados ou status de uma transferencia')
+          .AddParamBody('Dados da Transferencia', 'Transferencias')
+            .Required(True)
+            .Schema(TTransferencia)
+          .&End
+          .AddResponse(200, 'Ok')
+            .Schema(TTransferencia)
+          .&End
+          .AddResponse(400, 'BadRequest').&End
+          .AddResponse(500, 'InternalServerError').&End
+        .&End
+      .&End
+    .&End
+    .BasePath('v1')
+      .Path('transferencias/{id}')
+        .Tag('Transferencias')
+        .GET('Obtem uma Transferencia', 'Busca dados da transferencia por ID')
+          .AddParamPath('id', 'Id da Transferencia para buscar')
+            .Required(True)
+            .Schema(SWAG_INTEGER)
+          .&End
+          .AddResponse(200, 'Operacao bem Sucedida')
+            .Schema(TTransferencia)
+          .&End
+          .AddResponse(404, 'Transferencia nao encontrada').&End
+          .AddResponse(400, 'BadRequest').&End
+          .AddResponse(500, 'InternalServerError').&End
+        .&End
+        .DELETE('Apagar uma Transferencia', 'Remove ou cancela a transferencia')
+          .AddParamPath('id', 'id da Transferencia para deletar')
+            .Required(True)
+            .Schema(SWAG_INTEGER)
+          .&End
+          .AddResponse(204, 'No Content').&End
+          .AddResponse(404, 'Transferencia nao encontrada').&End
+          .AddResponse(400, 'BadRequest').&End
+          .AddResponse(500, 'InternalServerError').&End
+        .&End
+      .&End
+    .&End
+    .BasePath('v1')
+      .Path('transferenciaItens')
+        .Tag('Transferencias')
+        .GET('Lista Itens da Transferencia', 'Lista itens vinculados a uma transferencia')
+          .AddResponse(200, 'Operacao bem Sucedida')
+            .Schema(TTransferenciaItem)
+            .IsArray(True)
+          .&End
+          .AddResponse(400, 'BadRequest').&End
+          .AddResponse(500, 'InternalServerError').&End
+        .&End
+        .POST('Adicionar Item', 'Adiciona item ao romaneio de transferencia')
+          .AddParamBody('Item da Transferencia', 'TransferenciaItem')
+            .Required(True)
+            .Schema(TTransferenciaItem)
+          .&End
+          .AddResponse(201, 'Created')
+            .Schema(TTransferenciaItem)
+          .&End
+          .AddResponse(400, 'BadRequest').&End
+          .AddResponse(500, 'InternalServerError').&End
+        .&End
+      .&End
+    .&End;
 
 end.

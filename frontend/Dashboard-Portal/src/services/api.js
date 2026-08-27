@@ -14,9 +14,8 @@ let refreshPromise = null;
 
 export const isUnauthorizedError = (error) => error.response?.status === 401 || error.isAuthRefreshFailure;
 
-export function createApi(useCdApi = false) {
-  const dynamicBase = normalizeBaseUrl(getBaseUrl());
-  const baseUrl = useCdApi ? (dynamicBase || CD_API_BASE) : dynamicBase;
+export function createApi() {
+  const baseUrl = normalizeBaseUrl(CD_API_BASE);
   const token = getAccessToken();
 
   const headers = {
@@ -26,11 +25,9 @@ export function createApi(useCdApi = false) {
     headers.Authorization = `Bearer ${token}`;
   }
 
-  if (useCdApi) {
-    const selectedCompanyId = localStorage.getItem('selected_company_id');
-    if (selectedCompanyId) {
-      headers['X-Empresa-Id'] = selectedCompanyId;
-    }
+  const selectedCompanyId = localStorage.getItem('selected_company_id');
+  if (selectedCompanyId) {
+    headers['X-Empresa-Id'] = selectedCompanyId;
   }
 
   const api = axios.create({
@@ -47,13 +44,11 @@ export function createApi(useCdApi = false) {
     config.headers['X-Empresa-Id'] = empId;
     config.headers['X-Empresa-CC'] = empCc;
 
-    if (useCdApi) {
-      config.params = {
-        emp_id: empId,
-        emp_cc: empCc,
-        ...config.params
-      };
-    }
+    config.params = {
+      emp_id: empId,
+      emp_cc: empCc,
+      ...config.params
+    };
     return config;
   });
 

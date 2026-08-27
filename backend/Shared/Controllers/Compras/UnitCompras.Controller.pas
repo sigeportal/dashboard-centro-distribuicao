@@ -5,6 +5,7 @@ interface
 uses
   Horse,
   Horse.Commons,
+  Horse.GBSwagger,
   Classes,
   SysUtils,
   System.Math,
@@ -276,7 +277,25 @@ begin
   LResponseObj.AddPair('observacao', QueryHeader.Dataset.FieldByName('OBSERVACAO').AsString);
 
   LItensArr := TJSONArray.Create;
-  QueryItens.Open(Format('SELECT ID, PRODUTO_CODIGO, PRODUTO_NOME, QUANTIDADE, VALOR_UNITARIO, VALOR_FRETE, VALOR_IPI, VALOR_ST, VALOR_OUTROS, CUSTO_MERCADORIA, CUSTO_MEDIO, CUSTO_OPERACIONAL FROM COMPRAS_ITENS WHERE COMPRA_ID = %d', [LId]));
+  QueryItens.Open(Format(
+    'SELECT ' +
+    '  CE.CE_CODIGO AS ID, ' +
+    '  CE.CE_PRO AS PRODUTO_CODIGO, ' +
+    '  P.PRO_NOME AS PRODUTO_NOME, ' +
+    '  CE.CE_QUANTIDADE AS QUANTIDADE, ' +
+    '  CE.CE_VALOR AS VALOR_UNITARIO, ' +
+    '  CE.CE_CUSTO_FRETE AS VALOR_FRETE, ' +
+    '  CE.CE_IPI AS VALOR_IPI, ' +
+    '  CE.CE_CUSTO_OUTROS AS VALOR_OUTROS, ' +
+    '  CE.CE_CUSTO_MERCADORIA AS CUSTO_MERCADORIA, ' +
+    '  CE.CE_CUSTO_MEDIO AS CUSTO_MEDIO, ' +
+    '  CE.CE_VALOROP AS CUSTO_OPERACIONAL, ' +
+    '  CE.CE_GRADE AS GRADE_ID ' +
+    'FROM COM_EST CE ' +
+    'LEFT JOIN PRODUTOS P ON (P.PRO_CODIGO = CE.CE_PRO) ' +
+    'WHERE CE.CE_COM = %d',
+    [LId]
+  ));
   QueryItens.Dataset.First;
   while not QueryItens.Dataset.Eof do
   begin
@@ -288,11 +307,12 @@ begin
     LItemObj.AddPair('valor_unitario', TJSONNumber.Create(QueryItens.Dataset.FieldByName('VALOR_UNITARIO').AsFloat));
     LItemObj.AddPair('valor_frete', TJSONNumber.Create(QueryItens.Dataset.FieldByName('VALOR_FRETE').AsFloat));
     LItemObj.AddPair('valor_ipi', TJSONNumber.Create(QueryItens.Dataset.FieldByName('VALOR_IPI').AsFloat));
-    LItemObj.AddPair('valor_st', TJSONNumber.Create(QueryItens.Dataset.FieldByName('VALOR_ST').AsFloat));
+    LItemObj.AddPair('valor_st', TJSONNumber.Create(0));
     LItemObj.AddPair('valor_outros', TJSONNumber.Create(QueryItens.Dataset.FieldByName('VALOR_OUTROS').AsFloat));
     LItemObj.AddPair('custo_mercadoria', TJSONNumber.Create(QueryItens.Dataset.FieldByName('CUSTO_MERCADORIA').AsFloat));
     LItemObj.AddPair('custo_medio', TJSONNumber.Create(QueryItens.Dataset.FieldByName('CUSTO_MEDIO').AsFloat));
     LItemObj.AddPair('custo_operacional', TJSONNumber.Create(QueryItens.Dataset.FieldByName('CUSTO_OPERACIONAL').AsFloat));
+    LItemObj.AddPair('grade_id', TJSONNumber.Create(QueryItens.Dataset.FieldByName('GRADE_ID').AsInteger));
 
     LItensArr.AddElement(LItemObj);
     QueryItens.Dataset.Next;
@@ -466,25 +486,26 @@ begin
         LQuery.AddParam('PRO_COD', LProCodigo);
         LQuery.ExecSQL;
 
-        // Insere o Item da Compra
-        LNewItemId := GeraCodigo('COMPRAS_ITENS', 'ID');
+        // Insere o Item da Compra em COM_EST
+        LNewItemId := GeraCodigo('COM_EST', 'CE_CODIGO');
         LQuery.Clear;
-        LQuery.Add('INSERT INTO COMPRAS_ITENS (ID, COMPRA_ID, PRODUTO_CODIGO, PRODUTO_NOME, QUANTIDADE, VALOR_UNITARIO, VALOR_FRETE, VALOR_IPI, VALOR_ST, VALOR_OUTROS, CUSTO_MERCADORIA, CUSTO_MEDIO, CUSTO_OPERACIONAL)');
-        LQuery.Add('VALUES (:ID, :CID, :PCOD, :PNOME, :QTD, :VUNIT, :VFRETE, :VIPI, :VST, :VOUTROS, :CMERC, :CMED, :COPER)');
+        LQuery.Add('INSERT INTO COM_EST (CE_CODIGO, CE_COM, CE_PRO, CE_QUANTIDADE, CE_VALOR, CE_VALORC, CE_CUSTO_FRETE, CE_IPI, CE_CUSTO_OUTROS, CE_CUSTO_MERCADORIA, CE_CUSTO_MEDIO, CE_VALOROP, CE_VALORV, CE_GRADE)');
+        LQuery.Add('VALUES (:ID, :CID, :PCOD, :QTD, :VUNIT, :VCUSTO, :VFRETE, :VIPI, :VOUTROS, :CMERC, :CMED, :COPER, :VVISTA, :GRADE)');
 
         LQuery.AddParam('ID', LNewItemId);
         LQuery.AddParam('CID', LCompraId);
         LQuery.AddParam('PCOD', LProCodigo);
-        LQuery.AddParam('PNOME', LItemObj.GetValue<string>('produto_nome', ''));
         LQuery.AddParam('QTD', LQtd);
         LQuery.AddParam('VUNIT', LValUnit);
+        LQuery.AddParam('VCUSTO', LCustoEntrada);
         LQuery.AddParam('VFRETE', LValFrete);
         LQuery.AddParam('VIPI', LValIpi);
-        LQuery.AddParam('VST', LValSt);
         LQuery.AddParam('VOUTROS', LValOutros);
         LQuery.AddParam('CMERC', LCustoMercadoria);
         LQuery.AddParam('CMED', LCustoMedio);
         LQuery.AddParam('COPER', LCustoOperacional);
+        LQuery.AddParam('VVISTA', LVendaVista);
+        LQuery.AddParam('GRADE', LItemObj.GetValue<Integer>('grade_id', 0));
         LQuery.ExecSQL;
 
         // Grava no Historico de Estoque (HIS_PRO)
@@ -653,7 +674,25 @@ begin
   LResponseObj.AddPair('observacao', QueryHeader.Dataset.FieldByName('OBSERVACAO').AsString);
 
   LItensArr := TJSONArray.Create;
-  QueryItens.Open(Format('SELECT ID, PRODUTO_CODIGO, PRODUTO_NOME, QUANTIDADE, VALOR_UNITARIO, VALOR_FRETE, VALOR_IPI, VALOR_ST, VALOR_OUTROS, CUSTO_MERCADORIA, CUSTO_MEDIO, CUSTO_OPERACIONAL FROM COMPRAS_ITENS WHERE COMPRA_ID = %d', [LCompraId]));
+  QueryItens.Open(Format(
+    'SELECT ' +
+    '  CE.CE_CODIGO AS ID, ' +
+    '  CE.CE_PRO AS PRODUTO_CODIGO, ' +
+    '  P.PRO_NOME AS PRODUTO_NOME, ' +
+    '  CE.CE_QUANTIDADE AS QUANTIDADE, ' +
+    '  CE.CE_VALOR AS VALOR_UNITARIO, ' +
+    '  CE.CE_CUSTO_FRETE AS VALOR_FRETE, ' +
+    '  CE.CE_IPI AS VALOR_IPI, ' +
+    '  CE.CE_CUSTO_OUTROS AS VALOR_OUTROS, ' +
+    '  CE.CE_CUSTO_MERCADORIA AS CUSTO_MERCADORIA, ' +
+    '  CE.CE_CUSTO_MEDIO AS CUSTO_MEDIO, ' +
+    '  CE.CE_VALOROP AS CUSTO_OPERACIONAL, ' +
+    '  CE.CE_GRADE AS GRADE_ID ' +
+    'FROM COM_EST CE ' +
+    'LEFT JOIN PRODUTOS P ON (P.PRO_CODIGO = CE.CE_PRO) ' +
+    'WHERE CE.CE_COM = %d',
+    [LCompraId]
+  ));
   QueryItens.Dataset.First;
   while not QueryItens.Dataset.Eof do
   begin
@@ -665,11 +704,12 @@ begin
     LItemObj.AddPair('valor_unitario', TJSONNumber.Create(QueryItens.Dataset.FieldByName('VALOR_UNITARIO').AsFloat));
     LItemObj.AddPair('valor_frete', TJSONNumber.Create(QueryItens.Dataset.FieldByName('VALOR_FRETE').AsFloat));
     LItemObj.AddPair('valor_ipi', TJSONNumber.Create(QueryItens.Dataset.FieldByName('VALOR_IPI').AsFloat));
-    LItemObj.AddPair('valor_st', TJSONNumber.Create(QueryItens.Dataset.FieldByName('VALOR_ST').AsFloat));
+    LItemObj.AddPair('valor_st', TJSONNumber.Create(0));
     LItemObj.AddPair('valor_outros', TJSONNumber.Create(QueryItens.Dataset.FieldByName('VALOR_OUTROS').AsFloat));
     LItemObj.AddPair('custo_mercadoria', TJSONNumber.Create(QueryItens.Dataset.FieldByName('CUSTO_MERCADORIA').AsFloat));
     LItemObj.AddPair('custo_medio', TJSONNumber.Create(QueryItens.Dataset.FieldByName('CUSTO_MEDIO').AsFloat));
     LItemObj.AddPair('custo_operacional', TJSONNumber.Create(QueryItens.Dataset.FieldByName('CUSTO_OPERACIONAL').AsFloat));
+    LItemObj.AddPair('grade_id', TJSONNumber.Create(QueryItens.Dataset.FieldByName('GRADE_ID').AsInteger));
 
     LItensArr.AddElement(LItemObj);
     QueryItens.Dataset.Next;
@@ -678,5 +718,49 @@ begin
   LResponseObj.AddPair('itens', LItensArr);
   Res.Send<TJSONObject>(LResponseObj);
 end;
+
+initialization
+  Swagger
+    .BasePath('v1')
+      .Path('compras')
+        .Tag('Compras')
+        .GET('Lista Compras', 'Lista historico de entradas e compras com paginacao e busca')
+          .AddResponse(200, 'Operacao bem Sucedida')
+            .Schema(TCompras)
+            .IsArray(True)
+          .&End
+          .AddResponse(400, 'BadRequest').&End
+          .AddResponse(500, 'InternalServerError').&End
+        .&End
+        .POST('Lancar Compra', 'Realiza lancamento de compra, rateio de custos, entrada de estoque e parcelamento no Contas a Pagar')
+          .AddParamBody('Dados da Compra', 'Compras')
+            .Required(True)
+            .Schema(TCompras)
+          .&End
+          .AddResponse(201, 'Created')
+            .Schema(TCompras)
+          .&End
+          .AddResponse(400, 'BadRequest').&End
+          .AddResponse(500, 'InternalServerError').&End
+        .&End
+      .&End
+    .&End
+    .BasePath('v1')
+      .Path('compras/{id}')
+        .Tag('Compras')
+        .GET('Obtem Detalhes da Compra', 'Obtem detalhes completos da compra, itens rateados e parcelas')
+          .AddParamPath('id', 'Id da Compra para buscar')
+            .Required(True)
+            .Schema(SWAG_INTEGER)
+          .&End
+          .AddResponse(200, 'Operacao bem Sucedida')
+            .Schema(TCompras)
+          .&End
+          .AddResponse(404, 'Compra nao encontrada').&End
+          .AddResponse(400, 'BadRequest').&End
+          .AddResponse(500, 'InternalServerError').&End
+        .&End
+      .&End
+    .&End;
 
 end.

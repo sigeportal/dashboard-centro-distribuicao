@@ -289,6 +289,25 @@
   width: 100%;
 }
 
+.product-grid-precos {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+  width: 100%;
+}
+
+@media (max-width: 900px) {
+  .product-grid-precos {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 500px) {
+  .product-grid-precos {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* 3 Prices Highlight Box */
 .product-section-card.highlight-prices {
   background: #fffaf5;

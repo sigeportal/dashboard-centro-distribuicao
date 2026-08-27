@@ -1,4 +1,4 @@
-﻿# 🚀 API Central & Portal de Gestão do Centro de Distribuição (CD)
+# 🚀 API Central & Portal de Gestão do Centro de Distribuição (CD)
 
 Sistema centralizado de gestão multi-filial, sincronização incremental de dados (Delta Sync) e Portal Web Dashboard para o Centro de Distribuição e 5 filiais ativas.
 
@@ -6,6 +6,7 @@ Sistema centralizado de gestão multi-filial, sincronização incremental de dad
 
 ## 📌 Arquitetura do Sistema
 
+- **Documento de Roadmap & Sprints**: Consulte o arquivo [`ROADMAP_CD.md`](./ROADMAP_CD.md) para o cronograma oficial de desenvolvimento e critérios de aceite.
 - **Frontend Web**: Portal Dashboard em React + Vite + Vanilla CSS.
 - **Servidor Central REST**: API em Delphi + Horse + PortalORM (porta 9000).
 - **Banco de Dados Central**: Firebird SQL aislados / centralizado (pi_centro_distribuicao.fdb).

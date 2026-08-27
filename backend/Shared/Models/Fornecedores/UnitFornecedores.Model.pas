@@ -3,8 +3,7 @@ unit UnitFornecedores.Model;
 interface
 
 uses
-	UnitPortalORM.Model,
-	UnitCidade.Model;
+	UnitPortalORM.Model;
 
 type
   [TRecursoServidor('/fornecedores')]
@@ -40,7 +39,6 @@ type
     FEndereco: string;
     FCelular: string;
     FInscMunicipal: string;
-    FCidade: TCidade;
     FCadastrar: string;
     { private declarations }
   public
@@ -49,25 +47,25 @@ type
     property Codigo: integer read FCodigo write FCodigo;
     [TCampo('FOR_NOME', 'VARCHAR(80) NOT NULL')]
     property Nome: string read FNome write FNome;
-		[TCampo('FOR_ENDERECO', 'VARCHAR(50)')]
+		[TCampo('FOR_ENDERECO', 'VARCHAR(100)')]
     property Endereco: string read FEndereco write FEndereco;
-    [TCampo('FOR_BAIRRO', 'VARCHAR(30)')]
+    [TCampo('FOR_BAIRRO', 'VARCHAR(50)')]
     property Bairro: string read FBairro write FBairro;
 		[TCampo('FOR_CEP', 'VARCHAR(9)')]
     property Cep: string read FCep write FCep;
     [TCampo('FOR_UF', 'VARCHAR(2)')]
     property Uf: string read FUf write FUf;
-    [TCampo('FOR_FONE', 'VARCHAR(13)')]
+    [TCampo('FOR_FONE', 'VARCHAR(20)')]
     property Fone: string read FFone write FFone;
-		[TCampo('FOR_CONTATO', 'VARCHAR(15)')]
+		[TCampo('FOR_CONTATO', 'VARCHAR(50)')]
     property Contato: string read FContato write FContato;
-    [TCampo('FOR_EMAIL', 'VARCHAR(30)')]
+    [TCampo('FOR_EMAIL', 'VARCHAR(100)')]
     property Email: string read FEmail write FEmail;
     [TCampo('FOR_DATAC', 'DATE')]
     property Datac: TDate read FDatac write FDatac;
     [TCampo('FOR_DATAU', 'DATE')]
     property Datau: TDate read FDatau write FDatau;
-    [TCampo('FOR_CELULAR', 'VARCHAR(14)')]
+    [TCampo('FOR_CELULAR', 'VARCHAR(20)')]
     property Celular: string read FCelular write FCelular;
     [TCampo('FOR_ENDCORRESP', 'VARCHAR(50)')]
     property Endcorresp: string read FEndcorresp write FEndcorresp;
@@ -97,8 +95,6 @@ type
 		property Tipo: string read FTipo write FTipo;
 		[TCampo('FOR_INSC_MUNICIPAL', 'VARCHAR(20)')]
 		property InscMunicipal: string read FInscMunicipal write FInscMunicipal;
-    [TRelacionamento('CIDADES', 'CID_CODIGO', 'FOR_CID', TCidade, UmPraUm)]
-		property Cidade: TCidade read FCidade write FCidade;
     [TCampo('FOR_CADASTRAR', 'CHAR(1) DEFAULT ''N''')]
     property Cadastrar: string read FCadastrar write FCadastrar;
   end;

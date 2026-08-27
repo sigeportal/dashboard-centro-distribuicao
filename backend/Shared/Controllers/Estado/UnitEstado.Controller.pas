@@ -123,6 +123,17 @@ begin
           .Get(GetForID)
           .Delete(Delete)
         .&End
+        .Prefix('/v1')
+        .Route('/estados')
+          .Get(Get)
+          .Post(Post)
+          .Put(Put)
+        .&End
+        .Prefix('/v1')
+        .Route('/estados/:id')
+          .Get(GetForID)
+          .Delete(Delete)
+        .&End;
 end;
 
 end.

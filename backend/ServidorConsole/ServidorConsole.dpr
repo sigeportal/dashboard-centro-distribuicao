@@ -76,6 +76,9 @@ uses
   ConciliacaoFiscal.Controller in '..\Shared\Controllers\ConciliacaoFiscal.Controller.pas',
   UnitFaturamento2.Model in '..\..\..\FormsComuns\Classes\Faturamento2\UnitFaturamento2.Model.pas',
   UnitPagamentos.Model in '..\..\..\FormsComuns\Classes\Pagamentos\UnitPagamentos.Model.pas',
+  UnitModelos.Model in '..\Shared\Models\Modelos\UnitModelos.Model.pas',
+  UnitModelos.Controller in '..\Shared\Controllers\Modelos\UnitModelos.Controller.pas',
+  UnitComEst.Model in '..\Shared\Models\Compras\UnitComEst.Model.pas',
   UnitConstants in '..\..\..\FormsComuns\Classes\ServidoresUtils\Utils\UnitConstants.pas';
 
 var
@@ -98,6 +101,7 @@ begin
     TProdutosController.Router;
     TGruposController.Router;
     TSubGruposController.Router;
+    TModelosController.Router;
     TFornecedoresController.Router;
     TEmpresaController.Router;
     TEstadoController.Router;
@@ -142,7 +146,9 @@ begin
     procedure
     begin
       Writeln('Servidor rodando na porta '+THorse.Port.ToString);
+      Writeln('Documentacao: http://localhost:'+THorse.Port.ToString+'/swagger/doc/html');
       Writeln('BD: '+TConstants.BancoDados);
+      Writeln('BD Fiscal: '+TConstants.BancoDadosFiscal);
     end);
   finally
 		LLogFileConfig.Free;
