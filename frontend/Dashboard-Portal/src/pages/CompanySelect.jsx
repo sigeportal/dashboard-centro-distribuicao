@@ -141,10 +141,21 @@ export default function CompanySelect() {
     else if (compName.includes('RIO BRILHANTE')) compId = 6;
     else if (compName.includes('ITAPORA')) compId = 7;
     else if (compName.includes('NOVA ALVORADA')) compId = 4;
-    else if (compName.includes('DOURADINA') || compName.includes('CD')) compId = 5;
+    const fallbackCities = {
+      5: 'DOURADINA',
+      1: 'DOURADINA',
+      6: 'RIO BRILHANTE',
+      7: 'ITAPORÃ',
+      4: 'NOVA ALVORADA DO SUL',
+      8: 'MARACAJU'
+    };
+    const city = company.municipio || company.cidade || company.emp_municipio || fallbackCities[compId] || '';
+    const uf = company.uf || company.emp_uf || (city ? 'MS' : '');
 
     localStorage.setItem('selected_company_id', String(compId));
     localStorage.setItem('selected_company_name', company.nome || compName);
+    if (city) localStorage.setItem('selected_company_city', city);
+    if (uf) localStorage.setItem('selected_company_uf', uf);
     navigate('/dashboard', { replace: true });
   };
 
@@ -249,38 +260,75 @@ export default function CompanySelect() {
           </div>
         ) : (
           <div className="company-grid">
-            {companies.map((company) => (
-              <button
-                key={getCompanyKey(company)}
-                type="button"
-                className={`company-card company-card--${company.connectivity}`}
-                onClick={() => handleSelectCompany(company)}
-              >
-                <span className="company-card-icon">
-                  <Building2 size={24} aria-hidden="true" />
-                </span>
-                <span className="company-card-content">
-                  <span className="company-card-header">
-                    <span>
-                      <span className="company-name">{company.nome || 'Empresa vinculada'}</span>
-                      <span className="company-document">{formatCnpj(company.cnpj)}</span>
-                    </span>
-                    <span className={`company-status company-status--${company.connectivity}`}>
-                      <span className="status-dot"></span>
-                      {company.connectivity === 'online' ? 'Online' : 'Offline'}
+            {companies.map((company) => {
+              const fallbackCities = {
+                5: 'DOURADINA',
+                1: 'DOURADINA',
+                6: 'RIO BRILHANTE',
+                7: 'ITAPORÃ',
+                4: 'NOVA ALVORADA DO SUL',
+                8: 'MARACAJU'
+              };
+              const rawName = company.nome || company.razao_social || company.fantasia || 'Empresa vinculada';
+              let compId = Number(company.codigo || company.id) || 5;
+              const upperName = rawName.toUpperCase();
+              if (upperName.includes('MARACAJU')) compId = 8;
+              else if (upperName.includes('RIO BRILHANTE')) compId = 6;
+              else if (upperName.includes('ITAPORA')) compId = 7;
+              else if (upperName.includes('NOVA ALVORADA')) compId = 4;
+              else if (upperName.includes('DOURADINA') || upperName.includes('CD')) compId = 5;
+
+              const city = company.municipio || company.cidade || company.emp_municipio || fallbackCities[compId] || '';
+              const uf = company.uf || company.emp_uf || (city ? 'MS' : '');
+
+              return (
+                <button
+                  key={getCompanyKey(company)}
+                  type="button"
+                  className={`company-card company-card--${company.connectivity}`}
+                  onClick={() => handleSelectCompany(company)}
+                >
+                  <span className="company-card-icon">
+                    <Building2 size={24} aria-hidden="true" />
+                  </span>
+                  <span className="company-card-content">
+                    <span className="company-card-header">
+                      <span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                          <span className="company-name">{rawName}</span>
+                          {city && (
+                            <span style={{
+                              fontSize: '0.74rem',
+                              background: 'rgba(37, 99, 235, 0.08)',
+                              color: '#2563eb',
+                              padding: '1px 6px',
+                              borderRadius: '4px',
+                              fontWeight: 600,
+                              border: '1px solid rgba(37, 99, 235, 0.2)'
+                            }}>
+                              {city}{uf ? ` - ${uf}` : ''}
+                            </span>
+                          )}
+                        </div>
+                        <span className="company-document">{formatCnpj(company.cnpj)}</span>
+                      </span>
+                      <span className={`company-status company-status--${company.connectivity}`}>
+                        <span className="status-dot"></span>
+                        {company.connectivity === 'online' ? 'Online' : 'Offline'}
+                      </span>
                     </span>
                   </span>
-                </span>
-                <span className="company-card-action" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  {pendingTransfers[company.id] > 0 && (
-                    <span className="notification-badge" style={{ backgroundColor: 'var(--brand-primary)', color: 'white', padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: '600' }}>
-                      {pendingTransfers[company.id]} pendente
-                    </span>
-                  )}
-                  <ArrowRight size={20} aria-hidden="true" />
-                </span>
-              </button>
-            ))}
+                  <span className="company-card-action" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {pendingTransfers[company.id] > 0 && (
+                      <span className="notification-badge" style={{ backgroundColor: 'var(--brand-primary)', color: 'white', padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: '600' }}>
+                        {pendingTransfers[company.id]} pendente
+                      </span>
+                    )}
+                    <ArrowRight size={20} aria-hidden="true" />
+                  </span>
+                </button>
+              );
+            })}
           </div>
         )}
       </section>

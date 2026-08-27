@@ -53,8 +53,10 @@ export default function Layout() {
       try {
         const storedId = Number(localStorage.getItem('selected_company_id')) || 5;
         const storedName = localStorage.getItem('selected_company_name');
+        const storedCity = localStorage.getItem('selected_company_city');
+        const storedUf = localStorage.getItem('selected_company_uf');
         if (storedName) {
-          setActiveCompany({ id: storedId, storedName });
+          setActiveCompany({ id: storedId, storedName, storedCity, storedUf });
         }
 
         const api = createApi(true);
@@ -63,9 +65,13 @@ export default function Layout() {
           const currentEmp = res.data.find(e => Number(e.codigo || e.Codigo || e.id) === storedId);
           if (currentEmp) {
             const realName = currentEmp.fantasia || currentEmp.Fantasia || currentEmp.razao_social || currentEmp.Razao_social;
+            const realCity = currentEmp.municipio || currentEmp.Municipio || currentEmp.EMP_MUNICIPIO || currentEmp.emp_municipio;
+            const realUf = currentEmp.uf || currentEmp.Uf || currentEmp.EMP_UF || currentEmp.emp_uf;
             if (realName) {
               localStorage.setItem('selected_company_name', realName);
-              setActiveCompany({ id: storedId, storedName: realName });
+              if (realCity) localStorage.setItem('selected_company_city', realCity);
+              if (realUf) localStorage.setItem('selected_company_uf', realUf);
+              setActiveCompany({ id: storedId, storedName: realName, storedCity: realCity, storedUf: realUf });
             }
           }
         }
@@ -79,21 +85,28 @@ export default function Layout() {
   const getCompanyDisplay = () => {
     const id = activeCompany.id;
     let name = activeCompany.storedName;
+    let city = activeCompany.storedCity || localStorage.getItem('selected_company_city') || '';
+    let uf = activeCompany.storedUf || localStorage.getItem('selected_company_uf') || '';
 
-    if (!name) {
-      const fallbackNames = {
-        5: 'CD DOURADINA',
-        6: 'RIO BRILHANTE',
-        7: 'ITAPORA',
-        4: 'NOVA ALVORADA',
-        8: 'MARACAJU',
-        1: 'CD DOURADINA',
-      };
-      name = fallbackNames[id] || `Unidade #${id}`;
+    const fallbackInfo = {
+      5: { name: 'CD DOURADINA', city: 'DOURADINA', uf: 'MS' },
+      6: { name: 'RIO BRILHANTE', city: 'RIO BRILHANTE', uf: 'MS' },
+      7: { name: 'ITAPORA', city: 'ITAPORÃ', uf: 'MS' },
+      4: { name: 'NOVA ALVORADA', city: 'NOVA ALVORADA DO SUL', uf: 'MS' },
+      8: { name: 'MARACAJU', city: 'MARACAJU', uf: 'MS' },
+      1: { name: 'CD DOURADINA', city: 'DOURADINA', uf: 'MS' },
+    };
+
+    if (!name && fallbackInfo[id]) {
+      name = fallbackInfo[id].name;
+    }
+    if (!city && fallbackInfo[id]) {
+      city = fallbackInfo[id].city;
+      uf = fallbackInfo[id].uf;
     }
 
-    const isMatriz = id === 1 || id === 5 || name.toUpperCase().includes('CD') || name.toUpperCase().includes('DOURADINA');
-    return { id, name, isMatriz };
+    const isMatriz = id === 1 || id === 5 || name?.toUpperCase().includes('CD') || name?.toUpperCase().includes('MATRIZ') || name?.toUpperCase().includes('DOURADINA');
+    return { id, name: name || `Unidade #${id}`, city, uf, isMatriz };
   };
 
   const companyDisplay = getCompanyDisplay();
@@ -210,6 +223,20 @@ export default function Layout() {
               <Building2 size={16} className="company-badge-icon" />
               <span className="company-badge-text">
                 Unidade: <strong>{companyDisplay.name}</strong>
+                {companyDisplay.city && (
+                  <span className="company-badge-city" style={{
+                    marginLeft: '6px',
+                    fontSize: '0.76rem',
+                    background: 'rgba(37, 99, 235, 0.1)',
+                    color: '#2563eb',
+                    padding: '1px 6px',
+                    borderRadius: '4px',
+                    fontWeight: 600,
+                    border: '1px solid rgba(37, 99, 235, 0.2)'
+                  }}>
+                    {companyDisplay.city}{companyDisplay.uf ? ` - ${companyDisplay.uf}` : ''}
+                  </span>
+                )}
               </span>
               <span className={`company-type-tag ${companyDisplay.isMatriz ? 'matriz' : 'filial'}`}>
                 {companyDisplay.isMatriz ? 'CD MATRIZ' : 'FILIAL'}

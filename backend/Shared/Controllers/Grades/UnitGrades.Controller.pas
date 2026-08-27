@@ -111,18 +111,52 @@ var
 	aJson: TJSONArray;
 	Query: iQuery;
 	LObj, LTamObj: TJSONObject;
+	LSQL, LWhere: string;
+	LCodPro: Integer;
+	LSomenteComEstoque: Boolean;
 begin
 	aJson := TJSONArray.Create;
 	Query := TDatabase.Query;
 	try
-		Query.Open(
+		LCodPro := 0;
+		if Req.Query.ContainsKey('produto_id') then
+			LCodPro := StrToIntDef(Req.Query.Items['produto_id'], 0)
+		else if Req.Query.ContainsKey('pro') then
+			LCodPro := StrToIntDef(Req.Query.Items['pro'], 0)
+		else if Req.Query.ContainsKey('gra_pro') then
+			LCodPro := StrToIntDef(Req.Query.Items['gra_pro'], 0)
+		else if Req.Query.ContainsKey('pro_codigo') then
+			LCodPro := StrToIntDef(Req.Query.Items['pro_codigo'], 0)
+		else if Req.Query.ContainsKey('codigo') then
+			LCodPro := StrToIntDef(Req.Query.Items['codigo'], 0);
+
+		LSomenteComEstoque := False;
+		if Req.Query.ContainsKey('somente_com_estoque') and (UpperCase(Req.Query.Items['somente_com_estoque']) = 'S') then
+			LSomenteComEstoque := True
+		else if Req.Query.ContainsKey('com_estoque') and (LowerCase(Req.Query.Items['com_estoque']) = 'true') then
+			LSomenteComEstoque := True;
+
+		LSQL := 
 			'SELECT G.GRA_CODIGO, G.GRA_PRO, G.GRA_VALOR, G.GRA_VALOR_DINHEIRO, G.GRA_VALOR_PRAZO, ' +
 			'G.GRA_TAM, G.GRA_QUANTIDADE, G.GRA_CODBARRA, G.GRA_COR, ' +
 			'T.TAM_TAMANHO, T.TAM_SIGLA ' +
 			'FROM GRADES G ' +
-			'LEFT JOIN TAMANHOS T ON T.TAM_CODIGO = G.GRA_TAM ' +
-			'ORDER BY G.GRA_CODIGO'
-		);
+			'LEFT JOIN TAMANHOS T ON T.TAM_CODIGO = G.GRA_TAM ';
+
+		LWhere := '';
+		if LCodPro > 0 then
+			LWhere := 'WHERE G.GRA_PRO = ' + IntToStr(LCodPro);
+
+		if LSomenteComEstoque then
+		begin
+			if LWhere = '' then
+				LWhere := 'WHERE COALESCE(G.GRA_QUANTIDADE, 0) > 0'
+			else
+				LWhere := LWhere + ' AND COALESCE(G.GRA_QUANTIDADE, 0) > 0';
+		end;
+
+		LSQL := LSQL + LWhere + ' ORDER BY G.GRA_CODIGO';
+		Query.Open(LSQL);
 		Query.Dataset.First;
 		while not Query.Dataset.Eof do
 		begin
@@ -135,11 +169,23 @@ begin
 			LObj.AddPair('gra_tam', TJSONNumber.Create(Query.Dataset.FieldByName('GRA_TAM').AsInteger));
 			
 			if not Query.Dataset.FieldByName('TAM_SIGLA').IsNull and (Query.Dataset.FieldByName('TAM_SIGLA').AsString <> '') then
-				LObj.AddPair('tam_nome', Query.Dataset.FieldByName('TAM_SIGLA').AsString)
-			else if not Query.Dataset.FieldByName('TAM_TAMANHO').IsNull then
-				LObj.AddPair('tam_nome', Query.Dataset.FieldByName('TAM_TAMANHO').AsString)
+			begin
+				LObj.AddPair('tam_nome', Query.Dataset.FieldByName('TAM_SIGLA').AsString);
+				LObj.AddPair('sigla', Query.Dataset.FieldByName('TAM_SIGLA').AsString);
+				LObj.AddPair('tamanho_str', Query.Dataset.FieldByName('TAM_SIGLA').AsString);
+			end
+			else if not Query.Dataset.FieldByName('TAM_TAMANHO').IsNull and (Query.Dataset.FieldByName('TAM_TAMANHO').AsString <> '') then
+			begin
+				LObj.AddPair('tam_nome', Query.Dataset.FieldByName('TAM_TAMANHO').AsString);
+				LObj.AddPair('sigla', Query.Dataset.FieldByName('TAM_TAMANHO').AsString);
+				LObj.AddPair('tamanho_str', Query.Dataset.FieldByName('TAM_TAMANHO').AsString);
+			end
 			else
+			begin
 				LObj.AddPair('tam_nome', 'Tam #' + Query.Dataset.FieldByName('GRA_TAM').AsString);
+				LObj.AddPair('sigla', 'Tam #' + Query.Dataset.FieldByName('GRA_TAM').AsString);
+				LObj.AddPair('tamanho_str', 'Tam #' + Query.Dataset.FieldByName('GRA_TAM').AsString);
+			end;
 
 			LTamObj := TJSONObject.Create;
 			LTamObj.AddPair('codigo', TJSONNumber.Create(Query.Dataset.FieldByName('GRA_TAM').AsInteger));
@@ -347,7 +393,7 @@ begin
 		end;
 
 		if Grades.Codigo = 0 then
-			Grades.Codigo := UnitFunctions.UnitFunctions.GeraCodigo('GRADES', 'GRA_CODIGO');
+			Grades.Codigo := GeraCodigo('GRADES', 'GRA_CODIGO');
 		Grades.Cadastrar := 'S';
 		Grades.SalvaNoBanco(0);
 		AtualizaEstoqueProduto(Grades.Pro);

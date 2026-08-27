@@ -6,14 +6,42 @@ import './RomaneioModal.css';
 export default function RomaneioModal({ transfer, items, products, units, onClose }) {
   if (!transfer) return null;
 
+  const cleanName = (str) => {
+    if (!str) return '';
+    return String(str)
+      .replace(/CALÃ≠ADOS/gi, 'CALÇADOS')
+      .replace(/CALÃ‡ADOS/gi, 'CALÇADOS')
+      .replace(/CALÃ§ADOS/gi, 'CALÇADOS');
+  };
+
   const getUnitName = (unitId) => {
     if (!unitId) return 'N/A';
     const found = units.find(u => Number(u.id) === Number(unitId));
-    return found ? found.name : `Unidade #${unitId}`;
+    return cleanName(found ? found.name : `Unidade #${unitId}`);
   };
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const resolveItemSize = (item, prod) => {
+    if (!item) return 'UN';
+    if (typeof item.tamanho === 'string' && item.tamanho.trim() && item.tamanho !== '-') return item.tamanho.trim();
+    if (typeof item.tamanho_str === 'string' && item.tamanho_str.trim() && item.tamanho_str !== '-') return item.tamanho_str.trim();
+    if (typeof item.tam_nome === 'string' && item.tam_nome.trim() && item.tam_nome !== '-') return item.tam_nome.trim();
+    if (typeof item.sigla === 'string' && item.sigla.trim() && item.sigla !== '-') return item.sigla.trim();
+    if (typeof item.tam === 'string' && item.tam.trim() && item.tam !== '-' && isNaN(Number(item.tam))) return item.tam.trim();
+    if (item.tamanho && typeof item.tamanho === 'object') {
+      if (item.tamanho.sigla) return item.tamanho.sigla;
+      if (item.tamanho.tamanho) return item.tamanho.tamanho;
+    }
+    if (prod) {
+      if (prod.um && String(prod.um).trim()) return String(prod.um).trim();
+      if (prod.embalagem && String(prod.embalagem).trim()) return String(prod.embalagem).trim();
+    }
+    if (item.um && String(item.um).trim()) return String(item.um).trim();
+    if (item.embalagem && String(item.embalagem).trim()) return String(item.embalagem).trim();
+    return 'UN';
   };
 
   // Cálculo de totalizadores
@@ -90,7 +118,7 @@ export default function RomaneioModal({ transfer, items, products, units, onClos
 
           {transfer.obs && (
             <div className="romaneio-obs-box">
-              <strong>Observações Logísticas:</strong> {transfer.obs}
+              <strong>Observações Logísticas:</strong> {cleanName(transfer.obs)}
             </div>
           )}
 
@@ -99,9 +127,10 @@ export default function RomaneioModal({ transfer, items, products, units, onClos
             <table className="romaneio-table">
               <thead>
                 <tr>
-                  <th style={{ width: '60px' }}>Item</th>
-                  <th style={{ width: '100px' }}>Código</th>
+                  <th style={{ width: '50px' }}>Item</th>
+                  <th style={{ width: '80px' }}>Código</th>
                   <th>Descrição do Produto</th>
+                  <th style={{ width: '110px', textAlign: 'center' }}>Tam / Grade</th>
                   <th style={{ width: '90px', textAlign: 'center' }}>Qtd Enviada</th>
                   <th style={{ width: '90px', textAlign: 'center' }}>Qtd Conf.</th>
                   <th style={{ width: '110px', textAlign: 'right' }}>Valor Unit.</th>
@@ -110,8 +139,10 @@ export default function RomaneioModal({ transfer, items, products, units, onClos
               </thead>
               <tbody>
                 {items.map((item, idx) => {
-                  const prod = products.find(p => p.codigo === item.produtoId);
-                  const prodName = prod ? prod.nome : (item.nome || `Produto #${item.produtoId}`);
+                  const prod = products.find(p => p.codigo === (item.produtoId || item.produto_id));
+                  const prodName = cleanName(prod ? prod.nome : (item.nome || `Produto #${item.produtoId || item.produto_id}`));
+                  const tam = resolveItemSize(item, prod);
+                  const cor = item.cor && item.cor !== 'UNICA' ? item.cor : '';
                   const qtdEnviada = Number(item.quantidade) || 0;
                   const qtdConf = isConferido ? (Number(item.quantidadeConferida ?? item.quantidade) || 0) : qtdEnviada;
                   const valorUnit = Number(item.valor) || 0;
@@ -120,12 +151,26 @@ export default function RomaneioModal({ transfer, items, products, units, onClos
                   return (
                     <tr key={item.id || idx}>
                       <td style={{ textAlign: 'center' }}>#{idx + 1}</td>
-                      <td><strong>#{item.produtoId}</strong></td>
+                      <td><strong>#{item.produtoId || item.produto_id}</strong></td>
                       <td>
-                        {prodName}
+                        <strong>{prodName}</strong>
                         {item.justificativa && (
                           <div className="romaneio-item-obs">Obs: {item.justificativa}</div>
                         )}
+                      </td>
+                      <td style={{ textAlign: 'center' }}>
+                        <span style={{ 
+                          fontSize: '0.84rem', 
+                          fontWeight: 700, 
+                          background: '#f8fafc', 
+                          color: '#1e293b', 
+                          padding: '2px 8px', 
+                          borderRadius: '4px',
+                          border: '1px solid #cbd5e1',
+                          display: 'inline-block'
+                        }}>
+                          {tam}{cor ? ` • ${cor}` : ''}
+                        </span>
                       </td>
                       <td style={{ textAlign: 'center', fontWeight: 'bold' }}>{qtdEnviada}</td>
                       <td style={{ textAlign: 'center' }}>{isConferido ? qtdConf : '-'}</td>
@@ -137,7 +182,7 @@ export default function RomaneioModal({ transfer, items, products, units, onClos
 
                 {items.length === 0 && (
                   <tr>
-                    <td colSpan="7" style={{ textAlign: 'center', padding: '1.5rem' }}>
+                    <td colSpan="8" style={{ textAlign: 'center', padding: '1.5rem' }}>
                       Nenhum item listado neste lote.
                     </td>
                   </tr>

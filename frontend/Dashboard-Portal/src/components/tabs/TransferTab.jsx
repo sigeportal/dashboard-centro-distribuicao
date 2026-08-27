@@ -60,6 +60,7 @@ export default function TransferTab() {
   // Seleção rápida de produto atual para o Romaneio
   const [selectedProductObj, setSelectedProductObj] = useState(null);
   const [productGrades, setProductGrades] = useState([]);
+  const [selectedProductStock, setSelectedProductStock] = useState(0);
   const [matrixQuantities, setMatrixQuantities] = useState({}); // { [gradeId]: number }
   const [singleQty, setSingleQty] = useState(1);
   const [singlePrice, setSinglePrice] = useState('');
@@ -130,29 +131,32 @@ export default function TransferTab() {
       const response = await api.get('/v1/empresa');
       const unitMap = new Map();
 
+      const fallbackCities = {
+        5: 'DOURADINA',
+        1: 'DOURADINA',
+        6: 'RIO BRILHANTE',
+        7: 'ITAPORÃ',
+        4: 'NOVA ALVORADA DO SUL',
+        8: 'MARACAJU'
+      };
+
       // Mapeamento das 5 unidades reais
       if (Array.isArray(response.data) && response.data.length > 0) {
         response.data.forEach(u => {
           const rawName = (u.fantasia || u.Fantasia || u.razao_social || u.Razao_social || '').trim().toUpperCase();
           const code = Number(u.codigo || u.Codigo || u.id);
-          const isMatriz = code === 5 || code === 1 || rawName.includes('CD') || rawName.includes('DOURADINA');
+          const isMatriz = code === 5 || code === 1 || rawName.includes('CD') || rawName.includes('DOURADINA') || rawName.includes('MATRIZ');
+          const city = (u.municipio || u.Municipio || u.EMP_MUNICIPIO || u.emp_municipio || fallbackCities[code] || '').trim().toUpperCase();
 
-          let displayName = `${code} - ${rawName}`;
+          let displayName = `${code} - ${rawName}${city ? ` (${city})` : ''}`;
           if (isMatriz) {
-            displayName = '5 - CD DOURADINA (Matriz)';
-          } else if (code === 6 || rawName.includes('RIO BRILHANTE')) {
-            displayName = '6 - RIO BRILHANTE';
-          } else if (code === 7 || rawName.includes('ITAPORA')) {
-            displayName = '7 - ITAPORA';
-          } else if (code === 4 || rawName.includes('NOVA ALVORADA')) {
-            displayName = '4 - NOVA ALVORADA';
-          } else if (code === 8 || rawName.includes('MARACAJU')) {
-            displayName = '8 - MARACAJU';
+            displayName = `5 - ${rawName || 'CD DOURADINA'}${city ? ` (${city})` : ' (DOURADINA)'} [CD MATRIZ]`;
           }
 
           unitMap.set(isMatriz ? 5 : code, {
             id: isMatriz ? 5 : code,
             name: displayName,
+            city: city,
             isCd: isMatriz,
             isMatriz: isMatriz
           });
@@ -160,11 +164,11 @@ export default function TransferTab() {
       }
 
       // Garante a presença das 5 unidades oficiais
-      if (!unitMap.has(5)) unitMap.set(5, { id: 5, name: '5 - CD DOURADINA (Matriz)', isCd: true, isMatriz: true });
-      if (!unitMap.has(6)) unitMap.set(6, { id: 6, name: '6 - RIO BRILHANTE', isCd: false, isMatriz: false });
-      if (!unitMap.has(7)) unitMap.set(7, { id: 7, name: '7 - ITAPORA', isCd: false, isMatriz: false });
-      if (!unitMap.has(4)) unitMap.set(4, { id: 4, name: '4 - NOVA ALVORADA', isCd: false, isMatriz: false });
-      if (!unitMap.has(8)) unitMap.set(8, { id: 8, name: '8 - MARACAJU', isCd: false, isMatriz: false });
+      if (!unitMap.has(5)) unitMap.set(5, { id: 5, name: '5 - CD DOURADINA (DOURADINA) [CD MATRIZ]', city: 'DOURADINA', isCd: true, isMatriz: true });
+      if (!unitMap.has(6)) unitMap.set(6, { id: 6, name: '6 - GIGANTE (RIO BRILHANTE)', city: 'RIO BRILHANTE', isCd: false, isMatriz: false });
+      if (!unitMap.has(7)) unitMap.set(7, { id: 7, name: '7 - GIGANTE (ITAPORÃ)', city: 'ITAPORÃ', isCd: false, isMatriz: false });
+      if (!unitMap.has(4)) unitMap.set(4, { id: 4, name: '4 - GIGANTE (NOVA ALVORADA DO SUL)', city: 'NOVA ALVORADA DO SUL', isCd: false, isMatriz: false });
+      if (!unitMap.has(8)) unitMap.set(8, { id: 8, name: '8 - GIGANTE (MARACAJU)', city: 'MARACAJU', isCd: false, isMatriz: false });
 
       const finalUnits = Array.from(unitMap.values());
       finalUnits.sort((a, b) => (b.isMatriz ? 1 : 0) - (a.isMatriz ? 1 : 0));
@@ -202,11 +206,12 @@ export default function TransferTab() {
       setSelectedProductObj(null);
       setProductGrades([]);
       setMatrixQuantities({});
+      setSelectedProductStock(0);
       return;
     }
 
     setSelectedProductObj(prod);
-    const pId = prod.codigo || prod.PRO_CODIGO;
+    const pId = Number(prod.codigo || prod.PRO_CODIGO);
     const defaultPrice = Number(prod.valorv || prod.custo || prod.pro_valor_dinheiro || 0);
     setSinglePrice(defaultPrice > 0 ? String(defaultPrice) : '0.00');
     setSingleQty(1);
@@ -214,9 +219,31 @@ export default function TransferTab() {
 
     setLoadingGrades(true);
     try {
+      // 1. Busca posição de estoque por filial para extrair o saldo real da unidade de origem
+      let originStock = 0;
+      try {
+        const stockRes = await api.get(`/v1/estoque/posicao?pro_codigo=${pId}`);
+        const stockArr = Array.isArray(stockRes.data) ? stockRes.data : (stockRes.data?.data || []);
+        const originRow = stockArr.find(st => Number(st.empresa_id) === Number(origin));
+        if (originRow) {
+          originStock = Number(originRow.quantidade) || 0;
+        } else {
+          const isOriginCd = Number(origin) === 5 || Number(origin) === 1;
+          if (isOriginCd) {
+            originStock = Number(prod.quantidade || prod.pro_quantidade || prod.PRO_QUANTIDADE || 0);
+          }
+        }
+      } catch (stkErr) {
+        console.warn('Erro ao consultar estoque da unidade de origem:', stkErr);
+      }
+      setSelectedProductStock(originStock);
+
+      // 2. Busca variações de grade do produto
       const res = await api.get(`/v1/grades?produto_id=${pId}`);
       if (Array.isArray(res.data) && res.data.length > 0) {
-        setProductGrades(res.data);
+        // Exibe estritamente as grades com estoque disponível (> 0)
+        const availableGrades = res.data.filter(g => Number(g.quantidade || g.gra_quantidade || 0) > 0);
+        setProductGrades(availableGrades);
       } else {
         setProductGrades([]);
       }
@@ -228,6 +255,13 @@ export default function TransferTab() {
     }
   };
 
+  // Recarrega o estoque caso a unidade de origem seja alterada
+  useEffect(() => {
+    if (selectedProductObj) {
+      handleSelectProduct(selectedProductObj);
+    }
+  }, [origin]);
+
   const handleMatrixQtyChange = (gradeId, value) => {
     const val = parseInt(value, 10);
     setMatrixQuantities(prev => ({
@@ -236,7 +270,7 @@ export default function TransferTab() {
     }));
   };
 
-  // 1. Adicionar Variações da Grade ao Romaneio
+  // 1. Adicionar Variações da Grade ao Romaneio com Validação de Estoque
   const handleAddGradeMatrixToTransfer = () => {
     if (!selectedProductObj) return;
 
@@ -247,29 +281,54 @@ export default function TransferTab() {
     const pCodFiscal = Number(selectedProductObj.pro_cod_fiscal || selectedProductObj.codFiscal || 0);
     const isFiscal = pFiscalGerar !== 'N' && (pCodFiscal > 0 || pFiscalGerar === 'S');
 
-    productGrades.forEach(g => {
+    for (const g of productGrades) {
       const gId = g.codigo || g.id || g.gra_codigo;
       const qtd = Number(matrixQuantities[gId] || 0);
+      const maxGradeQty = Number(g.quantidade || g.gra_quantidade || 0);
+      
+      let tamNome = 'UN';
+      if (typeof g.tamanho_str === 'string' && g.tamanho_str.trim()) {
+        tamNome = g.tamanho_str.trim();
+      } else if (typeof g.tam_nome === 'string' && g.tam_nome.trim()) {
+        tamNome = g.tam_nome.trim();
+      } else if (typeof g.sigla === 'string' && g.sigla.trim()) {
+        tamNome = g.sigla.trim();
+      } else if (g.tamanho && typeof g.tamanho === 'object') {
+        tamNome = g.tamanho.sigla || g.tamanho.tamanho || 'UN';
+      } else if (typeof g.tamanho === 'string' && g.tamanho.trim()) {
+        tamNome = g.tamanho.trim();
+      }
+
       if (qtd > 0) {
+        const alreadyInRomaneio = transferItems
+          .filter(it => it.produto_id === pId && it.grade_id === gId)
+          .reduce((acc, it) => acc + Number(it.quantidade || 0), 0);
+
+        if (alreadyInRomaneio + qtd > maxGradeQty) {
+          alert(`A quantidade informada para o tamanho "${tamNome}" (${alreadyInRomaneio + qtd} UN) ultrapassa o estoque disponível (${maxGradeQty} UN) na unidade de origem.`);
+          return;
+        }
+
         const val = Number(g.valor || g.valor_dinheiro || singlePrice || selectedProductObj.valorv || selectedProductObj.custo || 0);
         itemsToAdd.push({
           produto_id: pId,
           nome: pNome,
           codbarra: g.codbarra || selectedProductObj.codbarra || '',
           grade_id: gId,
-          tamanho: g.tam_nome || g.tam || g.sigla || 'UN',
+          tamanho: tamNome,
           cor: g.cor || 'UNICA',
           quantidade: qtd,
+          max_disponivel: maxGradeQty,
           valor: val,
           pro_cod_fiscal: pCodFiscal,
           pro_fiscal_gerar: pFiscalGerar,
           isFiscal: isFiscal
         });
       }
-    });
+    }
 
     if (itemsToAdd.length === 0) {
-      alert('Informe ao menos uma quantidade em um dos tamanhos da grade.');
+      alert('Informe ao menos uma quantidade em um dos tamanhos da grade com saldo disponível.');
       return;
     }
 
@@ -281,7 +340,7 @@ export default function TransferTab() {
     setTimeout(() => setSuccessMsg(''), 3500);
   };
 
-  // 2. Adicionar Produto Simples (Sem Grade) ao Romaneio
+  // 2. Adicionar Produto Simples (Sem Grade) ao Romaneio com Validação de Estoque
   const handleAddSingleProductToTransfer = () => {
     if (!selectedProductObj) {
       alert('Selecione um produto antes de adicionar.');
@@ -289,25 +348,43 @@ export default function TransferTab() {
     }
     const qtd = Number(singleQty);
     if (!qtd || qtd <= 0) {
-      alert('Informe uma quantidade válida.');
+      alert('Informe uma quantidade válida maior que 0.');
       return;
     }
 
     const pId = Number(selectedProductObj.codigo || selectedProductObj.PRO_CODIGO);
+    const maxAvailable = selectedProductStock > 0 ? selectedProductStock : Number(selectedProductObj.quantidade || selectedProductObj.pro_quantidade || 0);
+
+    if (maxAvailable <= 0) {
+      alert(`O produto #${pId} não possui estoque disponível na unidade de origem selecionada (${getUnitName(origin)}).`);
+      return;
+    }
+
+    const alreadyInRomaneio = transferItems
+      .filter(it => it.produto_id === pId && (!it.grade_id || it.grade_id === 0))
+      .reduce((acc, it) => acc + Number(it.quantidade || 0), 0);
+
+    if (alreadyInRomaneio + qtd > maxAvailable) {
+      alert(`A quantidade total informada (${alreadyInRomaneio + qtd} UN) ultrapassa o saldo disponível na unidade de origem (${maxAvailable} UN).`);
+      return;
+    }
+
     const pNome = selectedProductObj.nome || selectedProductObj.PRO_NOME;
     const pFiscalGerar = selectedProductObj.pro_fiscal_gerar || selectedProductObj.fiscalGerar || 'S';
     const pCodFiscal = Number(selectedProductObj.pro_cod_fiscal || selectedProductObj.codFiscal || 0);
     const isFiscal = pFiscalGerar !== 'N' && (pCodFiscal > 0 || pFiscalGerar === 'S');
     const val = Number(singlePrice) || Number(selectedProductObj.valorv || selectedProductObj.custo || 0);
+    const singleTam = selectedProductObj.um || selectedProductObj.embalagem || 'UN';
 
     const newItem = {
       produto_id: pId,
       nome: pNome,
       codbarra: selectedProductObj.codbarra || '',
       grade_id: 0,
-      tamanho: selectedProductObj.um || 'UN',
+      tamanho: singleTam,
       cor: 'UNICA',
       quantidade: qtd,
+      max_disponivel: maxAvailable,
       valor: val,
       pro_cod_fiscal: pCodFiscal,
       pro_fiscal_gerar: pFiscalGerar,
@@ -318,11 +395,11 @@ export default function TransferTab() {
     setSelectedProductObj(null);
     setProductGrades([]);
     setSingleQty(1);
-    setSuccessMsg(`Produto #${pId} - ${pNome} adicionado ao Romaneio!`);
+    setSuccessMsg(`Produto #${pId} - ${pNome} (${qtd} UN) adicionado ao Romaneio!`);
     setTimeout(() => setSuccessMsg(''), 3500);
   };
 
-  // 3. Bipagem Rápida via Código de Barras
+  // 3. Bipagem Rápida via Código de Barras com Validação
   const handleBarcodeScan = (e) => {
     if (e.key === 'Enter') {
       e.preventDefault();
@@ -332,12 +409,21 @@ export default function TransferTab() {
       const matchedProd = products.find(p => p.codbarra === code || String(p.codigo) === code);
       if (matchedProd) {
         const pId = Number(matchedProd.codigo);
+        const maxStock = Number(matchedProd.quantidade || matchedProd.pro_quantidade || 0);
+
+        const existingIdx = transferItems.findIndex(it => it.produto_id === pId && (!it.grade_id || it.grade_id === 0));
+        const currentQty = existingIdx >= 0 ? transferItems[existingIdx].quantidade : 0;
+
+        if (maxStock > 0 && currentQty + 1 > maxStock) {
+          alert(`Estoque insuficiente na unidade de origem (${maxStock} UN disponíveis).`);
+          setBarcodeInput('');
+          return;
+        }
+
         const pFiscalGerar = matchedProd.pro_fiscal_gerar || matchedProd.fiscalGerar || 'S';
         const pCodFiscal = Number(matchedProd.pro_cod_fiscal || matchedProd.codFiscal || 0);
         const isFiscal = pFiscalGerar !== 'N' && (pCodFiscal > 0 || pFiscalGerar === 'S');
 
-        // Se o item já estiver no Romaneio, incrementa quantidade + 1
-        const existingIdx = transferItems.findIndex(it => it.produto_id === pId && (!it.grade_id || it.grade_id === 0));
         if (existingIdx >= 0) {
           setTransferItems(prev => {
             const next = [...prev];
@@ -355,6 +441,7 @@ export default function TransferTab() {
               tamanho: matchedProd.um || 'UN',
               cor: 'UNICA',
               quantidade: 1,
+              max_disponivel: maxStock > 0 ? maxStock : null,
               valor: Number(matchedProd.valorv || matchedProd.custo || 0),
               pro_cod_fiscal: pCodFiscal,
               pro_fiscal_gerar: pFiscalGerar,
@@ -362,7 +449,7 @@ export default function TransferTab() {
             }
           ]);
         }
-        setSuccessMsg(`Bipado: #${pId} - ${matchedProd.nome} (+1 un)`);
+        setSuccessMsg(`+1 UN adicionada: #${pId} - ${matchedProd.nome}`);
         setTimeout(() => setSuccessMsg(''), 2500);
       } else {
         alert(`Código de barras "${code}" não encontrado no catálogo do CD.`);
@@ -417,12 +504,18 @@ export default function TransferTab() {
     }
   };
 
-  // Edição inline de itens na tabela do Romaneio
+  // Edição inline de itens na tabela do Romaneio com validação de limite
   const handleUpdateItemQty = (idx, newQty) => {
-    const val = parseFloat(newQty);
+    let val = parseFloat(newQty);
+    if (isNaN(val) || val <= 0) val = 1;
     setTransferItems(prev => {
       const next = [...prev];
-      next[idx].quantidade = isNaN(val) || val <= 0 ? 1 : val;
+      const item = next[idx];
+      if (item && item.max_disponivel && val > item.max_disponivel) {
+        alert(`A quantidade informada (${val} UN) ultrapassa o estoque disponível (${item.max_disponivel} UN) para este item.`);
+        val = item.max_disponivel;
+      }
+      next[idx].quantidade = val;
       return next;
     });
   };
@@ -523,14 +616,83 @@ export default function TransferTab() {
     }
   };
 
+  // Busca e enriquece os itens com a descrição real da grade (ex: P, M, G, GG, 38)
+  const fetchAndEnrichTransferItems = async (transferId) => {
+    try {
+      const res = await api.get(`/v1/transferenciaItens?transferencia_id=${transferId}`);
+      const rawItems = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+
+      const enriched = await Promise.all(rawItems.map(async (item) => {
+        let sizeName = '';
+        if (typeof item.tamanho === 'string' && item.tamanho.trim() && isNaN(Number(item.tamanho)) && item.tamanho !== '-') {
+          sizeName = item.tamanho.trim();
+        } else if (typeof item.tam_nome === 'string' && item.tam_nome.trim() && isNaN(Number(item.tam_nome)) && item.tam_nome !== '-') {
+          sizeName = item.tam_nome.trim();
+        } else if (typeof item.sigla === 'string' && item.sigla.trim() && isNaN(Number(item.sigla)) && item.sigla !== '-') {
+          sizeName = item.sigla.trim();
+        }
+
+        // Se ainda não tiver o tamanho textual (ex: 'P', 'M', 'G', 'GG'), consulta as variações de grade do produto
+        const pId = Number(item.produtoId || item.produto_id);
+        if (!sizeName && pId > 0) {
+          try {
+            const gRes = await api.get(`/v1/grades?produto_id=${pId}`);
+            const gList = Array.isArray(gRes.data) ? gRes.data : (gRes.data?.data || []);
+            if (gList.length > 0) {
+              const matchedGrade = gList.find(g => Number(g.codigo || g.id || g.gra_codigo) === Number(item.grade_id || item.gradeId));
+              const chosen = matchedGrade || gList[0];
+              if (chosen) {
+                if (chosen.tamanho && typeof chosen.tamanho === 'object') {
+                  sizeName = chosen.tamanho.sigla || chosen.tamanho.tamanho || chosen.tam_nome || '';
+                } else if (chosen.tamanho_str) {
+                  sizeName = chosen.tamanho_str;
+                } else if (chosen.tam_nome) {
+                  sizeName = chosen.tam_nome;
+                } else if (chosen.sigla) {
+                  sizeName = chosen.sigla;
+                }
+              }
+            }
+          } catch (e) {
+            console.warn('Erro ao enriquecer tamanho da grade do item:', e);
+          }
+        }
+
+        if (!sizeName) {
+          const prod = products.find(p => Number(p.codigo) === pId);
+          if (prod && prod.um && isNaN(Number(prod.um))) {
+            sizeName = String(prod.um).trim();
+          } else if (item.embalagem && isNaN(Number(item.embalagem))) {
+            sizeName = String(item.embalagem).trim();
+          } else {
+            sizeName = 'UN';
+          }
+        }
+
+        return {
+          ...item,
+          tamanho: sizeName,
+          tam: sizeName,
+          tam_nome: sizeName,
+          sigla: sizeName
+        };
+      }));
+
+      return enriched;
+    } catch (err) {
+      console.error('Erro ao buscar itens enriquecidos da transferência:', err);
+      return [];
+    }
+  };
+
   // Visualização e Ações
   const handleViewDetails = async (transfer) => {
     setSelectedTransfer(transfer);
     setIsViewingDetails(true);
     setLoading(true);
     try {
-      const res = await api.get(`/v1/transferenciaItens?transferencia_id=${transfer.id}`);
-      setSelectedTransferItems(Array.isArray(res.data) ? res.data : []);
+      const items = await fetchAndEnrichTransferItems(transfer.id);
+      setSelectedTransferItems(items);
     } catch (err) {
       setSelectedTransferItems([]);
     } finally {
@@ -542,8 +704,8 @@ export default function TransferTab() {
     setRomaneioTransfer(transfer);
     setLoading(true);
     try {
-      const res = await api.get(`/v1/transferenciaItens?transferencia_id=${transfer.id}`);
-      setRomaneioItems(Array.isArray(res.data) ? res.data : []);
+      const items = await fetchAndEnrichTransferItems(transfer.id);
+      setRomaneioItems(items);
       setShowRomaneioModal(true);
     } catch (err) {
       setRomaneioItems([]);
@@ -557,8 +719,8 @@ export default function TransferTab() {
     setNfeTransfer(transfer);
     setLoading(true);
     try {
-      const res = await api.get(`/v1/transferenciaItens?transferencia_id=${transfer.id}`);
-      setNfeItems(Array.isArray(res.data) ? res.data : []);
+      const items = await fetchAndEnrichTransferItems(transfer.id);
+      setNfeItems(items);
       setShowNfeModal(true);
     } catch (err) {
       setNfeItems([]);
@@ -571,10 +733,10 @@ export default function TransferTab() {
   const handleOpenConference = async (transfer) => {
     setLoading(true);
     try {
-      const response = await api.get(`/v1/transferenciaItens?transferencia_id=${transfer.id}`);
-      if (Array.isArray(response.data)) {
+      const items = await fetchAndEnrichTransferItems(transfer.id);
+      if (items.length > 0) {
         setReceptionTransfer(transfer);
-        setReceptionItems(response.data.map(item => ({
+        setReceptionItems(items.map(item => ({
           ...item,
           quantidadeConferida: 0, // Conferência Cega: inicia em 0, conferente digita a contagem real
           justificativa: item.justificativa || ''
@@ -647,8 +809,28 @@ export default function TransferTab() {
     }
   };
 
+  const resolveItemSize = (it, prod) => {
+    if (!it) return 'UN';
+    if (typeof it.tamanho === 'string' && it.tamanho.trim() && it.tamanho !== '-') return it.tamanho.trim();
+    if (typeof it.tamanho_str === 'string' && it.tamanho_str.trim() && it.tamanho_str !== '-') return it.tamanho_str.trim();
+    if (typeof it.tam_nome === 'string' && it.tam_nome.trim() && it.tam_nome !== '-') return it.tam_nome.trim();
+    if (typeof it.sigla === 'string' && it.sigla.trim() && it.sigla !== '-') return it.sigla.trim();
+    if (typeof it.tam === 'string' && it.tam.trim() && it.tam !== '-' && isNaN(Number(it.tam))) return it.tam.trim();
+    if (it.tamanho && typeof it.tamanho === 'object') {
+      if (it.tamanho.sigla) return it.tamanho.sigla;
+      if (it.tamanho.tamanho) return it.tamanho.tamanho;
+    }
+    if (prod) {
+      if (prod.um && String(prod.um).trim()) return String(prod.um).trim();
+      if (prod.embalagem && String(prod.embalagem).trim()) return String(prod.embalagem).trim();
+    }
+    if (it.um && String(it.um).trim()) return String(it.um).trim();
+    if (it.embalagem && String(it.embalagem).trim()) return String(it.embalagem).trim();
+    return 'UN';
+  };
+
   return (
-    <div className="cd-container full-width">
+    <div className="cd-transfers-container full-width">
       
       {/* Banner de Feedback / Sucesso */}
       {successMsg && (
@@ -825,6 +1007,7 @@ export default function TransferTab() {
                 <tr>
                   <th style={{ width: '80px' }}>Código</th>
                   <th>Descrição do Produto</th>
+                  <th style={{ width: '100px', textAlign: 'center' }}>Tam / Grade</th>
                   <th style={{ width: '130px' }}>Classificação</th>
                   <th style={{ width: '100px', textAlign: 'center' }}>Qtd Enviada</th>
                   <th style={{ width: '100px', textAlign: 'center' }}>Qtd Conferida</th>
@@ -834,15 +1017,30 @@ export default function TransferTab() {
               </thead>
               <tbody>
                 {selectedTransferItems.map((item, idx) => {
-                  const prod = products.find(p => p.codigo === item.produtoId);
+                  const prod = products.find(p => p.codigo === (item.produtoId || item.produto_id));
                   const isFiscal = item.fiscalGerar !== 'N' && (Number(item.codFiscal || item.pro_cod_fiscal) > 0 || item.fiscalGerar === 'S');
+                  const tam = resolveItemSize(item, prod);
+                  const cor = item.cor && item.cor !== 'UNICA' ? item.cor : '';
                   const qtd = Number(item.quantidade) || 0;
                   const vlr = Number(item.valor) || 0;
 
                   return (
                     <tr key={item.id || idx}>
-                      <td><span className="item-code">#{item.produtoId}</span></td>
-                      <td><strong>{prod ? prod.nome : (item.nome || `Produto #${item.produtoId}`)}</strong></td>
+                      <td><span className="item-code">#{item.produtoId || item.produto_id}</span></td>
+                      <td><strong>{prod ? prod.nome : (item.nome || `Produto #${item.produtoId || item.produto_id}`)}</strong></td>
+                      <td style={{ textAlign: 'center' }}>
+                        <span style={{ 
+                          fontSize: '0.82rem', 
+                          fontWeight: 700, 
+                          background: '#f8fafc', 
+                          color: '#1e293b', 
+                          padding: '2px 8px', 
+                          borderRadius: '4px',
+                          border: '1px solid #cbd5e1'
+                        }}>
+                          {tam}{cor ? ` • ${cor}` : ''}
+                        </span>
+                      </td>
                       <td>
                         {isFiscal ? (
                           <span className="badge badge-success" style={{ fontSize: '0.72rem' }}>🏛️ Fiscal (NF-e)</span>
@@ -1079,33 +1277,50 @@ export default function TransferTab() {
                 />
               </div>
 
-              {/* MATRIZ DE VARIAÇÕES DE GRADE (Se o produto tiver variações cadastradas) */}
+              {/* MATRIZ DE VARIAÇÕES DE GRADE (Se o produto tiver variações cadastradas com estoque) */}
               {selectedProductObj && productGrades.length > 0 && (
                 <div className="transfer-grade-matrix-card">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                    <span style={{ fontWeight: 700, color: '#1e293b' }}>
-                      ✨ Variações de Tamanho / Grade de: {selectedProductObj.nome}
-                    </span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '8px' }}>
+                    <div>
+                      <span style={{ fontWeight: 700, color: '#1e293b', fontSize: '0.98rem' }}>
+                        ✨ Variações de Tamanho / Grade com Estoque: #{selectedProductObj.codigo} - {selectedProductObj.nome}
+                      </span>
+                      <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '2px' }}>
+                        Unidade Origem: <strong>{getUnitName(origin)}</strong> | Saldo Total: <strong style={{ color: '#16a34a' }}>{selectedProductStock} UN</strong>
+                      </div>
+                    </div>
                     <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
-                      Informe a quantidade desejada em cada tamanho:
+                      Informe a quantidade desejada em cada tamanho com saldo disponível:
                     </span>
                   </div>
 
                   <div className="transfer-grade-matrix-grid">
                     {productGrades.map(g => {
                       const gId = g.codigo || g.id || g.gra_codigo;
-                      const tamNome = g.tam_nome || g.tam || g.sigla || 'UN';
+                      const tamNome = g.tamanho_str || (typeof g.tam_nome === 'string' && g.tam_nome) || (typeof g.sigla === 'string' && g.sigla) || (g.tamanho && typeof g.tamanho === 'object' ? (g.tamanho.sigla || g.tamanho.tamanho) : '') || 'UN';
+                      const maxQtd = Number(g.quantidade || g.gra_quantidade || 0);
                       const currentVal = matrixQuantities[gId] || '';
 
                       return (
                         <div key={gId} className="transfer-grade-box">
                           <div className="transfer-grade-label">{tamNome}</div>
-                          <div className="transfer-grade-stock">Estoque CD: {g.quantidade || 0}</div>
+                          <div className="transfer-grade-stock" style={{ color: '#16a34a', fontWeight: 600, fontSize: '0.78rem' }}>
+                            Disponível: {maxQtd} UN
+                          </div>
                           <input 
                             type="number"
                             min="0"
+                            max={maxQtd}
                             value={currentVal}
-                            onChange={(e) => handleMatrixQtyChange(gId, e.target.value)}
+                            onChange={(e) => {
+                              let val = parseInt(e.target.value, 10);
+                              if (isNaN(val) || val < 0) val = 0;
+                              if (val > maxQtd) {
+                                val = maxQtd;
+                                alert(`A quantidade informada ultrapassa o estoque disponível (${maxQtd} UN) para o tamanho ${tamNome}.`);
+                              }
+                              handleMatrixQtyChange(gId, val);
+                            }}
                             placeholder="0"
                             className="transfer-grade-input"
                           />
@@ -1127,13 +1342,18 @@ export default function TransferTab() {
                 </div>
               )}
 
-              {/* SELEÇÃO SIMPLES (Caso o produto não tenha matriz de grades) */}
+              {/* SELEÇÃO SIMPLES (Caso o produto não tenha matriz de grades ou não haja grades com saldo) */}
               {selectedProductObj && productGrades.length === 0 && (
                 <div style={{ background: '#ffffff', padding: '1rem', borderRadius: '0.75rem', border: '1px solid #cbd5e1', display: 'flex', gap: '1rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
                   <div style={{ flex: 2, minWidth: '200px' }}>
                     <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#475569' }}>Produto Selecionado:</label>
                     <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#1e293b' }}>
                       #{selectedProductObj.codigo} - {selectedProductObj.nome}
+                    </div>
+                    <div style={{ fontSize: '0.82rem', marginTop: '4px', fontWeight: 600, color: selectedProductStock > 0 ? '#16a34a' : '#dc2626' }}>
+                      {selectedProductStock > 0 
+                        ? `📦 Estoque Disponível na Origem (${getUnitName(origin)}): ${selectedProductStock} UN` 
+                        : `⚠️ Sem estoque disponível na unidade de origem (${getUnitName(origin)})`}
                     </div>
                   </div>
 
@@ -1142,8 +1362,16 @@ export default function TransferTab() {
                     <input 
                       type="number" 
                       min="1"
+                      max={selectedProductStock > 0 ? selectedProductStock : 1}
                       value={singleQty} 
-                      onChange={(e) => setSingleQty(e.target.value)} 
+                      onChange={(e) => {
+                        let val = Number(e.target.value);
+                        if (selectedProductStock > 0 && val > selectedProductStock) {
+                          val = selectedProductStock;
+                          alert(`A quantidade não pode ultrapassar o saldo disponível (${selectedProductStock} UN).`);
+                        }
+                        setSingleQty(val);
+                      }} 
                       className="cd-text-input" 
                       style={{ fontWeight: 700 }}
                     />
@@ -1165,6 +1393,7 @@ export default function TransferTab() {
                     className="btn-primary" 
                     onClick={handleAddSingleProductToTransfer}
                     style={{ height: '38px', padding: '0 1.25rem' }}
+                    disabled={selectedProductStock <= 0}
                   >
                     + Adicionar Item
                   </button>

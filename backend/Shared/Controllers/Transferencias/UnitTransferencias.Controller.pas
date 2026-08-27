@@ -133,7 +133,7 @@ class procedure TTransferenciasController.GetItens(Req: THorseRequest; Res: THor
 var
     aJson: TJSONArray;
     Query: iQuery;
-    tr_id: string;
+    tr_id, LTamStr, LCorStr: string;
     itemObj: TJSONObject;
 begin
   aJson := TJSONArray.Create;
@@ -152,21 +152,31 @@ begin
 
     if tr_id <> '' then
       Query.Open(
-        'SELECT TI.TRI_ID, TI.TRI_TRANSFERENCIA_ID, TI.TRI_PRODUTO_ID, TI.TRI_QUANTIDADE, TI.TRI_VALOR, TI.TRI_QTD_CONFERIDA, TI.TRI_JUSTIFICATIVA, ' +
+        'SELECT TI.TRI_ID, TI.TRI_TRANSFERENCIA_ID, TI.TRI_PRODUTO_ID, TI.TRI_GRADE_ID, TI.TRI_TAMANHO, TI.TRI_COR, ' +
+        '       TI.TRI_QUANTIDADE, TI.TRI_VALOR, TI.TRI_QTD_CONFERIDA, TI.TRI_JUSTIFICATIVA, ' +
         '       P.PRO_NOME, P.PRO_CODBARRA, P.PRO_NCM, P.PRO_CFOP, P.PRO_CEST, P.PRO_EMBALAGEM, P.PRO_BALANCA, P.PRO_GRU, P.PRO_VALORC, ' +
-        '       COALESCE(P.PRO_COD_FISCAL, 0) AS PRO_COD_FISCAL, COALESCE(P.PRO_FISCAL_GERAR, ''S'') AS PRO_FISCAL_GERAR, P.PRO_TIPO ' +
+        '       COALESCE(P.PRO_COD_FISCAL, 0) AS PRO_COD_FISCAL, COALESCE(P.PRO_FISCAL_GERAR, ''S'') AS PRO_FISCAL_GERAR, P.PRO_TIPO, ' +
+        '       G.GRA_CODBARRA, T.TAM_TAMANHO, T.TAM_SIGLA, ' +
+        '       (SELECT FIRST 1 COALESCE(T2.TAM_SIGLA, T2.TAM_TAMANHO) FROM GRADES G2 JOIN TAMANHOS T2 ON T2.TAM_CODIGO = G2.GRA_TAM WHERE G2.GRA_PRO = TI.TRI_PRODUTO_ID) AS PRO_GRADE_PADRAO ' +
         'FROM TRANSFERENCIA_ITEM TI ' +
         'LEFT JOIN PRODUTOS P ON (P.PRO_CODIGO = TI.TRI_PRODUTO_ID) ' +
+        'LEFT JOIN GRADES G ON (G.GRA_CODIGO = TI.TRI_GRADE_ID) ' +
+        'LEFT JOIN TAMANHOS T ON (T.TAM_CODIGO = G.GRA_TAM) ' +
         'WHERE TI.TRI_TRANSFERENCIA_ID = ' + tr_id + ' ' +
         'ORDER BY TI.TRI_ID'
       )
     else
       Query.Open(
-        'SELECT TI.TRI_ID, TI.TRI_TRANSFERENCIA_ID, TI.TRI_PRODUTO_ID, TI.TRI_QUANTIDADE, TI.TRI_VALOR, TI.TRI_QTD_CONFERIDA, TI.TRI_JUSTIFICATIVA, ' +
+        'SELECT TI.TRI_ID, TI.TRI_TRANSFERENCIA_ID, TI.TRI_PRODUTO_ID, TI.TRI_GRADE_ID, TI.TRI_TAMANHO, TI.TRI_COR, ' +
+        '       TI.TRI_QUANTIDADE, TI.TRI_VALOR, TI.TRI_QTD_CONFERIDA, TI.TRI_JUSTIFICATIVA, ' +
         '       P.PRO_NOME, P.PRO_CODBARRA, P.PRO_NCM, P.PRO_CFOP, P.PRO_CEST, P.PRO_EMBALAGEM, P.PRO_BALANCA, P.PRO_GRU, P.PRO_VALORC, ' +
-        '       COALESCE(P.PRO_COD_FISCAL, 0) AS PRO_COD_FISCAL, COALESCE(P.PRO_FISCAL_GERAR, ''S'') AS PRO_FISCAL_GERAR, P.PRO_TIPO ' +
+        '       COALESCE(P.PRO_COD_FISCAL, 0) AS PRO_COD_FISCAL, COALESCE(P.PRO_FISCAL_GERAR, ''S'') AS PRO_FISCAL_GERAR, P.PRO_TIPO, ' +
+        '       G.GRA_CODBARRA, T.TAM_TAMANHO, T.TAM_SIGLA, ' +
+        '       (SELECT FIRST 1 COALESCE(T2.TAM_SIGLA, T2.TAM_TAMANHO) FROM GRADES G2 JOIN TAMANHOS T2 ON T2.TAM_CODIGO = G2.GRA_TAM WHERE G2.GRA_PRO = TI.TRI_PRODUTO_ID) AS PRO_GRADE_PADRAO ' +
         'FROM TRANSFERENCIA_ITEM TI ' +
         'LEFT JOIN PRODUTOS P ON (P.PRO_CODIGO = TI.TRI_PRODUTO_ID) ' +
+        'LEFT JOIN GRADES G ON (G.GRA_CODIGO = TI.TRI_GRADE_ID) ' +
+        'LEFT JOIN TAMANHOS T ON (T.TAM_CODIGO = G.GRA_TAM) ' +
         'ORDER BY TI.TRI_ID'
       );
       
@@ -179,7 +189,35 @@ begin
       itemObj.AddPair('transferenciaId', TJSONNumber.Create(Query.Dataset.FieldByName('TRI_TRANSFERENCIA_ID').AsInteger));
       itemObj.AddPair('tri_transferencia_id', TJSONNumber.Create(Query.Dataset.FieldByName('TRI_TRANSFERENCIA_ID').AsInteger));
       itemObj.AddPair('produtoId', TJSONNumber.Create(Query.Dataset.FieldByName('TRI_PRODUTO_ID').AsInteger));
+      itemObj.AddPair('produto_id', TJSONNumber.Create(Query.Dataset.FieldByName('TRI_PRODUTO_ID').AsInteger));
       itemObj.AddPair('tri_produto_id', TJSONNumber.Create(Query.Dataset.FieldByName('TRI_PRODUTO_ID').AsInteger));
+      itemObj.AddPair('gradeId', TJSONNumber.Create(Query.Dataset.FieldByName('TRI_GRADE_ID').AsInteger));
+      itemObj.AddPair('grade_id', TJSONNumber.Create(Query.Dataset.FieldByName('TRI_GRADE_ID').AsInteger));
+      itemObj.AddPair('tri_grade_id', TJSONNumber.Create(Query.Dataset.FieldByName('TRI_GRADE_ID').AsInteger));
+
+      LTamStr := '';
+      if not Query.Dataset.FieldByName('TRI_TAMANHO').IsNull and (Trim(Query.Dataset.FieldByName('TRI_TAMANHO').AsString) <> '') and (Trim(Query.Dataset.FieldByName('TRI_TAMANHO').AsString) <> '-') then
+        LTamStr := Trim(Query.Dataset.FieldByName('TRI_TAMANHO').AsString)
+      else if not Query.Dataset.FieldByName('TAM_SIGLA').IsNull and (Trim(Query.Dataset.FieldByName('TAM_SIGLA').AsString) <> '') then
+        LTamStr := Trim(Query.Dataset.FieldByName('TAM_SIGLA').AsString)
+      else if not Query.Dataset.FieldByName('TAM_TAMANHO').IsNull and (Trim(Query.Dataset.FieldByName('TAM_TAMANHO').AsString) <> '') then
+        LTamStr := Trim(Query.Dataset.FieldByName('TAM_TAMANHO').AsString)
+      else if not Query.Dataset.FieldByName('PRO_GRADE_PADRAO').IsNull and (Trim(Query.Dataset.FieldByName('PRO_GRADE_PADRAO').AsString) <> '') then
+        LTamStr := Trim(Query.Dataset.FieldByName('PRO_GRADE_PADRAO').AsString)
+      else if not Query.Dataset.FieldByName('PRO_EMBALAGEM').IsNull and (Trim(Query.Dataset.FieldByName('PRO_EMBALAGEM').AsString) <> '') then
+        LTamStr := Trim(Query.Dataset.FieldByName('PRO_EMBALAGEM').AsString)
+      else
+        LTamStr := 'UN';
+
+      LCorStr := '';
+      if not Query.Dataset.FieldByName('TRI_COR').IsNull and (Trim(Query.Dataset.FieldByName('TRI_COR').AsString) <> '') then
+        LCorStr := Trim(Query.Dataset.FieldByName('TRI_COR').AsString);
+
+      itemObj.AddPair('tamanho', LTamStr);
+      itemObj.AddPair('tam', LTamStr);
+      itemObj.AddPair('tam_nome', LTamStr);
+      itemObj.AddPair('cor', LCorStr);
+
       itemObj.AddPair('quantidade', TJSONNumber.Create(Query.Dataset.FieldByName('TRI_QUANTIDADE').AsFloat));
       itemObj.AddPair('tri_quantidade', TJSONNumber.Create(Query.Dataset.FieldByName('TRI_QUANTIDADE').AsFloat));
       itemObj.AddPair('valor', TJSONNumber.Create(Query.Dataset.FieldByName('TRI_VALOR').AsFloat));
@@ -192,8 +230,12 @@ begin
       // Dados completos do produto e classificacao fiscal
       itemObj.AddPair('nome', Query.Dataset.FieldByName('PRO_NOME').AsString);
       itemObj.AddPair('PRO_NOME', Query.Dataset.FieldByName('PRO_NOME').AsString);
-      itemObj.AddPair('codbarra', Query.Dataset.FieldByName('PRO_CODBARRA').AsString);
-      itemObj.AddPair('PRO_CODBARRA', Query.Dataset.FieldByName('PRO_CODBARRA').AsString);
+      
+      if not Query.Dataset.FieldByName('GRA_CODBARRA').IsNull and (Trim(Query.Dataset.FieldByName('GRA_CODBARRA').AsString) <> '') then
+        itemObj.AddPair('codbarra', Query.Dataset.FieldByName('GRA_CODBARRA').AsString)
+      else
+        itemObj.AddPair('codbarra', Query.Dataset.FieldByName('PRO_CODBARRA').AsString);
+
       itemObj.AddPair('ncm', Query.Dataset.FieldByName('PRO_NCM').AsString);
       itemObj.AddPair('PRO_NCM', Query.Dataset.FieldByName('PRO_NCM').AsString);
       itemObj.AddPair('cfop', Query.Dataset.FieldByName('PRO_CFOP').AsString);
@@ -251,6 +293,9 @@ begin
             LItem.Id := GeraCodigo('TRANSFERENCIA_ITEM', 'TRI_ID');
             LItem.TransferenciaId := LTrId;
             LItem.ProdutoId := LItemObj.GetValue<Integer>('produto_id', LItemObj.GetValue<Integer>('produtoId', 0));
+            LItem.GradeId := LItemObj.GetValue<Integer>('grade_id', LItemObj.GetValue<Integer>('gradeId', 0));
+            LItem.Tamanho := LItemObj.GetValue<string>('tamanho', LItemObj.GetValue<string>('tam', ''));
+            LItem.Cor := LItemObj.GetValue<string>('cor', '');
             LItem.Quantidade := LItemObj.GetValue<Double>('quantidade', 1);
             LItem.Valor := LItemObj.GetValue<Double>('valor', 0);
             LItem.QuantidadeConferida := LItem.Quantidade;

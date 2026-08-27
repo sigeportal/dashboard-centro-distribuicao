@@ -62,22 +62,53 @@ export default function NfeTransferModal({ transfer, items = [], units = [], onC
         return true;
       });
 
-      const populated = fiscalOnly.map((it, idx) => ({
-        id: it.produto_id || it.produtoId || idx + 1,
-        seq: idx + 1,
-        codigo: it.produto_id || it.produtoId,
-        nome: it.nome || it.descricao || `PRODUTO #${it.produto_id || it.produtoId}`,
-        ncm: it.ncm || '6109.10.00',
-        cest: it.cest || '28.038.00',
-        cfop: header.cfopPadrao.replace('.', ''),
-        unidade: it.um || it.embalagem || 'UN',
-        quantidade: Number(it.quantidade) || 1,
-        valorUnitario: Number(it.valor) || 10.00,
-        valorTotal: (Number(it.quantidade) || 1) * (Number(it.valor) || 10.00),
-        cst: '400', // Não tributada (Reforma STF ADC 49)
-        aliquotaIcms: 0,
-        valorIcms: 0
-      }));
+      const resolveItemSize = (it) => {
+        if (!it) return 'UN';
+        if (typeof it.tamanho === 'string' && it.tamanho.trim() && it.tamanho !== '-') return it.tamanho.trim();
+        if (typeof it.tamanho_str === 'string' && it.tamanho_str.trim() && it.tamanho_str !== '-') return it.tamanho_str.trim();
+        if (typeof it.tam_nome === 'string' && it.tam_nome.trim() && it.tam_nome !== '-') return it.tam_nome.trim();
+        if (typeof it.sigla === 'string' && it.sigla.trim() && it.sigla !== '-') return it.sigla.trim();
+        if (typeof it.tam === 'string' && it.tam.trim() && it.tam !== '-' && isNaN(Number(it.tam))) return it.tam.trim();
+        if (it.tamanho && typeof it.tamanho === 'object') {
+          if (it.tamanho.sigla) return it.tamanho.sigla;
+          if (it.tamanho.tamanho) return it.tamanho.tamanho;
+        }
+        if (it.um && String(it.um).trim()) return String(it.um).trim();
+        if (it.embalagem && String(it.embalagem).trim()) return String(it.embalagem).trim();
+        return 'UN';
+      };
+
+      const populated = fiscalOnly.map((it, idx) => {
+        const tam = resolveItemSize(it);
+        const cor = it.cor && it.cor !== 'UNICA' ? it.cor : '';
+        const baseName = it.nome || it.PRO_NOME || it.descricao || `PRODUTO #${it.produto_id || it.produtoId}`;
+        
+        let formattedName = baseName;
+        if (tam && tam !== 'UN' && !baseName.toUpperCase().includes(`TAM: ${tam.toUpperCase()}`)) {
+          formattedName = `${baseName} - TAM: ${tam}${cor ? ` / ${cor}` : ''}`;
+        }
+
+        return {
+          id: it.produto_id || it.produtoId || idx + 1,
+          seq: idx + 1,
+          codigo: it.produto_id || it.produtoId,
+          grade_id: it.grade_id || it.gradeId || 0,
+          tamanho: tam,
+          cor: cor,
+          nome: formattedName,
+          descricaoOriginal: baseName,
+          ncm: it.ncm || it.PRO_NCM || '6109.10.00',
+          cest: it.cest || it.PRO_CEST || '28.038.00',
+          cfop: header.cfopPadrao.replace('.', ''),
+          unidade: it.um || it.embalagem || 'UN',
+          quantidade: Number(it.quantidade || it.tri_quantidade) || 1,
+          valorUnitario: Number(it.valor || it.tri_valor) || 10.00,
+          valorTotal: (Number(it.quantidade || it.tri_quantidade) || 1) * (Number(it.valor || it.tri_valor) || 10.00),
+          cst: '400', // Não tributada (Reforma STF ADC 49)
+          aliquotaIcms: 0,
+          valorIcms: 0
+        };
+      });
       setNfeItems(populated);
     }
   }, [items]);
@@ -401,17 +432,18 @@ export default function NfeTransferModal({ transfer, items = [], units = [], onC
                 <table className="nfe-table">
                   <thead>
                     <tr>
-                      <th style={{ width: '40px' }}>#</th>
-                      <th style={{ width: '80px' }}>CÓDIGO</th>
+                      <th style={{ width: '35px' }}>#</th>
+                      <th style={{ width: '70px' }}>CÓDIGO</th>
                       <th>DESCRIÇÃO DO PRODUTO</th>
-                      <th style={{ width: '100px' }}>NCM</th>
-                      <th style={{ width: '70px' }}>CFOP</th>
-                      <th style={{ width: '50px' }}>UN</th>
-                      <th style={{ width: '70px' }}>QUANT</th>
-                      <th style={{ width: '100px' }}>VALOR UNIT</th>
-                      <th style={{ width: '110px' }}>VALOR TOTAL</th>
-                      <th style={{ width: '90px' }}>CST/CSOSN</th>
-                      <th style={{ width: '40px' }}>AÇÕES</th>
+                      <th style={{ width: '90px', textAlign: 'center' }}>TAM / GRADE</th>
+                      <th style={{ width: '95px' }}>NCM</th>
+                      <th style={{ width: '65px' }}>CFOP</th>
+                      <th style={{ width: '45px' }}>UN</th>
+                      <th style={{ width: '65px' }}>QUANT</th>
+                      <th style={{ width: '95px' }}>VALOR UNIT</th>
+                      <th style={{ width: '105px' }}>VALOR TOTAL</th>
+                      <th style={{ width: '85px' }}>CST</th>
+                      <th style={{ width: '35px' }}>AÇÕES</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -425,6 +457,19 @@ export default function NfeTransferModal({ transfer, items = [], units = [], onC
                             value={item.nome} 
                             onChange={(e) => handleItemChange(idx, 'nome', e.target.value)}
                           />
+                        </td>
+                        <td style={{ textAlign: 'center' }}>
+                          <span style={{ 
+                            fontSize: '0.8rem', 
+                            fontWeight: 700, 
+                            background: '#f1f5f9', 
+                            color: '#1e293b', 
+                            padding: '2px 6px', 
+                            borderRadius: '4px',
+                            border: '1px solid #cbd5e1'
+                          }}>
+                            {item.tamanho || '-'}{item.cor ? ` / ${item.cor}` : ''}
+                          </span>
                         </td>
                         <td>
                           <input 
@@ -581,7 +626,8 @@ export default function NfeTransferModal({ transfer, items = [], units = [], onC
                 <thead>
                   <tr style={{ background: '#f1f5f9' }}>
                     <th style={{ border: '1px solid #000000', padding: '4px' }}>CÓD</th>
-                    <th style={{ border: '1px solid #000000', padding: '4px' }}>DESCRIÇÃO</th>
+                    <th style={{ border: '1px solid #000000', padding: '4px' }}>DESCRIÇÃO DO PRODUTO</th>
+                    <th style={{ border: '1px solid #000000', padding: '4px', width: '60px' }}>TAM</th>
                     <th style={{ border: '1px solid #000000', padding: '4px' }}>NCM</th>
                     <th style={{ border: '1px solid #000000', padding: '4px' }}>CFOP</th>
                     <th style={{ border: '1px solid #000000', padding: '4px' }}>UN</th>
@@ -595,6 +641,7 @@ export default function NfeTransferModal({ transfer, items = [], units = [], onC
                     <tr key={idx}>
                       <td style={{ border: '1px solid #000000', padding: '4px' }}>{it.codigo}</td>
                       <td style={{ border: '1px solid #000000', padding: '4px' }}>{it.nome}</td>
+                      <td style={{ border: '1px solid #000000', padding: '4px', textAlign: 'center', fontWeight: 'bold' }}>{it.tamanho || '-'}</td>
                       <td style={{ border: '1px solid #000000', padding: '4px' }}>{it.ncm}</td>
                       <td style={{ border: '1px solid #000000', padding: '4px' }}>{it.cfop}</td>
                       <td style={{ border: '1px solid #000000', padding: '4px' }}>{it.unidade}</td>

@@ -1622,6 +1622,10 @@ begin
           'SELECT ' +
           '  EMP.EMP_CODIGO AS EE_EMPRESA_ID, ' +
           '  COALESCE(NULLIF(TRIM(EMP.EMP_FANTASIA), ''''), NULLIF(TRIM(EMP.EMP_RAZAO_SOCIAL), ''''), ''Unidade #'' || EMP.EMP_CODIGO) AS EMP_NOME, ' +
+          '  EMP.EMP_FANTASIA, ' +
+          '  EMP.EMP_RAZAO_SOCIAL, ' +
+          '  EMP.EMP_MUNICIPIO, ' +
+          '  EMP.EMP_UF, ' +
           '  EMP.EMP_CNPJ, ' +
           '  %d AS EE_PRO_CODIGO, ' +
           '  P.PRO_NOME AS PRO_NOME, ' +
@@ -1649,6 +1653,10 @@ begin
           'SELECT ' +
           '  EMP.EMP_CODIGO AS EE_EMPRESA_ID, ' +
           '  COALESCE(NULLIF(TRIM(EMP.EMP_FANTASIA), ''''), NULLIF(TRIM(EMP.EMP_RAZAO_SOCIAL), ''''), ''Unidade #'' || EMP.EMP_CODIGO) AS EMP_NOME, ' +
+          '  EMP.EMP_FANTASIA, ' +
+          '  EMP.EMP_RAZAO_SOCIAL, ' +
+          '  EMP.EMP_MUNICIPIO, ' +
+          '  EMP.EMP_UF, ' +
           '  EMP.EMP_CNPJ, ' +
           '  P.PRO_CODIGO AS EE_PRO_CODIGO, ' +
           '  P.PRO_NOME, ' +
@@ -1680,6 +1688,12 @@ begin
 
         LItem.AddPair('empresa_id', TJSONNumber.Create(LEmpId));
         LItem.AddPair('empresa_nome', LEmpNome);
+        LItem.AddPair('empresa_fantasia', LQuery.DataSet.FieldByName('EMP_FANTASIA').AsString);
+        LItem.AddPair('empresa_razao_social', LQuery.DataSet.FieldByName('EMP_RAZAO_SOCIAL').AsString);
+        LItem.AddPair('empresa_municipio', LQuery.DataSet.FieldByName('EMP_MUNICIPIO').AsString);
+        LItem.AddPair('empresa_uf', LQuery.DataSet.FieldByName('EMP_UF').AsString);
+        LItem.AddPair('municipio', LQuery.DataSet.FieldByName('EMP_MUNICIPIO').AsString);
+        LItem.AddPair('uf', LQuery.DataSet.FieldByName('EMP_UF').AsString);
         LItem.AddPair('pro_codigo', TJSONNumber.Create(LQuery.DataSet.FieldByName('EE_PRO_CODIGO').AsInteger));
         if not LQuery.DataSet.FieldByName('PRO_NOME').IsNull then
           LItem.AddPair('pro_nome', LQuery.DataSet.FieldByName('PRO_NOME').AsString)
@@ -1699,7 +1713,7 @@ begin
         Writeln('-> Fallback EstoquePosicao: ' + E.Message);
         try
           LQuery.Clear;
-          LQuery.Add('SELECT EMP_CODIGO, COALESCE(EMP_FANTASIA, EMP_RAZAO_SOCIAL) AS EMP_NOME FROM EMPRESA WHERE EMP_CODIGO IS NOT NULL ORDER BY EMP_CODIGO');
+          LQuery.Add('SELECT EMP_CODIGO, COALESCE(EMP_FANTASIA, EMP_RAZAO_SOCIAL) AS EMP_NOME, EMP_FANTASIA, EMP_RAZAO_SOCIAL, EMP_MUNICIPIO, EMP_UF FROM EMPRESA WHERE EMP_CODIGO IS NOT NULL ORDER BY EMP_CODIGO');
           LQuery.Open;
           while not LQuery.DataSet.Eof do
           begin
@@ -1710,6 +1724,12 @@ begin
               LEmpNome := 'Unidade #' + IntToStr(LEmpId);
             LItem.AddPair('empresa_id', TJSONNumber.Create(LEmpId));
             LItem.AddPair('empresa_nome', LEmpNome);
+            LItem.AddPair('empresa_fantasia', LQuery.DataSet.FieldByName('EMP_FANTASIA').AsString);
+            LItem.AddPair('empresa_razao_social', LQuery.DataSet.FieldByName('EMP_RAZAO_SOCIAL').AsString);
+            LItem.AddPair('empresa_municipio', LQuery.DataSet.FieldByName('EMP_MUNICIPIO').AsString);
+            LItem.AddPair('empresa_uf', LQuery.DataSet.FieldByName('EMP_UF').AsString);
+            LItem.AddPair('municipio', LQuery.DataSet.FieldByName('EMP_MUNICIPIO').AsString);
+            LItem.AddPair('uf', LQuery.DataSet.FieldByName('EMP_UF').AsString);
             LItem.AddPair('pro_codigo', TJSONNumber.Create(LProCodigo));
             LItem.AddPair('pro_nome', '');
             LItem.AddPair('quantidade', TJSONNumber.Create(0));

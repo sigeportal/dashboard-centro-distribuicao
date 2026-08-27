@@ -13,6 +13,9 @@ type
     FId: Integer;
     FTransferenciaId: Integer;
     FProdutoId: Integer;
+    FGradeId: Integer;
+    FTamanho: string;
+    FCor: string;
     FQuantidade: double;
     FValor: double;
     FQuantidadeConferida: double;
@@ -26,6 +29,15 @@ type
 
     [TCampo('TRI_PRODUTO_ID', 'INTEGER NOT NULL')]
     property ProdutoId: Integer read FProdutoId write FProdutoId;
+
+    [TCampo('TRI_GRADE_ID', 'INTEGER')]
+    property GradeId: Integer read FGradeId write FGradeId;
+
+    [TCampo('TRI_TAMANHO', 'VARCHAR(30)')]
+    property Tamanho: string read FTamanho write FTamanho;
+
+    [TCampo('TRI_COR', 'VARCHAR(30)')]
+    property Cor: string read FCor write FCor;
 
     [TCampo('TRI_QUANTIDADE', 'NUMERIC(9,2) NOT NULL')]
     property Quantidade: double read FQuantidade write FQuantidade;

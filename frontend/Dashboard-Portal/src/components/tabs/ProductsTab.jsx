@@ -307,7 +307,7 @@ export default function ProductsTab({ data, pages, searchTerms, setSearchTerms, 
       {/* Modal de Posição de Estoque por Unidade */}
       {selectedProduct && createPortal(
         <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setSelectedProduct(null); }}>
-          <div className="modal-content glass" style={{ maxWidth: '640px', borderRadius: '16px' }}>
+          <div className="modal-content glass" style={{ maxWidth: '820px', width: '95vw', borderRadius: '16px' }}>
             <div className="modal-header" style={{ borderBottom: '1px solid rgba(0,0,0,0.08)', paddingBottom: '1rem' }}>
               <div>
                 <h4 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0, fontSize: '1.15rem' }}>
@@ -352,20 +352,30 @@ export default function ProductsTab({ data, pages, searchTerms, setSearchTerms, 
                     </span>
                   </div>
 
-                  <div className="table-responsive" style={{ maxHeight: '360px', overflowY: 'auto' }}>
-                    <table className="data-table">
+                  <div className="table-responsive" style={{ maxHeight: '380px', overflowY: 'auto' }}>
+                    <table className="data-table" style={{ width: '100%', minWidth: '680px' }}>
                       <thead>
                         <tr>
-                          <th>Unidade / Filial</th>
-                          <th style={{ textAlign: 'center' }}>Cód. Item</th>
-                          <th style={{ textAlign: 'center' }}>Estoque Atual</th>
-                          <th>Status Sincronização</th>
+                          <th style={{ textAlign: 'left', minWidth: '280px' }}>Unidade / Filial</th>
+                          <th style={{ textAlign: 'center', width: '85px' }}>Cód. Item</th>
+                          <th style={{ textAlign: 'center', width: '130px' }}>Estoque Atual</th>
+                          <th style={{ textAlign: 'center', minWidth: '170px' }}>Status Sincronização</th>
                         </tr>
                       </thead>
                       <tbody>
                         {unitStocks.map((stock, i) => {
-                          const empName = stock.empresa_nome || `Unidade #${stock.empresa_id}`;
-                          const isCd = empName.toUpperCase().includes('CD') || stock.empresa_id === 1 || stock.empresa_id === 5;
+                          const fallbackCities = {
+                            5: 'DOURADINA',
+                            1: 'DOURADINA',
+                            6: 'RIO BRILHANTE',
+                            7: 'ITAPORÃ',
+                            4: 'NOVA ALVORADA DO SUL',
+                            8: 'MARACAJU'
+                          };
+                          const empName = stock.empresa_fantasia || stock.empresa_nome || `Unidade #${stock.empresa_id}`;
+                          const city = stock.empresa_municipio || stock.municipio || stock.cidade || fallbackCities[stock.empresa_id] || '';
+                          const uf = stock.empresa_uf || stock.uf || (city ? 'MS' : '');
+                          const isCd = empName.toUpperCase().includes('CD') || empName.toUpperCase().includes('MATRIZ') || stock.empresa_id === 1 || stock.empresa_id === 5;
                           const mainCdQty = Number(selectedProduct.quantidade || selectedProduct.pro_quantidade || selectedProduct.PRO_QUANTIDADE || 0);
                           let qty = Number(stock.quantidade) || 0;
                           if (isCd && qty === 0 && mainCdQty > 0) {
@@ -375,16 +385,34 @@ export default function ProductsTab({ data, pages, searchTerms, setSearchTerms, 
                           return (
                             <tr key={stock.empresa_id || i}>
                               <td>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                  <strong style={{ fontSize: '0.92rem' }}>{empName}</strong>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'nowrap' }}>
+                                  <strong style={{ fontSize: '0.92rem', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
+                                    {empName}
+                                  </strong>
+                                  {city && (
+                                    <span style={{ 
+                                      fontSize: '0.78rem', 
+                                      background: 'rgba(37, 99, 235, 0.08)', 
+                                      color: '#2563eb', 
+                                      padding: '2px 8px', 
+                                      borderRadius: '6px', 
+                                      fontWeight: 600,
+                                      border: '1px solid rgba(37, 99, 235, 0.18)',
+                                      whiteSpace: 'nowrap'
+                                    }}>
+                                      {city}{uf ? ` - ${uf}` : ''}
+                                    </span>
+                                  )}
                                   {isCd && (
                                     <span style={{ 
-                                      fontSize: '0.72rem', 
+                                      fontSize: '0.68rem', 
                                       background: 'rgba(234, 88, 12, 0.12)', 
                                       color: '#ea580c', 
                                       padding: '2px 6px', 
                                       borderRadius: '4px', 
-                                      fontWeight: 700 
+                                      fontWeight: 700,
+                                      whiteSpace: 'nowrap',
+                                      letterSpacing: '0.5px'
                                     }}>
                                       CD MATRIZ
                                     </span>
@@ -403,8 +431,8 @@ export default function ProductsTab({ data, pages, searchTerms, setSearchTerms, 
                                   </span>
                                 )}
                               </td>
-                              <td style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                              <td style={{ textAlign: 'center', fontSize: '0.82rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                                   <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#22c55e', display: 'inline-block' }}></span>
                                   {formatDatePtBr(stock.data_atualizacao) || 'Atualizado'}
                                 </span>
