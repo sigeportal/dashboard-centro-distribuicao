@@ -1,4 +1,4 @@
-﻿unit SyncService;
+unit SyncService;
 
 interface
 
@@ -20,6 +20,8 @@ uses
   UnitGrades.Model,
   UnitTamanho.Model,
   UnitCddTransferencia.Model,
+  UnitProdutos.Model,
+  UnitModelos.Model,
   UnitFunctions,
   JOSE.Core.JWT,
   JOSE.Core.Builder;
@@ -284,6 +286,8 @@ var
   CddTransfItem: TCddTransferenciaItem;
   Tamanhos: TTamanho;
   Grades: TGrades;
+  Produtos: TProdutos;
+  Modelos: TModelos;
 begin
   try
     OrdEst := TOrdEst.Create(TDatabase.Connection);
@@ -326,6 +330,20 @@ begin
       Grades.CriaTabela;
     finally
       Grades.DisposeOf;
+    end;
+
+    Produtos := TProdutos.Create(TDatabase.Connection);
+    try
+      Produtos.CriaTabela;
+    finally
+      Produtos.DisposeOf;
+    end;
+
+    Modelos := TModelos.Create(TDatabase.Connection);
+    try
+      Modelos.CriaTabela;
+    finally
+      Modelos.DisposeOf;
     end;
   except
     on E: Exception do
@@ -796,9 +814,11 @@ begin
           begin
             LObj := TJSONObject(LArrModelos.Items[I]);
             LQuery.Clear;
-            LQuery.Add('UPDATE OR INSERT INTO MODELOS (MOD_CODIGO, MOD_NOME) VALUES (:COD, :NOME) MATCHING (MOD_CODIGO)');
+            LQuery.Add('UPDATE OR INSERT INTO MODELOS (MOD_CODIGO, MOD_NOME, MOD_GRUPO, MOD_SUBGRUPO) VALUES (:COD, :NOME, :GRU, :SUB) MATCHING (MOD_CODIGO)');
             LQuery.AddParam('COD', SafeGetInt(LObj, 'codigo', SafeGetInt(LObj, 'mod_codigo', 0)));
             LQuery.AddParam('NOME', SafeGetString(LObj, 'nome', SafeGetString(LObj, 'mod_nome')));
+            LQuery.AddParam('GRU', SafeGetInt(LObj, 'grupo', SafeGetInt(LObj, 'mod_grupo', 0)));
+            LQuery.AddParam('SUB', SafeGetInt(LObj, 'subgrupo', SafeGetInt(LObj, 'mod_subgrupo', 0)));
             LQuery.ExecSQL;
           end;
           Writeln('-> Sincronizados ' + LArrModelos.Count.ToString + ' modelos da matriz.');
@@ -848,7 +868,7 @@ begin
               LQuery.AddParam('TOT', SafeGetInt(LObj, 'pro_totalizador', SafeGetInt(LObj, 'codTotalizador', 1)));
               LQuery.AddParam('NCM', SafeGetString(LObj, 'pro_ncm', SafeGetString(LObj, 'ncm', '6109.10.00')));
               LQuery.AddParam('UM', SafeGetInt(LObj, 'pro_um', SafeGetInt(LObj, 'um', 0)));
-              LQuery.AddParam('QTD', SafeGetFloat(LObj, 'pro_quantidade', 0));
+              LQuery.AddParam('QTD', 0);// SafeGetFloat(LObj, 'pro_quantidade', 0));
               LQuery.AddParam('EST', 'ATIVO');
               LQuery.AddParam('DATAUA', SafeGetDateParam(LObj, 'pro_dataua'));
               LQuery.ExecSQL;
@@ -990,12 +1010,12 @@ begin
           end;
 
           // Atualiza PRO_QUANTIDADE em PRODUTOS a partir da soma de GRADES
-          try
-            LQuery.Clear;
-            LQuery.Add('UPDATE PRODUTOS P SET P.PRO_QUANTIDADE = COALESCE((SELECT SUM(G.GRA_QUANTIDADE) FROM GRADES G WHERE G.GRA_PRO = P.PRO_CODIGO), P.PRO_QUANTIDADE, 0) WHERE EXISTS (SELECT 1 FROM GRADES G WHERE G.GRA_PRO = P.PRO_CODIGO)');
-            LQuery.ExecSQL;
-          except
-          end;
+//          try
+//            LQuery.Clear;
+//            LQuery.Add('UPDATE PRODUTOS P SET P.PRO_QUANTIDADE = COALESCE((SELECT SUM(G.GRA_QUANTIDADE) FROM GRADES G WHERE G.GRA_PRO = P.PRO_CODIGO), P.PRO_QUANTIDADE, 0) WHERE EXISTS (SELECT 1 FROM GRADES G WHERE G.GRA_PRO = P.PRO_CODIGO)');
+//            LQuery.ExecSQL;
+//          except
+//          end;
 
           Writeln('-> Sincronizadas ' + LArrGrades.Count.ToString + ' grades da matriz.');
         end;
@@ -1092,7 +1112,7 @@ var
   LInterval: Integer;
   ICount: Integer;
 begin
-  LInterval := 10 * 60 * 1000; // 10 minutos
+  LInterval := 30 * 1000; // 10 minutos
   Sleep(10000); // 10 segundos iniciais
 
   while not Terminated do
