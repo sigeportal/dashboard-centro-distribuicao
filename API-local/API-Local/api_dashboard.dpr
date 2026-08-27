@@ -43,7 +43,8 @@ uses
   UnitTamanho.Model in 'src\models\UnitTamanho.Model.pas',
   SyncService in 'src\services\SyncService.pas',
   AutoUpdateService in 'src\services\AutoUpdateService.pas',
-  UnitCddTransferencia.Model in 'src\models\UnitCddTransferencia.Model.pas';
+  UnitCddTransferencia.Model in 'src\models\UnitCddTransferencia.Model.pas',
+  UnitModelos.Model in 'src\models\UnitModelos.Model.pas';
 
 //function GetConsoleWindow: HWND; stdcall; external kernel32;
 //

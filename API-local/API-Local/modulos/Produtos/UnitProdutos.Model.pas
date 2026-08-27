@@ -59,6 +59,19 @@ type
     FEstoque: string;
     FFcp: string;
     FTexto_semente_tratada: string;
+    FCst: string;
+    FCadastrar: string;
+    FCodFiscal: integer;
+    FFiscalGerar: string;
+    FModelo: integer;
+    FCor: string;
+    FMarca: string;
+    FColecao: string;
+    FReferencia: string;
+    FGrupo1: integer;
+    FValorDinheiro: double;
+    FURL_Imagem: string;
+    FEmp: integer;
   public
     { public declarations }
     [TCampo('PRO_CODIGO', 'INTEGER NOT NULL PRIMARY KEY')]
@@ -149,6 +162,32 @@ type
     property Fcp: string read FFcp write FFcp;
     [TCampo('PRO_TEXTO_SEMENTE_TRATADA', 'VARCHAR(200)')]
     property Texto_semente_tratada: string read FTexto_semente_tratada write FTexto_semente_tratada;
+    [TCampo('PRO_CST', 'VARCHAR(3)')]
+    property Cst: string read FCst write FCst;
+    [TCampo('PRO_CADASTRAR', 'CHAR(1) DEFAULT ''N''')]
+    property Cadastrar: string read FCadastrar write FCadastrar;
+    [TCampo('PRO_COD_FISCAL', 'INTEGER')]
+    property CodFiscal: integer read FCodFiscal write FCodFiscal;
+    [TCampo('PRO_FISCAL_GERAR', 'CHAR(1) DEFAULT ''S''')]
+    property FiscalGerar: string read FFiscalGerar write FFiscalGerar;
+    [TCampo('PRO_MODELO', 'INTEGER')]
+    property Modelo: integer read FModelo write FModelo;
+    [TCampo('PRO_COR', 'VARCHAR(30)')]
+    property Cor: string read FCor write FCor;
+    [TCampo('PRO_MARCA', 'VARCHAR(30)')]
+    property Marca: string read FMarca write FMarca;
+    [TCampo('PRO_COLECAO', 'VARCHAR(30)')]
+    property Colecao: string read FColecao write FColecao;
+    [TCampo('PRO_REFERENCIA', 'VARCHAR(30)')]
+    property Referencia: string read FReferencia write FReferencia;
+    [TCampo('PRO_GRUPO1', 'SMALLINT')]
+    property Grupo1: integer read FGrupo1 write FGrupo1;
+    [TCampo('PRO_VALOR_DINHEIRO', 'NUMERIC(12,4)')]
+    property ValorDinheiro: double read FValorDinheiro write FValorDinheiro;
+    [TCampo('PRO_URL_IMAGEM', 'VARCHAR(1000)')]
+    property URL_Imagem: string read FURL_Imagem write FURL_Imagem;
+    [TCampo('PRO_EMP', 'NUMERIC(4,0)')]
+    property Emp: integer read FEmp write FEmp;
   end;
 
 implementation

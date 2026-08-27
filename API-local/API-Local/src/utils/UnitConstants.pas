@@ -60,13 +60,13 @@ class function TConstants.BancoDados: string;
 var
   LIni: TIniFile;
 begin
-  LIni := TIniFile.Create(ExtractFilePath(ParamStr(0)) + 'sinc_config.ini');
-  try
-    Result := LIni.ReadString('Sincronia', 'CAMINHO_BD', 'PRINCIPAL.FDB');
-  finally
-    LIni.Free;
-  end;
-  if Result.IsEmpty then
+//  LIni := TIniFile.Create(ExtractFilePath(ParamStr(0)) + 'sinc_config.ini');
+//  try
+//    Result := LIni.ReadString('Sincronia', 'CAMINHO_BD', 'PRINCIPAL.FDB');
+//  finally
+//    LIni.Free;
+//  end;
+//  if Result.IsEmpty then
   	Result := GetEnvironmentVariable('CAMINHO_BD');  
 end;
 
