@@ -139,7 +139,8 @@ begin
       .Post(Post)
       .Put(Put)
     .&End
-    .Prefix('/v1')
+    .Group
+        .Prefix('/v1')
     .Route('/modelos/:id')
       .Get(GetForID)
       .Delete(Delete)

@@ -1,4 +1,4 @@
-unit UnitSync.Controller;
+﻿unit UnitSync.Controller;
 
 interface
 
@@ -60,71 +60,88 @@ begin
     .Route('/sync/dashboard')
       .Post(SyncDashboard)
     .&End
-    .Prefix('/v1')
+    .Group
+        .Prefix('/v1')
     .Route('/sync/pending')
       .Get(SyncPending)
     .&End
-    .Prefix('/v1')
+    .Group
+        .Prefix('/v1')
     .Route('/sync/ack')
       .Post(SyncAck)
     .&End
-    .Prefix('/v1')
+    .Group
+        .Prefix('/v1')
     .Route('/dashboard/clientes-cidade')
       .Get(ClientesCidade)
     .&End
-    .Prefix('/v1')
+    .Group
+        .Prefix('/v1')
     .Route('/dashboard/despesas-tipo-pagamento')
       .Get(DespesasTipoPagamento)
     .&End
-    .Prefix('/v1')
+    .Group
+        .Prefix('/v1')
     .Route('/dashboard/vendas-margem-lucro')
       .Get(VendasMargemLucro)
     .&End
-    .Prefix('/v1')
+    .Group
+        .Prefix('/v1')
     .Route('/dashboard/os-margem-lucro')
       .Get(OsMargemLucro)
     .&End
-    .Prefix('/v1')
+    .Group
+        .Prefix('/v1')
     .Route('/dashboard/vendas-lucro-grupo')
       .Get(VendasLucroGrupo)
     .&End
-    .Prefix('/v1')
+    .Group
+        .Prefix('/v1')
     .Route('/dashboard/tipos-pagamentos-vendas')
       .Get(TiposPagamentosVendas)
     .&End
-    .Prefix('/v1')
+    .Group
+        .Prefix('/v1')
     .Route('/dashboard/tipos-pagamentos-compras')
       .Get(TiposPagamentosCompras)
     .&End
-    .Prefix('/v1')
+    .Group
+        .Prefix('/v1')
     .Route('/dashboard/tipos-pagamentos-recebimentos')
       .Get(TiposPagamentosRecebimentos)
     .&End
-    .Prefix('/v1')
+    .Group
+        .Prefix('/v1')
     .Route('/dashboard/tipos-pagamentos-pagamentos')
       .Get(TiposPagamentosPagamentos)
     .&End
-    .Prefix('/v1')
+    .Group
+        .Prefix('/v1')
     .Route('/dashboard/movimentacoes')
       .Get(Movimentacoes)
     .&End
-    .Prefix('/v1')
+    .Group
+        .Prefix('/v1')
     .Route('/dashboard/vendas-diarias')
       .Get(VendasDiarias)
     .&End
-    .Prefix('/v1')
+    .Group
+        .Prefix('/v1')
     .Route('/dashboard/vendas-diarias/hora')
       .Get(VendasDiariasHora)
     .&End
-    .Prefix('/v1')
+    .Group
+        .Prefix('/v1')
     .Route('/dashboard/os-diarias')
       .Get(OsDiarias)
     .&End
-    .Prefix('/v1')
+    .Group
+        .Prefix('/v1')
     .Route('/estoque/posicao')
       .Get(EstoquePosicao)
     .&End
-    .Prefix('/v1')
+    .Group
+        .Prefix('/v1')
     .Route('/posicao-estoque')
       .Get(EstoquePosicao)
     .&End;

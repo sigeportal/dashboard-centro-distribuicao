@@ -118,17 +118,20 @@ begin
           .Post(Post)
           .Put(Put)
         .&End
+        .Group
         .Prefix('/v1')
         .Route('/estado/:id')
           .Get(GetForID)
           .Delete(Delete)
         .&End
+        .Group
         .Prefix('/v1')
         .Route('/estados')
           .Get(Get)
           .Post(Post)
           .Put(Put)
         .&End
+        .Group
         .Prefix('/v1')
         .Route('/estados/:id')
           .Get(GetForID)

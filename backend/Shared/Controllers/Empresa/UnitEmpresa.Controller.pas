@@ -119,6 +119,8 @@ begin
           .Post(Post)
           .Put(Put)
         .&End
+
+        .Group
         .Prefix('/v1')
         .Route('/empresa/:id')
           .Get(GetForID)

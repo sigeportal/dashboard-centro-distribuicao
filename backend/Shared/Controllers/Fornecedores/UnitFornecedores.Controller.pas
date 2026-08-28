@@ -1,4 +1,4 @@
-unit UnitFornecedores.Controller;
+﻿unit UnitFornecedores.Controller;
 
 interface
 uses
@@ -227,11 +227,13 @@ begin
           .Post(Post)
           .Put(Put)
         .&End
+        .Group
         .Prefix('/v1')
         .Route('/fornecedores/:id')
           .Get(GetForID)
           .Delete(Delete)
         .&End
+        .Group
         .Prefix('/v1')
         .Route('/fornecedores/emLote')
           .Post(PostEmLote)

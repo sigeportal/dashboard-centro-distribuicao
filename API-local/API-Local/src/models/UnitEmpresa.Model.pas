@@ -53,6 +53,7 @@ type
 		FIndicadorDaNaturezaPessoaJuridica: string;
 		FLogo                             : string;
 		FCodCNAE                          : string;
+    FEmpCC: integer;
 		function GetCNPJ: string;
 		function GetInscricaoEstadual: string;
 		function GetRazaoSocial: string;
@@ -165,6 +166,8 @@ type
 		property Logo: string read FLogo write FLogo;
 		[TCampo('EMP_CNAE', 'VARCHAR(10)')]
 		property CodCNAE: string read GetCodCNAE write FCodCNAE;
+    [TCampo('EMP_CC_CODIGO', 'INTEGER')]
+    property EmpCC: integer read FEmpCC write FEmpCC;
 	end;
 
 implementation

@@ -7,14 +7,14 @@ const navItems = [
   { tab: 'clientes', to: '/dashboard?tab=clientes', icon: Users, label: 'Clientes' },
   { tab: 'produtos', to: '/dashboard?tab=produtos', icon: Package, label: 'Produtos' },
   { tab: 'compras', to: '/dashboard?tab=compras', icon: ShoppingBag, label: 'Compras', roles: ['admin', 'gerente'] },
-  { tab: 'pedidos-compra', to: '/dashboard?tab=pedidos-compra', icon: FileSpreadsheet, label: 'Pedidos de Compra', roles: ['admin', 'gerente'] },
+  { tab: 'pedidos-compra', to: '/dashboard?tab=pedidos-compra', icon: FileSpreadsheet, label: 'Pedidos de Compra', roles: ['admin', 'gerente'], hidden: true },
   { tab: 'vendas', to: '/dashboard?tab=vendas', icon: ShoppingCart, label: 'Vendas' },
   { tab: 'os', to: '/dashboard?tab=os', icon: Wrench, label: 'OS' },
-  { tab: 'movimentacoes', to: '/dashboard?tab=movimentacoes', icon: ArrowRightLeft, label: 'Movimentações', roles: ['admin', 'gerente'] },
-  { tab: 'recebimentos', to: '/dashboard?tab=recebimentos', icon: DollarSign, label: 'Recebimentos', roles: ['admin', 'gerente'] },
+  { tab: 'movimentacoes', to: '/dashboard?tab=movimentacoes', icon: ArrowRightLeft, label: 'Movimentações', roles: ['admin', 'gerente'], hidden: true },
+  { tab: 'recebimentos', to: '/dashboard?tab=recebimentos', icon: DollarSign, label: 'Recebimentos', roles: ['admin', 'gerente'], hidden: true },
   { tab: 'transferencias', to: '/dashboard?tab=transferencias', icon: ArrowRightLeft, label: 'Centro Distribuição', roles: ['admin', 'gerente'] },
   { tab: 'nfe', to: '/dashboard?tab=nfe', icon: FileText, label: 'Notas Fiscais (NF-e)', roles: ['admin', 'gerente'] },
-  { tab: 'conciliacao', to: '/dashboard?tab=conciliacao', icon: FileCheck2, label: 'Conciliação Fiscal', roles: ['admin', 'gerente'] },
+  { tab: 'conciliacao', to: '/dashboard?tab=conciliacao', icon: FileCheck2, label: 'Conciliação Fiscal', roles: ['admin', 'gerente'], hidden: true },
   { tab: 'cadastros', to: '/dashboard?tab=cadastros', icon: Database, label: 'Cadastros Online', roles: ['admin', 'gerente'] },
 ];
 
@@ -28,6 +28,9 @@ export default function Sidebar({
   const { userRole } = useAuth();
 
   const filteredItems = navItems.filter(item => {
+    if (item.hidden) {
+      return false;
+    }
     if (item.tab === 'os' && !showServiceOrders) {
       return false;
     }

@@ -1,4 +1,4 @@
-unit UnitTransferencias.Controller;
+﻿unit UnitTransferencias.Controller;
 
 interface
 
@@ -670,52 +670,63 @@ begin
           .Post(Post)
           .Put(Put)
         .&End
+        .Group
         .Prefix('/v1')
         .Route('/transferencias/:id')
           .Get(GetForID)
           .Put(Put)
           .Delete(Delete)
         .&End
+        .Group
         .Prefix('/v1')
         .Route('/transferencias/:id/status')
           .Put(AtualizarStatus)
           .Post(AtualizarStatus)
         .&End
+        .Group
         .Prefix('/v1')
         .Route('/transferencias/emLote')
           .Post(PostEmLote)
         .&End
+        .Group
         .Prefix('/v1')
         .Route('/transferenciaItens')
           .Get(GetItens)
           .Post(PostItem)
           .Put(PutItem)
         .&End
+        .Group
         .Prefix('/v1')
         .Route('/transferenciaItens/:id')
           .Get(GetItemForID)
           .Delete(DeleteItem)
         .&End
+        .Group
         .Prefix('/v1')
         .Route('/transferencias/itens')
           .Get(GetItens)
         .&End
+        .Group
         .Prefix('/v1')
         .Route('/transferencias/:id/itens')
           .Get(GetItens)
         .&End
+        .Group
         .Prefix('/v1')
         .Route('/transferenciaItens/emLote')
           .Post(PostItensEmLote)
         .&End
+        .Group
         .Prefix('/v1')
         .Route('/transferenciaItens/lote')
           .Post(PostItensEmLote)
         .&End
+        .Group
         .Prefix('/v1')
         .Route('/transferencias/itens/lote')
           .Post(PostItensEmLote)
         .&End
+        .Group
         .Prefix('/v1')
         .Route('/transferencias/lote')
           .Post(PostEmLote)

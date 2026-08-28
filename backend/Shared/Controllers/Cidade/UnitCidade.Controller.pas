@@ -126,17 +126,20 @@ begin
           .Post(Post)
           .Put(Put)
         .&End
+        .Group
         .Prefix('/v1')
         .Route('/cidade/:id')
           .Get(GetForID)
           .Delete(Delete)
         .&End
+        .Group
         .Prefix('/v1')
         .Route('/cidades')
           .Get(Get)
           .Post(Post)
           .Put(Put)
         .&End
+        .Group
         .Prefix('/v1')
         .Route('/cidades/:id')
           .Get(GetForID)

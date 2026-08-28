@@ -199,15 +199,18 @@ begin
 		.Route('/usuarios')
 			.Get(Get)
 		.&End
-    .Prefix('/v1')
+    .Group
+        .Prefix('/v1')
 		.Route('/usuarios/:id')
 			.Get(GetOne)
 		.&End		
-		.Prefix('v1')
+		.Group
+        .Prefix('v1')
 		.Route('login')
 			.Post(Post)
 		.&End
-		.Prefix('v1')
+		.Group
+        .Prefix('v1')
 		.Route('/usuarios/:id/permissoes')
 			.Post(CriaPermissoes)
 		.&End
