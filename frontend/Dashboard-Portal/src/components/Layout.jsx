@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Outlet, useNavigate, useSearchParams } from 'react-router-dom';
-import { Building2, KeyRound, LifeBuoy, LogOut, Menu, Wrench } from 'lucide-react';
+import { Building2, ChevronRight, KeyRound, LifeBuoy, LogOut, Menu, Wrench } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { createApi } from '../services/api';
 import Sidebar from './Sidebar';
@@ -203,7 +203,7 @@ export default function Layout() {
 
       <main className="main-content">
         <header className="header glass">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <div className="header-left">
             <button
                className="hamburger-btn"
                onClick={handleToggleSidebar}
@@ -212,82 +212,83 @@ export default function Layout() {
             >
               <Menu size={24} aria-hidden="true" />
             </button>
-            <div className="header-title">{currentTitle}</div>
-
-            {/* Badge de Destaque da Unidade Logada */}
-            <div 
-              className="header-company-badge"
-              onClick={handleSwitchCompany}
-              title="Clique para alternar a unidade/empresa selecionada"
-            >
-              <Building2 size={16} className="company-badge-icon" />
-              <span className="company-badge-text">
-                Unidade: <strong>{companyDisplay.name}</strong>
-                {companyDisplay.city && (
-                  <span className="company-badge-city" style={{
-                    marginLeft: '6px',
-                    fontSize: '0.76rem',
-                    background: 'rgba(37, 99, 235, 0.1)',
-                    color: '#2563eb',
-                    padding: '1px 6px',
-                    borderRadius: '4px',
-                    fontWeight: 600,
-                    border: '1px solid rgba(37, 99, 235, 0.2)'
-                  }}>
-                    {companyDisplay.city}{companyDisplay.uf ? ` - ${companyDisplay.uf}` : ''}
-                  </span>
-                )}
-              </span>
-              <span className={`company-type-tag ${companyDisplay.isMatriz ? 'matriz' : 'filial'}`}>
-                {companyDisplay.isMatriz ? 'CD MATRIZ' : 'FILIAL'}
-              </span>
-            </div>
+            <h1 className="header-title">{currentTitle}</h1>
           </div>
-          <div className="header-user" ref={userMenuRef}>
+
+          <div className="header-right">
+            {/* Seletor de Unidade Moderno & Elegante */}
             <button
               type="button"
-              className="user-menu-trigger"
-              onClick={() => setIsUserMenuOpen(prev => !prev)}
-              aria-label="Abrir menu de usuário"
-              aria-haspopup="menu"
-              aria-expanded={isUserMenuOpen}
+              className="header-company-switcher"
+              onClick={handleSwitchCompany}
+              title="Clique para alternar a unidade/empresa selecionada"
+              aria-label={`Unidade selecionada: ${companyDisplay.name}. Clique para trocar de empresa.`}
             >
-              <img src="/user-avatar.png" alt="" className="avatar" aria-hidden="true" />
+              <div className="company-switcher-icon-wrap">
+                <Building2 size={16} className="company-switcher-icon" />
+              </div>
+              <div className="company-switcher-info">
+                <div className="company-switcher-line-1">
+                  <span className="company-switcher-name">{companyDisplay.name}</span>
+                  <span className={`company-switcher-tag ${companyDisplay.isMatriz ? 'matriz' : 'filial'}`}>
+                    {companyDisplay.isMatriz ? 'MATRIZ' : 'FILIAL'}
+                  </span>
+                </div>
+                <div className="company-switcher-line-2">
+                  <span className="company-switcher-location">
+                    {companyDisplay.city ? `${companyDisplay.city}${companyDisplay.uf ? ` - ${companyDisplay.uf}` : ''}` : 'Unidade Ativa'}
+                  </span>
+                </div>
+              </div>
+              <ChevronRight size={14} className="company-switcher-arrow" />
             </button>
 
-            {isUserMenuOpen && (
-              <div className="user-dropdown" role="menu">
-                <button type="button" className="user-dropdown-item support" onClick={handleOpenSupport} role="menuitem">
-                  <LifeBuoy size={18} aria-hidden="true" />
-                  <span>Suporte</span>
-                </button>
-                <button type="button" className="user-dropdown-item password" onClick={handleOpenPassword} role="menuitem">
-                  <KeyRound size={18} aria-hidden="true" />
-                  <span>Alterar Senha</span>
-                </button>
-                <button type="button" className="user-dropdown-item switch-company" onClick={handleSwitchCompany} role="menuitem">
-                  <Building2 size={18} aria-hidden="true" />
-                  <span>Trocar Empresa</span>
-                </button>
-                <button
-                  type="button"
-                  className="user-dropdown-item service-orders"
-                  onClick={handleToggleServiceOrders}
-                  role="menuitemcheckbox"
-                  aria-checked={showServiceOrders}
-                >
-                  <Wrench size={18} aria-hidden="true" />
-                  <span>Visualizar OS</span>
-                  <span className={`user-dropdown-switch ${showServiceOrders ? 'is-active' : ''}`} aria-hidden="true">
-                    <span className="user-dropdown-switch-thumb" />
-                  </span>
-                </button>
-                <button type="button" className="user-dropdown-item logout" onClick={handleLogout} role="menuitem">
-                  <LogOut size={18} aria-hidden="true" />
-                  <span>Sair</span>
-                </button>
-              </div>
-            )}
+            <div className="header-user" ref={userMenuRef}>
+              <button
+                type="button"
+                className="user-menu-trigger"
+                onClick={() => setIsUserMenuOpen(prev => !prev)}
+                aria-label="Abrir menu de usuário"
+                aria-haspopup="menu"
+                aria-expanded={isUserMenuOpen}
+              >
+                <img src="/user-avatar.png" alt="" className="avatar" aria-hidden="true" />
+              </button>
+
+              {isUserMenuOpen && (
+                <div className="user-dropdown" role="menu">
+                  <button type="button" className="user-dropdown-item support" onClick={handleOpenSupport} role="menuitem">
+                    <LifeBuoy size={18} aria-hidden="true" />
+                    <span>Suporte</span>
+                  </button>
+                  <button type="button" className="user-dropdown-item password" onClick={handleOpenPassword} role="menuitem">
+                    <KeyRound size={18} aria-hidden="true" />
+                    <span>Alterar Senha</span>
+                  </button>
+                  <button type="button" className="user-dropdown-item switch-company" onClick={handleSwitchCompany} role="menuitem">
+                    <Building2 size={18} aria-hidden="true" />
+                    <span>Trocar Empresa</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="user-dropdown-item service-orders"
+                    onClick={handleToggleServiceOrders}
+                    role="menuitemcheckbox"
+                    aria-checked={showServiceOrders}
+                  >
+                    <Wrench size={18} aria-hidden="true" />
+                    <span>Visualizar OS</span>
+                    <span className={`user-dropdown-switch ${showServiceOrders ? 'is-active' : ''}`} aria-hidden="true">
+                      <span className="user-dropdown-switch-thumb" />
+                    </span>
+                  </button>
+                  <button type="button" className="user-dropdown-item logout" onClick={handleLogout} role="menuitem">
+                    <LogOut size={18} aria-hidden="true" />
+                    <span>Sair</span>
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </header>
 

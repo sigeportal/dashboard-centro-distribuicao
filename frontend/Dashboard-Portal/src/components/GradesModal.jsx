@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Grid, Plus, Trash2, Check, X, Edit2, Barcode, Search } from 'lucide-react';
+import { Grid, Plus, Trash2, Check, X, Edit2, Barcode, AlertCircle } from 'lucide-react';
 import { createApi } from '../services/api';
+import { toast } from '../contexts/ToastContext';
 import './GradesModal.css';
 
 // Função de cálculo do Dígito Verificador EAN-13 do sistema legado (UnitFuncoesUtils.pas / GeraDVEAN)
@@ -136,7 +137,7 @@ export default function GradesModal({ isOpen, onClose, product, onGradesUpdated 
   // Gerador de código de barras (Individial ou Em Lote para todas as grades - Legado Delphi)
   const handleGenerateAllBarcodes = async () => {
     if (grades.length === 0) {
-      alert('Nenhuma grade cadastrada para este produto.');
+      toast.warning('Nenhuma grade cadastrada para este produto.');
       return;
     }
     if (!window.confirm('Deseja gerar código de barras EAN-13 para TODAS as grades deste produto?')) return;
@@ -158,12 +159,12 @@ export default function GradesModal({ isOpen, onClose, product, onGradesUpdated 
       }));
 
       await api.post('/v1/grades/emLote', { itens: updatedGrades });
-      alert('Cod. de Barras das Grades gerado com sucesso!');
+      toast.success('Cód. de Barras das Grades gerado com sucesso!');
       await fetchGradesForProduct();
       if (onGradesUpdated) onGradesUpdated();
     } catch (err) {
       console.error(err);
-      alert('Erro ao gerar Cod. Barras das Grades.');
+      toast.error('Erro ao gerar Cód. de Barras das Grades.');
     } finally {
       setLoading(false);
     }
@@ -248,7 +249,7 @@ export default function GradesModal({ isOpen, onClose, product, onGradesUpdated 
       if (onGradesUpdated) onGradesUpdated();
     } catch (err) {
       console.error('Erro ao salvar grade:', err);
-      alert('Erro ao salvar grade. Verifique se os campos estão corretos.');
+      toast.error('Erro ao salvar grade. Verifique se os campos estão corretos.');
     } finally {
       setLoading(false);
     }
@@ -264,167 +265,180 @@ export default function GradesModal({ isOpen, onClose, product, onGradesUpdated 
       await fetchGradesForProduct();
       if (onGradesUpdated) onGradesUpdated();
     } catch (err) {
-      alert('Erro ao excluir grade.');
+      toast.error('Erro ao excluir grade.');
     } finally {
       setLoading(false);
     }
   };
 
+  const totalGradeQty = grades.reduce((acc, g) => acc + (Number(g.quantidade || g.gra_quantidade) || 0), 0);
+  const productName = product ? `[#${product.codigo || product.id || product.pro_codigo}] ${product.nome || product.descricao || ''}` : '';
+
   return createPortal(
-    <div className="legacy-modal-overlay">
-      <div className="legacy-modal-window gra-modal-window">
-        {/* Header do Pop-up */}
-        <div className="legacy-modal-header">
-          <div className="legacy-modal-title" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Grid size={18} />
-            <span>Cadastro de Grades - {product ? `[${product.codigo || product.id}] ${product.nome}` : ''}</span>
-            <span className="badge badge-success" style={{ fontSize: '0.85rem', fontWeight: 700, padding: '3px 8px' }} title="Somatória das quantidades das grades (GRA_QUANTIDADE)">
-              Total: {grades.reduce((acc, g) => acc + (Number(g.quantidade || g.gra_quantidade) || 0), 0)} UN
-            </span>
+    <div className="grades-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="grades-modal-container glass">
+        {/* Cabeçalho Padronizado */}
+        <div className="grades-modal-header">
+          <div className="grades-title-wrap">
+            <div className="grades-icon-badge">
+              <Grid size={20} />
+            </div>
+            <div>
+              <div className="grades-header-title-line">
+                <h3>Cadastro de Grades & Variações</h3>
+                <span className="grades-total-badge" title="Somatória física de todas as variações (GRA_QUANTIDADE)">
+                  Total: {totalGradeQty} UN
+                </span>
+              </div>
+              <span className="grades-subtitle">
+                {productName ? `Produto: ${productName}` : 'Variações de tamanho, cor, preços e código de barras'}
+              </span>
+            </div>
           </div>
-          <button className="legacy-modal-close-btn" onClick={onClose}>
-            <X size={18} />
+          <button className="grades-btn-close" onClick={onClose} title="Fechar (ESC)">
+            <X size={20} />
           </button>
         </div>
 
-        {/* Inputs de Entrada (Dados Gerais no Topo) */}
-        <div className="gra-modal-body">
-          <div className="gra-inputs-grid">
-            <div className="gra-input-field">
-              <label>Código</label>
-              <input 
-                type="text" 
-                value={form.codigo} 
-                readOnly 
-                className="legacy-input read-only" 
-              />
-            </div>
-
-            <div className="gra-input-field">
-              <label>*Tamanho</label>
-              <select 
-                value={form.tam} 
-                onChange={(e) => setForm({ ...form, tam: e.target.value })}
-                disabled={mode === 'browse'}
-                className="legacy-input"
-                required
-              >
-                {tamanhosList.length > 0 ? (
-                  tamanhosList.map(t => (
-                    <option key={t.codigo} value={t.codigo}>
-                      {t.sigla ? `${t.sigla} - ${t.tamanho || ''}` : t.tamanho}
-                    </option>
-                  ))
-                ) : (
-                  tamanhosDisponiveis.map(t => <option key={t} value={t}>{t}</option>)
-                )}
-              </select>
-            </div>
-
-            <div className="gra-input-field">
-              <label>Cor</label>
-              <select 
-                value={form.cor} 
-                onChange={(e) => setForm({ ...form, cor: e.target.value })}
-                disabled={mode === 'browse'}
-                className="legacy-input"
-              >
-                {coresDisponiveis.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
-
-            <div className="gra-input-field">
-              <label>Quantidade</label>
-              <input 
-                type="number" 
-                value={form.quantidade} 
-                onChange={(e) => setForm({ ...form, quantidade: e.target.value })}
-                disabled={mode === 'browse'}
-                className="legacy-input"
-              />
-            </div>
-
-            <div className="gra-input-field">
-              <label>Vlr Dinheiro</label>
-              <input 
-                type="number" 
-                step="0.01"
-                value={form.valor_dinheiro} 
-                onChange={(e) => setForm({ ...form, valor_dinheiro: e.target.value })}
-                disabled={mode === 'browse'}
-                className="legacy-input"
-              />
-            </div>
-
-            <div className="gra-input-field">
-              <label>Vlr Vista</label>
-              <input 
-                type="number" 
-                step="0.01"
-                value={form.valor} 
-                onChange={(e) => setForm({ ...form, valor: e.target.value })}
-                disabled={mode === 'browse'}
-                className="legacy-input"
-              />
-            </div>
-
-            <div className="gra-input-field">
-              <label>Vlr Prazo</label>
-              <input 
-                type="number" 
-                step="0.01"
-                value={form.valor_prazo} 
-                onChange={(e) => setForm({ ...form, valor_prazo: e.target.value })}
-                disabled={mode === 'browse'}
-                className="legacy-input"
-              />
-            </div>
-
-            <div className="gra-input-field gra-barcode-field" style={{ minWidth: '180px' }}>
-              <label>Cód. Barras</label>
-              <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+        {/* Corpo do Modal */}
+        <div className="grades-modal-body">
+          {/* Card de Formulário Superior */}
+          <div className="grades-form-card">
+            <div className="grades-inputs-grid">
+              <div className="grades-input-field">
+                <label>Código</label>
                 <input 
                   type="text" 
-                  value={form.codbarra} 
-                  onChange={(e) => setForm({ ...form, codbarra: e.target.value })}
-                  disabled={mode === 'browse'}
-                  className="legacy-input"
-                  placeholder="EAN-13 (F10)"
-                  style={{ flex: 1, minWidth: '120px' }}
+                  value={form.codigo} 
+                  readOnly 
+                  className="grades-input grades-input-readonly" 
                 />
-                <button 
-                  type="button"
-                  className="btn-barcode-gen"
-                  onClick={handleGenerateBarcode}
-                  disabled={loading}
-                  title="Gerar Cód. Barras EAN-13 (F10)"
-                  style={{ height: '36px', padding: '0 8px', flexShrink: 0 }}
+              </div>
+
+              <div className="grades-input-field">
+                <label>*Tamanho</label>
+                <select 
+                  value={form.tam} 
+                  onChange={(e) => setForm({ ...form, tam: e.target.value })}
+                  disabled={mode === 'browse'}
+                  className="grades-input"
+                  required
                 >
-                  <Barcode size={18} />
-                </button>
+                  {tamanhosList.length > 0 ? (
+                    tamanhosList.map(t => (
+                      <option key={t.codigo} value={t.codigo}>
+                        {t.sigla ? `${t.sigla} - ${t.tamanho || ''}` : t.tamanho}
+                      </option>
+                    ))
+                  ) : (
+                    tamanhosDisponiveis.map(t => <option key={t} value={t}>{t}</option>)
+                  )}
+                </select>
+              </div>
+
+              <div className="grades-input-field">
+                <label>Cor</label>
+                <select 
+                  value={form.cor} 
+                  onChange={(e) => setForm({ ...form, cor: e.target.value })}
+                  disabled={mode === 'browse'}
+                  className="grades-input"
+                >
+                  {coresDisponiveis.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+
+              <div className="grades-input-field">
+                <label>Quantidade</label>
+                <input 
+                  type="number" 
+                  value={form.quantidade} 
+                  onChange={(e) => setForm({ ...form, quantidade: e.target.value })}
+                  disabled={mode === 'browse'}
+                  className="grades-input"
+                />
+              </div>
+
+              <div className="grades-input-field">
+                <label>Vlr Dinheiro</label>
+                <input 
+                  type="number" 
+                  step="0.01"
+                  value={form.valor_dinheiro} 
+                  onChange={(e) => setForm({ ...form, valor_dinheiro: e.target.value })}
+                  disabled={mode === 'browse'}
+                  className="grades-input"
+                />
+              </div>
+
+              <div className="grades-input-field">
+                <label>Vlr Vista</label>
+                <input 
+                  type="number" 
+                  step="0.01"
+                  value={form.valor} 
+                  onChange={(e) => setForm({ ...form, valor: e.target.value })}
+                  disabled={mode === 'browse'}
+                  className="grades-input"
+                />
+              </div>
+
+              <div className="grades-input-field">
+                <label>Vlr Prazo</label>
+                <input 
+                  type="number" 
+                  step="0.01"
+                  value={form.valor_prazo} 
+                  onChange={(e) => setForm({ ...form, valor_prazo: e.target.value })}
+                  disabled={mode === 'browse'}
+                  className="grades-input"
+                />
+              </div>
+
+              <div className="grades-input-field grades-barcode-col">
+                <label>Cód. Barras (EAN-13)</label>
+                <div className="grades-barcode-input-wrap">
+                  <input 
+                    type="text" 
+                    value={form.codbarra} 
+                    onChange={(e) => setForm({ ...form, codbarra: e.target.value })}
+                    disabled={mode === 'browse'}
+                    className="grades-input"
+                    placeholder="EAN-13 (F10)"
+                  />
+                  <button 
+                    type="button"
+                    className="grades-btn-barcode"
+                    onClick={handleGenerateBarcode}
+                    disabled={loading}
+                    title="Gerar Cód. Barras EAN-13 (F10)"
+                  >
+                    <Barcode size={16} />
+                  </button>
+                </div>
               </div>
             </div>
           </div>
 
           {/* Tabela Central e Botões Laterais */}
-          <div className="gra-table-and-actions">
-            <div className="gra-table-container">
-              <table className="legacy-data-table">
+          <div className="grades-table-and-actions">
+            <div className="grades-table-container">
+              <table className="grades-data-table">
                 <thead>
                   <tr>
-                    <th>CODIGO</th>
-                    <th>TAMANHO</th>
-                    <th style={{ textAlign: 'right' }}>VLR DINHEIRO</th>
-                    <th style={{ textAlign: 'right' }}>VLR VISTA</th>
-                    <th style={{ textAlign: 'right' }}>VLR PRAZO</th>
-                    <th style={{ textAlign: 'center' }}>QUANT</th>
-                    <th>COD. BARRAS</th>
-                    <th>COR</th>
+                    <th style={{ width: '80px' }}>CÓDIGO</th>
+                    <th style={{ width: '90px' }}>TAMANHO</th>
+                    <th style={{ textAlign: 'right', width: '110px' }}>VLR DINHEIRO</th>
+                    <th style={{ textAlign: 'right', width: '110px' }}>VLR VISTA</th>
+                    <th style={{ textAlign: 'right', width: '110px' }}>VLR PRAZO</th>
+                    <th style={{ textAlign: 'center', width: '85px' }}>QUANT</th>
+                    <th>CÓD. BARRAS (EAN-13)</th>
+                    <th style={{ width: '110px' }}>COR</th>
                   </tr>
                 </thead>
                 <tbody>
                   {grades.map((g) => {
-                    const isSelected = selectedGrade && selectedGrade.codigo === g.codigo;
+                    const isSelected = selectedGrade && String(selectedGrade.codigo) === String(g.codigo);
                     const vDin = Number(g.valor_dinheiro ?? g.valorDinheiro ?? g.valordinheiro ?? g.valor ?? 0);
                     const vVis = Number(g.valor || 0);
                     const vPrz = Number(g.valor_prazo ?? g.valorPrazo ?? g.valorprazo ?? g.valor ?? 0);
@@ -437,20 +451,32 @@ export default function GradesModal({ isOpen, onClose, product, onGradesUpdated 
                         className={isSelected ? 'selected-row' : ''}
                         onClick={() => handleSelectGrade(g)}
                       >
-                        <td><strong>#{g.codigo}</strong></td>
-                        <td><span className="grade-badge">{tamLabel}</span></td>
-                        <td style={{ textAlign: 'right' }}>R$ {vDin.toFixed(2)}</td>
-                        <td style={{ textAlign: 'right' }}>R$ {vVis.toFixed(2)}</td>
-                        <td style={{ textAlign: 'right' }}>R$ {vPrz.toFixed(2)}</td>
-                        <td style={{ textAlign: 'center', fontWeight: 'bold' }}>{g.quantidade || 0}</td>
-                        <td>{g.codbarra || '-'}</td>
-                        <td>{g.cor || 'PADRAO'}</td>
+                        <td>
+                          <span className="grades-item-code">#{g.codigo}</span>
+                        </td>
+                        <td>
+                          <span className="grades-size-badge">{tamLabel}</span>
+                        </td>
+                        <td style={{ textAlign: 'right', fontWeight: 600 }}>R$ {vDin.toFixed(2)}</td>
+                        <td style={{ textAlign: 'right', fontWeight: 600 }}>R$ {vVis.toFixed(2)}</td>
+                        <td style={{ textAlign: 'right', fontWeight: 600 }}>R$ {vPrz.toFixed(2)}</td>
+                        <td style={{ textAlign: 'center' }}>
+                          <span className="grades-qty-badge">{g.quantidade || 0}</span>
+                        </td>
+                        <td>
+                          <span className="grades-ean-cell">{g.codbarra || '-'}</span>
+                        </td>
+                        <td style={{ color: '#64748b', fontSize: '0.82rem', fontWeight: 500 }}>
+                          {g.cor || 'PADRAO'}
+                        </td>
                       </tr>
                     );
                   })}
                   {grades.length === 0 && (
                     <tr>
-                      <td colSpan="8" className="empty-table-cell">Nenhuma grade cadastrada para este produto.</td>
+                      <td colSpan="8" className="empty-table-cell">
+                        {loading ? 'Carregando grades...' : 'Nenhuma grade cadastrada para este produto.'}
+                      </td>
                     </tr>
                   )}
                 </tbody>
@@ -458,52 +484,73 @@ export default function GradesModal({ isOpen, onClose, product, onGradesUpdated 
             </div>
 
             {/* Botões Laterais */}
-            <div className="gru-side-buttons">
+            <div className="grades-side-buttons">
               <button 
-                className="legacy-cmd-btn btn-insert" 
+                className="grades-cmd-btn btn-insert" 
                 onClick={handleInsert}
                 disabled={mode !== 'browse'}
+                title="Inserir nova grade (F2)"
               >
-                <Plus size={16} /> Inserir
+                <Plus size={15} /> Inserir
               </button>
               <button 
-                className="legacy-cmd-btn btn-delete" 
-                onClick={handleDelete}
-                disabled={mode !== 'browse' || !selectedGrade}
-              >
-                <Trash2 size={16} /> Excluir
-              </button>
-              <button 
-                className="legacy-cmd-btn btn-confirm" 
-                onClick={handleConfirm}
-                disabled={mode === 'browse'}
-              >
-                <Check size={16} /> Confirmar
-              </button>
-              <button 
-                className="legacy-cmd-btn btn-cancel" 
-                onClick={() => setMode('browse')}
-                disabled={mode === 'browse'}
-              >
-                <X size={16} /> Cancelar
-              </button>
-              <button 
-                className="legacy-cmd-btn btn-edit" 
+                className="grades-cmd-btn btn-edit" 
                 onClick={handleEdit}
                 disabled={mode !== 'browse' || !selectedGrade}
+                title="Editar grade selecionada"
               >
-                <Edit2 size={16} /> Editar
+                <Edit2 size={15} /> Editar
+              </button>
+              <button 
+                className="grades-cmd-btn btn-confirm" 
+                onClick={handleConfirm}
+                disabled={mode === 'browse'}
+                title="Salvar alterações (Ctrl+S)"
+              >
+                <Check size={15} /> Gravar
+              </button>
+              <button 
+                className="grades-cmd-btn btn-cancel" 
+                onClick={() => setMode('browse')}
+                disabled={mode === 'browse'}
+                title="Cancelar edição"
+              >
+                <X size={15} /> Cancelar
+              </button>
+              <button 
+                className="grades-cmd-btn btn-delete" 
+                onClick={handleDelete}
+                disabled={mode !== 'browse' || !selectedGrade}
+                title="Excluir grade selecionada"
+              >
+                <Trash2 size={15} /> Excluir
               </button>
             </div>
           </div>
         </div>
 
         {/* Rodapé com Atalhos */}
-        <div className="legacy-modal-footer">
-          <div className="legacy-shortcuts">
-            <span className="shortcut-tag" onClick={onClose} style={{ cursor: 'pointer' }}><kbd>ESC</kbd> Sair</span>
-            <span className="shortcut-tag" onClick={handleInsert} style={{ cursor: 'pointer' }}><kbd>F2</kbd> Inserir</span>
-            <span className="shortcut-tag" onClick={handleGenerateAllBarcodes} style={{ cursor: 'pointer' }}><kbd>F10</kbd> Gerar Cód. Barras</span>
+        <div className="grades-modal-footer">
+          <div className="grades-shortcuts">
+            <span className="grades-shortcut-item"><kbd>ESC</kbd> Sair</span>
+            <span className="grades-shortcut-item"><kbd>F2</kbd> Inserir</span>
+            <span className="grades-shortcut-item"><kbd>F10</kbd> Gerar Cód. Barras</span>
+            <span className="grades-shortcut-item"><kbd>Ctrl+S</kbd> Gravar</span>
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.6rem' }}>
+            <button 
+              type="button"
+              className="grades-btn-batch-barcode"
+              onClick={handleGenerateAllBarcodes}
+              disabled={loading || grades.length === 0}
+              title="Gerar código de barras EAN-13 para todas as variações"
+            >
+              <Barcode size={15} /> Gerar EAN em Lote
+            </button>
+            <button className="grades-btn-secondary" onClick={onClose}>
+              Fechar
+            </button>
           </div>
         </div>
       </div>

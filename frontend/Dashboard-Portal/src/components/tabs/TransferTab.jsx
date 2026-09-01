@@ -1,17 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
 import { 
-  ArrowRightLeft, Plus, CheckCircle, AlertCircle, Eye, RefreshCw, Send, 
-  ShieldCheck, XCircle, Search, Package, X, Printer, FileText, Barcode, 
-  Trash2, Edit2, Layers, Check, ShoppingBag, Truck, Sparkles, Filter, ChevronRight,
-  Building2
+  ArrowRightLeft, Plus, CheckCircle, AlertCircle, AlertTriangle, Eye, RefreshCw, Send, 
+  ShieldCheck, Package, Printer, FileText, Barcode, 
+  Trash2, Layers, ShoppingBag, Truck, Building2, Upload, FileCheck2, ArrowRight
 } from 'lucide-react';
 import { createApi } from '../../services/api';
-import SearchBar from '../SearchBar';
-import Pagination from '../Pagination';
 import LookupSelect from '../LookupSelect';
 import RomaneioModal from '../RomaneioModal';
 import NfeTransferModal from '../NfeTransferModal';
+import { toast } from '../../contexts/ToastContext';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import './TransferTab.css';
 
@@ -47,7 +44,7 @@ export default function TransferTab() {
   const [nfeItems, setNfeItems] = useState([]);
 
   // =========================================================================
-  // ESTADO DO NOVO ROMANEIO DE TRANSFERÊNCIA (Criação com Total Liberdade)
+  // ESTADO DO NOVO ROMANEIO DE TRANSFERÊNCIA
   // =========================================================================
   const [origin, setOrigin] = useState('5'); // Padrão: 5 - CD DOURADINA (Matriz)
   const [destination, setDestination] = useState('6'); // Padrão: 6 - RIO BRILHANTE
@@ -55,7 +52,7 @@ export default function TransferTab() {
   const [motorista, setMotorista] = useState('');
   const [placaVeiculo, setPlacaVeiculo] = useState('');
   const [obs, setObs] = useState('');
-  const [transferItems, setTransferItems] = useState([]); // [{ produto_id, nome, codbarra, grade_id, tamanho, cor, quantidade, valor, pro_cod_fiscal, pro_fiscal_gerar, isFiscal }]
+  const [transferItems, setTransferItems] = useState([]);
 
   // Seleção rápida de produto atual para o Romaneio
   const [selectedProductObj, setSelectedProductObj] = useState(null);
@@ -64,7 +61,7 @@ export default function TransferTab() {
   const [matrixQuantities, setMatrixQuantities] = useState({}); // { [gradeId]: number }
   const [singleQty, setSingleQty] = useState(1);
   const [singlePrice, setSinglePrice] = useState('');
-  const [loadingGrades, setLoadingGrades] = useState(false);
+  const [, setLoadingGrades] = useState(false);
 
   // Bipagem rápida via Código de Barras / EAN
   const [barcodeInput, setBarcodeInput] = useState('');
@@ -82,8 +79,7 @@ export default function TransferTab() {
   const [receptionObs, setReceptionObs] = useState('');
   const [blindCheckRevealed, setBlindCheckRevealed] = useState(false); // true = mostra divergências
 
-  // Notificações
-  const [notifications, setNotifications] = useState([]);
+  // Feedback
   const [successMsg, setSuccessMsg] = useState('');
 
   useEffect(() => {
@@ -98,7 +94,7 @@ export default function TransferTab() {
       const response = await api.get('/v1/transferencias');
       if (Array.isArray(response.data)) {
         const activeUnitId = Number(localStorage.getItem('selected_company_id')) || 5;
-        // O CD MATRIZ DOURADINA (ID 5 ou 1) visualiza todas as transferências do grupo
+        // O CD MATRIZ DOURADINA visualiza todas as transferências do grupo
         const isMatriz = activeUnitId === 5 || activeUnitId === 1;
         const visibleTransfers = isMatriz
           ? response.data
@@ -305,7 +301,7 @@ export default function TransferTab() {
           .reduce((acc, it) => acc + Number(it.quantidade || 0), 0);
 
         if (alreadyInRomaneio + qtd > maxGradeQty) {
-          alert(`A quantidade informada para o tamanho "${tamNome}" (${alreadyInRomaneio + qtd} UN) ultrapassa o estoque disponível (${maxGradeQty} UN) na unidade de origem.`);
+          toast.warning(`A quantidade informada para o tamanho "${tamNome}" (${alreadyInRomaneio + qtd} UN) ultrapassa o estoque disponível (${maxGradeQty} UN) na unidade de origem.`);
           return;
         }
 
@@ -328,7 +324,7 @@ export default function TransferTab() {
     }
 
     if (itemsToAdd.length === 0) {
-      alert('Informe ao menos uma quantidade em um dos tamanhos da grade com saldo disponível.');
+      toast.warning('Informe ao menos uma quantidade em um dos tamanhos da grade com saldo disponível.');
       return;
     }
 
@@ -343,12 +339,12 @@ export default function TransferTab() {
   // 2. Adicionar Produto Simples (Sem Grade) ao Romaneio com Validação de Estoque
   const handleAddSingleProductToTransfer = () => {
     if (!selectedProductObj) {
-      alert('Selecione um produto antes de adicionar.');
+      toast.warning('Selecione um produto antes de adicionar.');
       return;
     }
     const qtd = Number(singleQty);
     if (!qtd || qtd <= 0) {
-      alert('Informe uma quantidade válida maior que 0.');
+      toast.warning('Informe uma quantidade válida maior que 0.');
       return;
     }
 
@@ -356,7 +352,7 @@ export default function TransferTab() {
     const maxAvailable = selectedProductStock > 0 ? selectedProductStock : Number(selectedProductObj.quantidade || selectedProductObj.pro_quantidade || 0);
 
     if (maxAvailable <= 0) {
-      alert(`O produto #${pId} não possui estoque disponível na unidade de origem selecionada (${getUnitName(origin)}).`);
+      toast.warning(`O produto #${pId} não possui estoque disponível na unidade de origem selecionada (${getUnitName(origin)}).`);
       return;
     }
 
@@ -365,7 +361,7 @@ export default function TransferTab() {
       .reduce((acc, it) => acc + Number(it.quantidade || 0), 0);
 
     if (alreadyInRomaneio + qtd > maxAvailable) {
-      alert(`A quantidade total informada (${alreadyInRomaneio + qtd} UN) ultrapassa o saldo disponível na unidade de origem (${maxAvailable} UN).`);
+      toast.warning(`A quantidade total informada (${alreadyInRomaneio + qtd} UN) ultrapassa o saldo disponível na unidade de origem (${maxAvailable} UN).`);
       return;
     }
 
@@ -415,7 +411,7 @@ export default function TransferTab() {
         const currentQty = existingIdx >= 0 ? transferItems[existingIdx].quantidade : 0;
 
         if (maxStock > 0 && currentQty + 1 > maxStock) {
-          alert(`Estoque insuficiente na unidade de origem (${maxStock} UN disponíveis).`);
+          toast.warning(`Estoque insuficiente na unidade de origem (${maxStock} UN disponíveis).`);
           setBarcodeInput('');
           return;
         }
@@ -452,7 +448,7 @@ export default function TransferTab() {
         setSuccessMsg(`+1 UN adicionada: #${pId} - ${matchedProd.nome}`);
         setTimeout(() => setSuccessMsg(''), 2500);
       } else {
-        alert(`Código de barras "${code}" não encontrado no catálogo do CD.`);
+        toast.error(`Código de barras "${code}" não encontrado no catálogo do CD.`);
       }
       setBarcodeInput('');
     }
@@ -462,7 +458,7 @@ export default function TransferTab() {
   const handleFetchNfItems = async () => {
     const term = nfSearchTerm.trim();
     if (!term) {
-      alert('Informe o número da NF ou chave de acesso da compra.');
+      toast.warning('Informe o número da NF ou chave de acesso da compra.');
       return;
     }
     setLoadingNf(true);
@@ -494,11 +490,11 @@ export default function TransferTab() {
         setSuccessMsg(`Sucesso! ${importedItems.length} itens importados da NF de compra #${compraData.numero_nf || term}!`);
         setTimeout(() => setSuccessMsg(''), 4000);
       } else {
-        alert('Nenhum item encontrado nesta Nota de Compra.');
+        toast.warning('Nenhum item encontrado nesta Nota de Compra.');
       }
     } catch (err) {
       console.error('Erro ao buscar itens da NF:', err);
-      alert('Nota de compra não localizada.');
+      toast.error('Nota de compra não localizada.');
     } finally {
       setLoadingNf(false);
     }
@@ -512,7 +508,7 @@ export default function TransferTab() {
       const next = [...prev];
       const item = next[idx];
       if (item && item.max_disponivel && val > item.max_disponivel) {
-        alert(`A quantidade informada (${val} UN) ultrapassa o estoque disponível (${item.max_disponivel} UN) para este item.`);
+        toast.warning(`A quantidade informada (${val} UN) ultrapassa o estoque disponível (${item.max_disponivel} UN) para este item.`);
         val = item.max_disponivel;
       }
       next[idx].quantidade = val;
@@ -563,12 +559,12 @@ export default function TransferTab() {
     if (e) e.preventDefault();
 
     if (!destination) {
-      alert('Selecione a Filial de Destino da transferência.');
+      toast.warning('Selecione a Filial de Destino da transferência.');
       return;
     }
 
     if (transferItems.length === 0) {
-      alert('Adicione ao menos um produto no Romaneio antes de expedir.');
+      toast.warning('Adicione ao menos um produto no Romaneio antes de expedir.');
       return;
     }
 
@@ -598,6 +594,7 @@ export default function TransferTab() {
       const res = await api.post('/v1/transferencias', payload);
       const newTrId = Number(res.data?.id || res.data?.tr_id || res.data?.TR_ID || 1);
 
+      toast.success(`Romaneio de Transferência #${newTrId} salvo e expedido com sucesso!`);
       setSuccessMsg(`Romaneio de Transferência #${newTrId} salvo e expedido com sucesso!`);
       setTimeout(() => setSuccessMsg(''), 5000);
 
@@ -610,7 +607,7 @@ export default function TransferTab() {
       fetchTransfers();
     } catch (err) {
       console.error('Erro ao salvar romaneio:', err);
-      alert('Erro ao salvar e expedir transferência.');
+      toast.error('Erro ao salvar e expedir transferência.');
     } finally {
       setLoading(false);
     }
@@ -632,7 +629,7 @@ export default function TransferTab() {
           sizeName = item.sigla.trim();
         }
 
-        // Se ainda não tiver o tamanho textual (ex: 'P', 'M', 'G', 'GG'), consulta as variações de grade do produto
+        // Se ainda não tiver o tamanho textual, consulta as variações de grade do produto
         const pId = Number(item.produtoId || item.produto_id);
         if (!sizeName && pId > 0) {
           try {
@@ -744,9 +741,11 @@ export default function TransferTab() {
         setReceptionObs('');
         setBlindCheckRevealed(false); // Esconde divergências até o conferente revelar
         setActiveSubTab('reception');
+      } else {
+        toast.warning('Nenhum item localizado para este romaneio.');
       }
     } catch (err) {
-      alert('Erro ao carregar itens para conferência.');
+      toast.error('Erro ao carregar itens para conferência.');
     } finally {
       setLoading(false);
     }
@@ -754,7 +753,7 @@ export default function TransferTab() {
 
   const handleApproveReception = async (status) => {
     if (!checkerName.trim()) {
-      alert('Por favor, informe o nome do conferente/responsável pela conferência.');
+      toast.warning('Por favor, informe o nome do conferente/responsável pela conferência.');
       return;
     }
 
@@ -776,7 +775,7 @@ export default function TransferTab() {
       }));
       await api.post('/v1/transferenciaItens/emLote', { itens: formattedReceptionItems });
 
-      alert('Recepção concluída e estoque da filial atualizado com sucesso!');
+      toast.success('Recepção concluída e estoque da filial atualizado com sucesso!');
       setReceptionTransfer(null);
       setReceptionItems([]);
       setCheckerName('');
@@ -786,7 +785,7 @@ export default function TransferTab() {
       fetchTransfers();
     } catch (err) {
       console.error(err);
-      alert('Erro ao aprovar o recebimento.');
+      toast.error('Erro ao aprovar o recebimento.');
     } finally {
       setLoading(false);
     }
@@ -797,15 +796,15 @@ export default function TransferTab() {
       case 'Pendente':
         return <span className="badge badge-warning">Pendente</span>;
       case 'Em Trânsito':
-        return <span className="badge badge-info" style={{ background: '#0284c7', color: '#fff' }}>🚚 Em Trânsito</span>;
+        return <span className="badge badge-info">Em Trânsito</span>;
       case 'Conferido/Aprovado':
-        return <span className="badge badge-success">🟢 Conferido & Aprovado</span>;
+        return <span className="badge badge-success">Conferido & Aprovado</span>;
       case 'Aceito Parcialmente':
-        return <span className="badge badge-warning" style={{ backgroundColor: '#f59e0b', color: '#ffffff' }}>🟡 Aceito em Partes</span>;
+        return <span className="badge badge-warning">Aceito em Partes</span>;
       case 'Rejeitado':
-        return <span className="badge badge-danger">🔴 Recusado</span>;
+        return <span className="badge badge-danger">Recusado</span>;
       default:
-        return <span className="badge">{status}</span>;
+        return <span className="badge badge-neutral">{status}</span>;
     }
   };
 
@@ -829,6 +828,9 @@ export default function TransferTab() {
     return 'UN';
   };
 
+  // Transferências em trânsito aguardando conferência
+  const pendingReceptionTransfers = transfers.filter(t => t.status === 'Em Trânsito' || t.status === 'Pendente');
+
   return (
     <div className="cd-transfers-container full-width">
       
@@ -840,38 +842,46 @@ export default function TransferTab() {
         </div>
       )}
 
-      {/* Navegação de Abas Superiores */}
-      <div className="cd-header-tabs glass">
+      {/* Navegação de Subabas Padronizada */}
+      <div className="crud-header-tabs glass">
         <button 
-          className={`cd-tab-btn ${activeSubTab === 'list' ? 'active' : ''}`}
+          className={`crud-tab-btn ${activeSubTab === 'list' ? 'active' : ''}`}
           onClick={() => { setActiveSubTab('list'); setIsViewingDetails(false); }}
         >
-          <ArrowRightLeft size={18} /> Romaneios & Transferências
+          <ArrowRightLeft size={18} /> Remessas & Transferências
         </button>
         <button 
-          className={`cd-tab-btn ${activeSubTab === 'new' ? 'active' : ''}`}
+          className={`crud-tab-btn ${activeSubTab === 'new' ? 'active' : ''}`}
           onClick={() => setActiveSubTab('new')}
         >
-          <Plus size={18} /> Novo Romaneio de Envio (Livre Escolha)
+          <Plus size={18} /> Novo Romaneio de Envio
+        </button>
+        <button 
+          className={`crud-tab-btn ${activeSubTab === 'reception' ? 'active' : ''}`}
+          onClick={() => setActiveSubTab('reception')}
+        >
+          <ShieldCheck size={18} /> Conferência de Recebimento
         </button>
       </div>
 
       {loading && <div className="loading-bar">Processando dados do Centro de Distribuição...</div>}
 
       {/* ========================================================================= */}
-      {/* SUBTAB 1: LISTAGEM DE ROMANEIOS & TRANSFERÊNCIAS                          */}
+      {/* SUBTAB 1: LISTAGEM DE REMESSAS & TRANSFERÊNCIAS                           */}
       {/* ========================================================================= */}
       {activeSubTab === 'list' && !isViewingDetails && (
         <div className="list-card glass">
           <div className="cd-title-row">
             <div>
-              <h3><Truck size={22} color="#f97316" /> Romaneios de Transferência (CD ➔ Filiais | Filial ➔ Filial)</h3>
-              <p style={{ fontSize: '0.84rem', color: '#64748b', margin: '2px 0 0 0' }}>
-                Gestão centralizada de expedição física e emissão automática de NF-e entre quaisquer unidades
+              <h3>
+                <Truck size={22} color="#f97316" /> Remessas & Transferências (CD → Filiais | Filial → Filial)
+              </h3>
+              <p className="cd-subtitle">
+                Gestão centralizada de expedição física e emissão automática de NF-e entre filiais e o CD
               </p>
             </div>
-            <button className="refresh-btn" onClick={fetchTransfers} disabled={loading}>
-              <RefreshCw size={17} /> Atualizar Lista
+            <button className="btn-secondary" onClick={fetchTransfers} disabled={loading}>
+              <RefreshCw size={16} /> Atualizar Lista
             </button>
           </div>
 
@@ -879,14 +889,14 @@ export default function TransferTab() {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th style={{ width: '85px' }}>Romaneio</th>
-                  <th style={{ width: '160px' }}>Origem</th>
-                  <th style={{ width: '160px' }}>Destino</th>
-                  <th style={{ width: '100px' }}>Data Envio</th>
-                  <th style={{ width: '130px', textAlign: 'center' }}>Status</th>
+                  <th style={{ width: '90px' }}>Romaneio</th>
+                  <th style={{ width: '180px' }}>Origem</th>
+                  <th style={{ width: '180px' }}>Destino</th>
+                  <th style={{ width: '110px' }}>Data Envio</th>
+                  <th style={{ width: '140px', textAlign: 'center' }}>Status</th>
                   <th>Observação Logística</th>
-                  <th style={{ width: '120px', textAlign: 'center' }}>NF-e Mod 55</th>
-                  <th style={{ width: '230px', textAlign: 'center' }}>Ações</th>
+                  <th style={{ width: '130px', textAlign: 'center' }}>NF-e Mod 55</th>
+                  <th style={{ width: '250px', textAlign: 'center' }}>Ações</th>
                 </tr>
               </thead>
               <tbody>
@@ -904,19 +914,19 @@ export default function TransferTab() {
                           <ShieldCheck size={12} /> #{item.numeroNf || 'Emitida'}
                         </span>
                       ) : item.tipoFiscal === 'NAO_FISCAL' ? (
-                        <span className="badge" style={{ background: '#f1f5f9', color: '#64748b' }}>
-                          📦 Controle Físico
+                        <span className="badge badge-neutral">
+                          <Layers size={12} /> Controle Físico
                         </span>
                       ) : (
                         <span className="badge badge-warning" style={{ fontSize: '0.72rem' }}>
-                          ⚡ Pendente Emissão
+                          Pendente Emissão
                         </span>
                       )}
                     </td>
                     <td style={{ textAlign: 'center' }}>
-                      <div style={{ display: 'inline-flex', gap: '5px', justifyContent: 'center' }}>
+                      <div style={{ display: 'inline-flex', gap: '6px', justifyContent: 'center', flexWrap: 'wrap' }}>
                         <button 
-                          className="cd-action-btn view" 
+                          className="crud-row-btn" 
                           onClick={() => handleViewDetails(item)} 
                           title="Ver Itens do Romaneio"
                         >
@@ -924,29 +934,24 @@ export default function TransferTab() {
                         </button>
 
                         <button 
-                          className="cd-action-btn" 
+                          className="btn-secondary small" 
                           onClick={() => handleOpenRomaneio(item)} 
                           title="Imprimir Guia de Separação / Romaneio de Carga A4"
-                          style={{ background: '#2563eb', color: '#ffffff' }}
                         >
                           <Printer size={13} /> Romaneio
                         </button>
 
                         <button 
-                          className="cd-action-btn" 
+                          className="btn-secondary small" 
                           onClick={() => handleOpenNfeModal(item)} 
                           title="Visualizar ou Emitir NF-e de Transferência dos Itens Fiscais"
-                          style={{ 
-                            background: item.chaveNfe ? '#059669' : '#7c3aed', 
-                            color: '#ffffff' 
-                          }}
                         >
                           <FileText size={13} /> {item.chaveNfe ? 'Ver NF-e' : 'Emitir NF-e'}
                         </button>
                         
                         {item.status === 'Em Trânsito' && (
                           <button 
-                            className="cd-action-btn check" 
+                            className="btn-primary small" 
                             onClick={() => handleOpenConference(item)}
                             title="Conferir e Receber Carga na Filial"
                           >
@@ -978,26 +983,26 @@ export default function TransferTab() {
           <div className="cd-title-row">
             <div>
               <h3>Itens do Romaneio #{selectedTransfer.id}</h3>
-              <span style={{ fontSize: '0.85rem', color: '#64748b' }}>
-                Origem: {getUnitName(selectedTransfer.origem)} ➔ Destino: <strong>{getUnitName(selectedTransfer.destino)}</strong>
-              </span>
+              <p className="cd-subtitle">
+                Origem: {getUnitName(selectedTransfer.origem)} <ArrowRight size={14} style={{ display: 'inline', verticalAlign: 'middle' }} /> Destino: <strong>{getUnitName(selectedTransfer.destino)}</strong>
+              </p>
             </div>
-            <div style={{ display: 'flex', gap: '0.6rem' }}>
+            <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
               <button 
-                className="refresh-btn" 
+                className="btn-secondary" 
                 onClick={() => handleOpenRomaneio(selectedTransfer)}
-                style={{ background: '#2563eb', color: '#ffffff', border: 'none' }}
               >
                 <Printer size={16} /> Imprimir Romaneio A4
               </button>
               <button 
-                className="refresh-btn" 
+                className="btn-primary" 
                 onClick={() => handleOpenNfeModal(selectedTransfer)}
-                style={{ background: '#059669', color: '#ffffff', border: 'none' }}
               >
                 <FileText size={16} /> NF-e de Transferência
               </button>
-              <button className="refresh-btn" onClick={() => setIsViewingDetails(false)}>Voltar</button>
+              <button className="btn-secondary" onClick={() => setIsViewingDetails(false)}>
+                Voltar
+              </button>
             </div>
           </div>
 
@@ -1007,8 +1012,8 @@ export default function TransferTab() {
                 <tr>
                   <th style={{ width: '80px' }}>Código</th>
                   <th>Descrição do Produto</th>
-                  <th style={{ width: '100px', textAlign: 'center' }}>Tam / Grade</th>
-                  <th style={{ width: '130px' }}>Classificação</th>
+                  <th style={{ width: '110px', textAlign: 'center' }}>Tam / Grade</th>
+                  <th style={{ width: '140px' }}>Classificação</th>
                   <th style={{ width: '100px', textAlign: 'center' }}>Qtd Enviada</th>
                   <th style={{ width: '100px', textAlign: 'center' }}>Qtd Conferida</th>
                   <th style={{ width: '120px', textAlign: 'right' }}>Valor Unitário</th>
@@ -1029,23 +1034,19 @@ export default function TransferTab() {
                       <td><span className="item-code">#{item.produtoId || item.produto_id}</span></td>
                       <td><strong>{prod ? prod.nome : (item.nome || `Produto #${item.produtoId || item.produto_id}`)}</strong></td>
                       <td style={{ textAlign: 'center' }}>
-                        <span style={{ 
-                          fontSize: '0.82rem', 
-                          fontWeight: 700, 
-                          background: '#f8fafc', 
-                          color: '#1e293b', 
-                          padding: '2px 8px', 
-                          borderRadius: '4px',
-                          border: '1px solid #cbd5e1'
-                        }}>
+                        <span className="badge badge-neutral">
                           {tam}{cor ? ` • ${cor}` : ''}
                         </span>
                       </td>
                       <td>
                         {isFiscal ? (
-                          <span className="badge badge-success" style={{ fontSize: '0.72rem' }}>🏛️ Fiscal (NF-e)</span>
+                          <span className="badge badge-success" style={{ fontSize: '0.72rem' }}>
+                            <FileCheck2 size={12} /> Fiscal (NF-e)
+                          </span>
                         ) : (
-                          <span className="badge" style={{ background: '#f1f5f9', color: '#475569', fontSize: '0.72rem' }}>📦 Controle Físico</span>
+                          <span className="badge badge-neutral" style={{ fontSize: '0.72rem' }}>
+                            <Layers size={12} /> Controle Físico
+                          </span>
                         )}
                       </td>
                       <td style={{ textAlign: 'center', fontWeight: 700 }}>{qtd}</td>
@@ -1070,7 +1071,7 @@ export default function TransferTab() {
           <div className="cd-title-row">
             <div>
               <h3><Send size={22} color="#f97316" /> Lançamento de Romaneio de Envio de Mercadorias</h3>
-              <p style={{ fontSize: '0.85rem', color: '#64748b', margin: '2px 0 0 0' }}>
+              <p className="cd-subtitle">
                 Monte o romaneio livremente com qualquer produto e grade. O sistema separará automaticamente os itens fiscais para NF-e.
               </p>
             </div>
@@ -1104,7 +1105,7 @@ export default function TransferTab() {
                   >
                     {units.map(u => (
                       <option key={u.id} value={String(u.id)}>
-                        {u.isMatriz ? '🏢' : '🏬'} {u.name}
+                        {u.name}
                       </option>
                     ))}
                   </select>
@@ -1122,7 +1123,7 @@ export default function TransferTab() {
                     <option value="">Selecione a Unidade de Destino...</option>
                     {units.filter(u => String(u.id) !== String(origin)).map(u => (
                       <option key={u.id} value={String(u.id)}>
-                        {u.isMatriz ? '🏢' : '🏬'} {u.name}
+                        {u.name}
                       </option>
                     ))}
                   </select>
@@ -1141,7 +1142,7 @@ export default function TransferTab() {
               </div>
 
               <div className="transfer-section-title" style={{ marginTop: '0.5rem' }}>
-                <Truck size={18} color="#2563eb" />
+                <Truck size={18} color="#f97316" />
                 <span>2. Transporte & Observações Logísticas</span>
               </div>
 
@@ -1185,13 +1186,13 @@ export default function TransferTab() {
             <div className="transfer-add-items-card">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <Package size={20} color="#2563eb" />
-                  <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 700 }}>Escolha de Produtos & Variações de Grade</h4>
+                  <Package size={20} color="#f97316" />
+                  <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' }}>Escolha de Produtos & Variações de Grade</h4>
                 </div>
 
-                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
                   {/* Bipagem Rápida */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '0.5rem', padding: '2px 8px' }}>
+                  <div className="barcode-input-container">
                     <Barcode size={18} color="#64748b" />
                     <input 
                       ref={barcodeInputRef}
@@ -1200,8 +1201,9 @@ export default function TransferTab() {
                       onChange={(e) => setBarcodeInput(e.target.value)}
                       onKeyDown={handleBarcodeScan}
                       placeholder="Bipar Código EAN..."
-                      style={{ border: 'none', outline: 'none', fontSize: '0.85rem', width: '150px' }}
+                      className="barcode-input"
                     />
+                    <kbd className="kbd-shortcut">Enter</kbd>
                   </div>
 
                   {/* Puxar de Compra / NF */}
@@ -1209,17 +1211,16 @@ export default function TransferTab() {
                     type="button" 
                     className="btn-secondary small" 
                     onClick={() => setShowNfImportBox(!showNfImportBox)}
-                    style={{ background: '#f0fdf4', color: '#16a34a', borderColor: '#bbf7d0' }}
                   >
-                    📥 Puxar de Compra / NF-e
+                    <Upload size={14} /> Puxar de Compra / NF-e
                   </button>
                 </div>
               </div>
 
               {/* Caixa de Importação de Compra */}
               {showNfImportBox && (
-                <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: '0.75rem', border: '1px solid #e2e8f0', marginBottom: '1rem', display: 'flex', gap: '0.75rem', alignItems: 'flex-end' }}>
-                  <div style={{ flex: 1 }}>
+                <div style={{ background: '#ffffff', padding: '1rem', borderRadius: '0.75rem', border: '1px solid #cbd5e1', marginBottom: '1rem', display: 'flex', gap: '0.75rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                  <div style={{ flex: 1, minWidth: '220px' }}>
                     <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '4px' }}>
                       Número da Nota ou Chave de Acesso da Compra:
                     </label>
@@ -1236,7 +1237,7 @@ export default function TransferTab() {
                     className="btn-primary" 
                     onClick={handleFetchNfItems}
                     disabled={loadingNf}
-                    style={{ height: '38px', padding: '0 1.25rem' }}
+                    style={{ height: '40px', padding: '0 1.25rem' }}
                   >
                     {loadingNf ? 'Importando...' : 'Carregar Itens'}
                   </button>
@@ -1245,7 +1246,9 @@ export default function TransferTab() {
 
               {/* Seletor com LookupSelect */}
               <div className="form-group" style={{ marginBottom: '1rem' }}>
-                <label style={{ fontWeight: 600, fontSize: '0.85rem' }}>Pesquisar Produto no Catálogo do CD:</label>
+                <label style={{ fontWeight: 600, fontSize: '0.85rem', color: '#334155', display: 'block', marginBottom: '4px' }}>
+                  Pesquisar Produto no Catálogo do CD:
+                </label>
                 <LookupSelect
                   value={selectedProductObj ? `#${selectedProductObj.codigo} - ${selectedProductObj.nome}` : ''}
                   placeholder="Busque por descrição, código, EAN ou referência..."
@@ -1268,8 +1271,8 @@ export default function TransferTab() {
                       label: 'Natureza', 
                       width: '110px',
                       render: (p) => (p.pro_fiscal_gerar !== 'N' && ((p.pro_cod_fiscal && Number(p.pro_cod_fiscal) > 0) || p.pro_fiscal_gerar === 'S'))
-                        ? <span className="badge badge-success" style={{ fontSize: '0.7rem' }}>🏛️ Fiscal</span>
-                        : <span className="badge" style={{ background: '#f1f5f9', color: '#475569', fontSize: '0.7rem' }}>📦 Físico</span>
+                        ? <span className="badge badge-success" style={{ fontSize: '0.7rem' }}><FileCheck2 size={12} /> Fiscal</span>
+                        : <span className="badge badge-neutral" style={{ fontSize: '0.7rem' }}><Layers size={12} /> Físico</span>
                     },
                     { key: 'valorv', label: 'Preço Venda', align: 'right', render: (p) => formatCurrency(p.valorv || 0) }
                   ]}
@@ -1277,19 +1280,19 @@ export default function TransferTab() {
                 />
               </div>
 
-              {/* MATRIZ DE VARIAÇÕES DE GRADE (Se o produto tiver variações cadastradas com estoque) */}
+              {/* MATRIZ DE VARIAÇÕES DE GRADE */}
               {selectedProductObj && productGrades.length > 0 && (
                 <div className="transfer-grade-matrix-card">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '8px' }}>
+                  <div className="transfer-matrix-header">
                     <div>
-                      <span style={{ fontWeight: 700, color: '#1e293b', fontSize: '0.98rem' }}>
-                        ✨ Variações de Tamanho / Grade com Estoque: #{selectedProductObj.codigo} - {selectedProductObj.nome}
+                      <span className="transfer-matrix-title">
+                        Variações de Tamanho / Grade com Estoque: #{selectedProductObj.codigo} - {selectedProductObj.nome}
                       </span>
-                      <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '2px' }}>
-                        Unidade Origem: <strong>{getUnitName(origin)}</strong> | Saldo Total: <strong style={{ color: '#16a34a' }}>{selectedProductStock} UN</strong>
+                      <div className="transfer-matrix-subtitle">
+                        Unidade Origem: <strong>{getUnitName(origin)}</strong> | Saldo Total: <strong className="text-success">{selectedProductStock} UN</strong>
                       </div>
                     </div>
-                    <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                    <span className="transfer-matrix-hint">
                       Informe a quantidade desejada em cada tamanho com saldo disponível:
                     </span>
                   </div>
@@ -1304,7 +1307,7 @@ export default function TransferTab() {
                       return (
                         <div key={gId} className="transfer-grade-box">
                           <div className="transfer-grade-label">{tamNome}</div>
-                          <div className="transfer-grade-stock" style={{ color: '#16a34a', fontWeight: 600, fontSize: '0.78rem' }}>
+                          <div className="transfer-grade-stock">
                             Disponível: {maxQtd} UN
                           </div>
                           <input 
@@ -1317,7 +1320,7 @@ export default function TransferTab() {
                               if (isNaN(val) || val < 0) val = 0;
                               if (val > maxQtd) {
                                 val = maxQtd;
-                                alert(`A quantidade informada ultrapassa o estoque disponível (${maxQtd} UN) para o tamanho ${tamNome}.`);
+                                toast.warning(`A quantidade informada ultrapassa o estoque disponível (${maxQtd} UN) para o tamanho ${tamNome}.`);
                               }
                               handleMatrixQtyChange(gId, val);
                             }}
@@ -1329,20 +1332,19 @@ export default function TransferTab() {
                     })}
                   </div>
 
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
+                  <div className="transfer-matrix-actions">
                     <button 
                       type="button" 
                       className="btn-primary" 
                       onClick={handleAddGradeMatrixToTransfer}
-                      style={{ padding: '0.6rem 1.5rem', fontWeight: 700 }}
                     >
-                      + Inserir Grade no Romaneio
+                      <Plus size={16} /> Inserir Grade no Romaneio
                     </button>
                   </div>
                 </div>
               )}
 
-              {/* SELEÇÃO SIMPLES (Caso o produto não tenha matriz de grades ou não haja grades com saldo) */}
+              {/* SELEÇÃO SIMPLES */}
               {selectedProductObj && productGrades.length === 0 && (
                 <div style={{ background: '#ffffff', padding: '1rem', borderRadius: '0.75rem', border: '1px solid #cbd5e1', display: 'flex', gap: '1rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
                   <div style={{ flex: 2, minWidth: '200px' }}>
@@ -1350,10 +1352,10 @@ export default function TransferTab() {
                     <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#1e293b' }}>
                       #{selectedProductObj.codigo} - {selectedProductObj.nome}
                     </div>
-                    <div style={{ fontSize: '0.82rem', marginTop: '4px', fontWeight: 600, color: selectedProductStock > 0 ? '#16a34a' : '#dc2626' }}>
+                    <div style={{ fontSize: '0.82rem', marginTop: '4px', fontWeight: 600 }} className={selectedProductStock > 0 ? 'text-success' : 'text-danger'}>
                       {selectedProductStock > 0 
-                        ? `📦 Estoque Disponível na Origem (${getUnitName(origin)}): ${selectedProductStock} UN` 
-                        : `⚠️ Sem estoque disponível na unidade de origem (${getUnitName(origin)})`}
+                        ? `Estoque Disponível na Origem (${getUnitName(origin)}): ${selectedProductStock} UN` 
+                        : `Sem estoque disponível na unidade de origem (${getUnitName(origin)})`}
                     </div>
                   </div>
 
@@ -1368,7 +1370,7 @@ export default function TransferTab() {
                         let val = Number(e.target.value);
                         if (selectedProductStock > 0 && val > selectedProductStock) {
                           val = selectedProductStock;
-                          alert(`A quantidade não pode ultrapassar o saldo disponível (${selectedProductStock} UN).`);
+                          toast.warning(`A quantidade não pode ultrapassar o saldo disponível (${selectedProductStock} UN).`);
                         }
                         setSingleQty(val);
                       }} 
@@ -1392,10 +1394,10 @@ export default function TransferTab() {
                     type="button" 
                     className="btn-primary" 
                     onClick={handleAddSingleProductToTransfer}
-                    style={{ height: '38px', padding: '0 1.25rem' }}
+                    style={{ height: '40px', padding: '0 1.25rem' }}
                     disabled={selectedProductStock <= 0}
                   >
-                    + Adicionar Item
+                    <Plus size={16} /> Adicionar Item
                   </button>
                 </div>
               )}
@@ -1426,7 +1428,7 @@ export default function TransferTab() {
                       <th style={{ width: '80px' }}>Código</th>
                       <th>Descrição do Produto</th>
                       <th style={{ width: '120px', textAlign: 'center' }}>Variação / Tam</th>
-                      <th style={{ width: '150px' }}>Classificação Fiscal Auto</th>
+                      <th style={{ width: '160px' }}>Classificação Fiscal Auto</th>
                       <th style={{ width: '100px', textAlign: 'center' }}>Qtd</th>
                       <th style={{ width: '120px', textAlign: 'right' }}>Vlr Unitário</th>
                       <th style={{ width: '130px', textAlign: 'right' }}>Subtotal</th>
@@ -1451,16 +1453,16 @@ export default function TransferTab() {
                               onClick={() => handleToggleItemFiscal(idx)}
                               title="Clique para alternar classificação"
                             >
-                              🏛️ Fiscal (Gera NF-e)
+                              <FileCheck2 size={12} /> Fiscal (Gera NF-e)
                             </span>
                           ) : (
                             <span 
-                              className="badge" 
-                              style={{ background: '#f1f5f9', color: '#475569', fontSize: '0.75rem', cursor: 'pointer' }}
+                              className="badge badge-neutral" 
+                              style={{ fontSize: '0.75rem', cursor: 'pointer' }}
                               onClick={() => handleToggleItemFiscal(idx)}
                               title="Clique para alternar classificação"
                             >
-                              📦 Controle Físico
+                              <Layers size={12} /> Controle Físico
                             </span>
                           )}
                         </td>
@@ -1514,22 +1516,37 @@ export default function TransferTab() {
               <div className="transfer-summary-grid">
                 
                 <div className="transfer-kpi-card total">
-                  <div className="transfer-kpi-title">📦 Total no Romaneio</div>
-                  <div className="transfer-kpi-value">{totalPecas} peças</div>
-                  <div className="transfer-kpi-sub">{formatCurrency(totalValor)}</div>
+                  <div className="transfer-kpi-header">
+                    <div className="transfer-kpi-icon-wrap total">
+                      <Package size={18} />
+                    </div>
+                    <div className="transfer-kpi-title">Total no Romaneio</div>
+                  </div>
+                  <div className="transfer-kpi-value">{totalPecas} <span className="kpi-unit">peças</span></div>
+                  <div className="transfer-kpi-sub">{formatCurrency(totalValor)} • {transferItems.length} linhas</div>
                 </div>
 
                 <div className="transfer-kpi-card fiscal">
-                  <div className="transfer-kpi-title">🏛️ Itens Fiscais (NF-e Mod 55)</div>
-                  <div className="transfer-kpi-value" style={{ color: '#059669' }}>{pecasFiscais} peças</div>
+                  <div className="transfer-kpi-header">
+                    <div className="transfer-kpi-icon-wrap fiscal">
+                      <FileCheck2 size={18} />
+                    </div>
+                    <div className="transfer-kpi-title">Itens Fiscais (NF-e Mod 55)</div>
+                  </div>
+                  <div className="transfer-kpi-value fiscal-val">{pecasFiscais} <span className="kpi-unit">peças</span></div>
                   <div className="transfer-kpi-sub">
                     {formatCurrency(valorFiscal)} • <em>Gera NF-e de Transferência</em>
                   </div>
                 </div>
 
                 <div className="transfer-kpi-card physical">
-                  <div className="transfer-kpi-title">📋 Controle Físico / Interno</div>
-                  <div className="transfer-kpi-value" style={{ color: '#0284c7' }}>{pecasFisicas} peças</div>
+                  <div className="transfer-kpi-header">
+                    <div className="transfer-kpi-icon-wrap physical">
+                      <Layers size={18} />
+                    </div>
+                    <div className="transfer-kpi-title">Controle Físico / Interno</div>
+                  </div>
+                  <div className="transfer-kpi-value physical-val">{pecasFisicas} <span className="kpi-unit">peças</span></div>
                   <div className="transfer-kpi-sub">
                     {formatCurrency(valorFisico)} • <em>Apenas Romaneio de Carga</em>
                   </div>
@@ -1551,7 +1568,7 @@ export default function TransferTab() {
                 type="submit" 
                 className="btn-primary" 
                 disabled={loading || transferItems.length === 0}
-                style={{ padding: '0.75rem 2rem', fontSize: '1rem', fontWeight: 700 }}
+                style={{ padding: '0.75rem 2rem', fontSize: '1rem' }}
               >
                 <Send size={18} /> Salvar & Expedir Romaneio
               </button>
@@ -1565,167 +1582,236 @@ export default function TransferTab() {
       {/* ========================================================================= */}
       {/* SUBTAB 3: CONFERÊNCIA CEGA DE RECEBIMENTO NA FILIAL                      */}
       {/* ========================================================================= */}
-      {activeSubTab === 'reception' && receptionTransfer && (
+      {activeSubTab === 'reception' && (
         <div className="list-card glass">
-          <div className="cd-title-row">
-            <div>
-              <h3><ShieldCheck size={22} color="#10b981" /> Conferência Cega — Recebimento de Carga</h3>
-              <span style={{ fontSize: '0.85rem', color: '#64748b' }}>
-                Romaneio Lote #{receptionTransfer.id} • Destino: {getUnitName(receptionTransfer.destino)}
-              </span>
-              <p style={{ fontSize: '0.78rem', color: '#94a3b8', margin: '4px 0 0 0', fontStyle: 'italic' }}>
-                🔒 Conferência Cega: conte fisicamente cada item e registre a quantidade real. A quantidade esperada ficará oculta até que você clique em "Revelar Divergências".
-              </p>
-            </div>
-            <button className="refresh-btn" onClick={() => setActiveSubTab('list')}>Voltar</button>
-          </div>
+          
+          {/* MODO 1: CONFERÊNCIA ATIVA PARA UM ROMANEIO SELECIONADO */}
+          {receptionTransfer ? (
+            <>
+              <div className="cd-title-row">
+                <div>
+                  <h3><ShieldCheck size={22} color="#16a34a" /> Conferência Cega — Recebimento de Carga</h3>
+                  <p className="cd-subtitle">
+                    Romaneio Lote #{receptionTransfer.id} • Destino: <strong>{getUnitName(receptionTransfer.destino)}</strong>
+                  </p>
+                  <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '4px 0 0 0' }}>
+                    Conferência Cega: conte fisicamente cada item e registre a quantidade real. A quantidade esperada ficará oculta até que você clique em "Revelar Divergências".
+                  </p>
+                </div>
+                <button className="btn-secondary" onClick={() => { setReceptionTransfer(null); setActiveSubTab('list'); }}>
+                  Voltar
+                </button>
+              </div>
 
-          <div className="table-responsive" style={{ marginTop: '1rem' }}>
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th style={{ width: '80px' }}>Código</th>
-                  <th>Descrição do Produto</th>
-                  <th style={{ width: '130px', textAlign: 'center' }}>Qtd Contada (Real)</th>
-                  {blindCheckRevealed && (
-                    <>
-                      <th style={{ width: '100px', textAlign: 'center' }}>Qtd Esperada</th>
-                      <th style={{ width: '110px', textAlign: 'center' }}>Divergência</th>
-                    </>
-                  )}
-                  <th>Justificativa / Divergência</th>
-                </tr>
-              </thead>
-              <tbody>
-                {receptionItems.map((item, idx) => {
-                  const prod = products.find(p => p.codigo === item.produtoId);
-                  const diff = blindCheckRevealed ? (Number(item.quantidadeConferida) - Number(item.quantidade)) : null;
-                  return (
-                    <tr key={idx} style={blindCheckRevealed && diff !== 0 ? { background: '#fef2f2' } : {}}>
-                      <td><span className="item-code">#{item.produtoId}</span></td>
-                      <td><strong>{prod ? prod.nome : (item.nome || `Produto #${item.produtoId}`)}</strong></td>
-                      <td style={{ textAlign: 'center' }}>
-                        <input 
-                          type="number"
-                          min="0"
-                          value={item.quantidadeConferida}
-                          onChange={(e) => {
-                            const next = [...receptionItems];
-                            next[idx].quantidadeConferida = Number(e.target.value) || 0;
-                            setReceptionItems(next);
-                          }}
-                          style={{ 
-                            width: '90px', padding: '0.4rem', textAlign: 'center', fontWeight: 700, 
-                            borderRadius: '0.35rem', border: '2px solid #10b981', fontSize: '1rem',
-                            background: '#f0fdf4'
-                          }}
-                        />
-                      </td>
+              <div className="table-responsive" style={{ marginTop: '1rem' }}>
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: '80px' }}>Código</th>
+                      <th>Descrição do Produto</th>
+                      <th style={{ width: '140px', textAlign: 'center' }}>Qtd Contada (Real)</th>
                       {blindCheckRevealed && (
                         <>
-                          <td style={{ textAlign: 'center', fontWeight: 700, color: '#64748b' }}>{item.quantidade}</td>
-                          <td style={{ textAlign: 'center' }}>
-                            {diff === 0 ? (
-                              <span className="badge badge-success" style={{ fontSize: '0.75rem' }}>✅ OK</span>
-                            ) : diff > 0 ? (
-                              <span className="badge badge-warning" style={{ background: '#f59e0b', color: '#fff', fontSize: '0.75rem' }}>+{diff} Sobra</span>
-                            ) : (
-                              <span className="badge" style={{ background: '#ef4444', color: '#fff', fontSize: '0.75rem' }}>{diff} Falta</span>
-                            )}
-                          </td>
+                          <th style={{ width: '110px', textAlign: 'center' }}>Qtd Esperada</th>
+                          <th style={{ width: '120px', textAlign: 'center' }}>Divergência</th>
                         </>
                       )}
-                      <td>
-                        <input 
-                          type="text"
-                          value={item.justificativa}
-                          onChange={(e) => {
-                            const next = [...receptionItems];
-                            next[idx].justificativa = e.target.value;
-                            setReceptionItems(next);
-                          }}
-                          placeholder={blindCheckRevealed ? "Justifique sobras, faltas ou avarias..." : "Observação (opcional)..."}
-                          style={{ width: '100%', padding: '0.35rem 0.6rem', borderRadius: '0.35rem', border: '1px solid #cbd5e1' }}
-                        />
-                      </td>
+                      <th>Justificativa / Divergência</th>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          <div style={{ marginTop: '1.5rem', display: 'flex', gap: '1rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
-            <div style={{ flex: 1, minWidth: '220px' }}>
-              <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
-                Nome do Conferente / Responsável *:
-              </label>
-              <input 
-                type="text"
-                value={checkerName}
-                onChange={(e) => setCheckerName(e.target.value)}
-                placeholder="Digite seu nome completo..."
-                className="cd-text-input"
-                required
-              />
-            </div>
-
-            <div style={{ flex: 2, minWidth: '300px' }}>
-              <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
-                Observações da Recepção:
-              </label>
-              <input 
-                type="text"
-                value={receptionObs}
-                onChange={(e) => setReceptionObs(e.target.value)}
-                placeholder="Observações sobre o estado das caixas e lacres..."
-                className="cd-text-input"
-              />
-            </div>
-
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              {!blindCheckRevealed ? (
-                <button 
-                  type="button" 
-                  className="btn-primary" 
-                  onClick={() => {
-                    const allZero = receptionItems.every(it => Number(it.quantidadeConferida) === 0);
-                    if (allZero) {
-                      alert('Nenhum item foi contado ainda. Insira a quantidade real de cada item antes de revelar as divergências.');
-                      return;
-                    }
-                    setBlindCheckRevealed(true);
-                  }}
-                  style={{ background: '#7c3aed', height: '40px', padding: '0 1.5rem' }}
-                >
-                  <Eye size={18} /> Revelar Divergências
-                </button>
-              ) : (
-                <button 
-                  type="button" 
-                  className="btn-primary" 
-                  onClick={() => handleApproveReception('Conferido/Aprovado')}
-                  style={{ background: '#059669', height: '40px', padding: '0 1.5rem' }}
-                >
-                  <CheckCircle size={18} /> Aprovar Recepção
-                </button>
-              )}
-            </div>
-          </div>
-
-          {blindCheckRevealed && (() => {
-            const divergences = receptionItems.filter(it => Number(it.quantidadeConferida) !== Number(it.quantidade));
-            if (divergences.length === 0) return (
-              <div style={{ marginTop: '1rem', padding: '0.75rem 1rem', background: '#f0fdf4', borderRadius: '0.5rem', border: '1px solid #86efac', fontSize: '0.9rem', color: '#166534' }}>
-                ✅ Conferência 100% — Todos os {receptionItems.length} itens bateram com as quantidades esperadas.
+                  </thead>
+                  <tbody>
+                    {receptionItems.map((item, idx) => {
+                      const prod = products.find(p => p.codigo === item.produtoId);
+                      const diff = blindCheckRevealed ? (Number(item.quantidadeConferida) - Number(item.quantidade)) : null;
+                      return (
+                        <tr key={idx} style={blindCheckRevealed && diff !== 0 ? { background: '#fef2f2' } : {}}>
+                          <td><span className="item-code">#{item.produtoId}</span></td>
+                          <td><strong>{prod ? prod.nome : (item.nome || `Produto #${item.produtoId}`)}</strong></td>
+                          <td style={{ textAlign: 'center' }}>
+                            <input 
+                              type="number"
+                              min="0"
+                              value={item.quantidadeConferida}
+                              onChange={(e) => {
+                                const next = [...receptionItems];
+                                next[idx].quantidadeConferida = Number(e.target.value) || 0;
+                                setReceptionItems(next);
+                              }}
+                              style={{ 
+                                width: '90px', padding: '0.4rem', textAlign: 'center', fontWeight: 700, 
+                                borderRadius: '0.4rem', border: '2px solid #16a34a', fontSize: '1rem',
+                                background: '#f0fdf4'
+                              }}
+                            />
+                          </td>
+                          {blindCheckRevealed && (
+                            <>
+                              <td style={{ textAlign: 'center', fontWeight: 700, color: '#64748b' }}>{item.quantidade}</td>
+                              <td style={{ textAlign: 'center' }}>
+                                {diff === 0 ? (
+                                  <span className="badge badge-success">OK</span>
+                                ) : diff > 0 ? (
+                                  <span className="badge badge-warning">+{diff} Sobra</span>
+                                ) : (
+                                  <span className="badge badge-danger">{diff} Falta</span>
+                                )}
+                              </td>
+                            </>
+                          )}
+                          <td>
+                            <input 
+                              type="text"
+                              value={item.justificativa}
+                              onChange={(e) => {
+                                const next = [...receptionItems];
+                                next[idx].justificativa = e.target.value;
+                                setReceptionItems(next);
+                              }}
+                              placeholder={blindCheckRevealed ? "Justifique sobras, faltas ou avarias..." : "Observação (opcional)..."}
+                              style={{ width: '100%', padding: '0.4rem 0.6rem', borderRadius: '0.35rem', border: '1px solid #cbd5e1' }}
+                            />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
-            );
-            return (
-              <div style={{ marginTop: '1rem', padding: '0.75rem 1rem', background: '#fef2f2', borderRadius: '0.5rem', border: '1px solid #fca5a5', fontSize: '0.9rem', color: '#991b1b' }}>
-                ⚠️ {divergences.length} item(ns) com divergência detectada. Preencha a justificativa antes de aprovar.
+
+              <div style={{ marginTop: '1.5rem', display: 'flex', gap: '1rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                <div style={{ flex: 1, minWidth: '220px' }}>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                    Nome do Conferente / Responsável *:
+                  </label>
+                  <input 
+                    type="text"
+                    value={checkerName}
+                    onChange={(e) => setCheckerName(e.target.value)}
+                    placeholder="Digite seu nome completo..."
+                    className="cd-text-input"
+                    required
+                  />
+                </div>
+
+                <div style={{ flex: 2, minWidth: '300px' }}>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                    Observações da Recepção:
+                  </label>
+                  <input 
+                    type="text"
+                    value={receptionObs}
+                    onChange={(e) => setReceptionObs(e.target.value)}
+                    placeholder="Observações sobre o estado das caixas e lacres..."
+                    className="cd-text-input"
+                  />
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  {!blindCheckRevealed ? (
+                    <button 
+                      type="button" 
+                      className="btn-primary" 
+                      onClick={() => {
+                        const allZero = receptionItems.every(it => Number(it.quantidadeConferida) === 0);
+                        if (allZero) {
+                          toast.warning('Nenhum item foi contado ainda. Insira a quantidade real de cada item antes de revelar as divergências.');
+                          return;
+                        }
+                        setBlindCheckRevealed(true);
+                      }}
+                      style={{ height: '42px', padding: '0 1.5rem' }}
+                    >
+                      <Eye size={18} /> Revelar Divergências
+                    </button>
+                  ) : (
+                    <button 
+                      type="button" 
+                      className="btn-primary btn-success" 
+                      onClick={() => handleApproveReception('Conferido/Aprovado')}
+                      style={{ height: '42px', padding: '0 1.5rem' }}
+                    >
+                      <CheckCircle size={18} /> Aprovar Recepção
+                    </button>
+                  )}
+                </div>
               </div>
-            );
-          })()}
+
+              {blindCheckRevealed && (() => {
+                const divergences = receptionItems.filter(it => Number(it.quantidadeConferida) !== Number(it.quantidade));
+                if (divergences.length === 0) return (
+                  <div className="cd-feedback-banner success" style={{ marginTop: '1rem' }}>
+                    <CheckCircle size={18} />
+                    <span>Conferência 100% — Todos os {receptionItems.length} itens bateram com as quantidades esperadas.</span>
+                  </div>
+                );
+                return (
+                  <div className="cd-feedback-banner warning" style={{ marginTop: '1rem' }}>
+                    <AlertTriangle size={18} />
+                    <span>{divergences.length} item(ns) com divergência detectada. Preencha a justificativa antes de aprovar.</span>
+                  </div>
+                );
+              })()}
+            </>
+          ) : (
+            /* MODO 2: LISTAGEM DE REMESSAS AGUARDANDO CONFERÊNCIA */
+            <>
+              <div className="cd-title-row">
+                <div>
+                  <h3><ShieldCheck size={22} color="#16a34a" /> Remessas Aguardando Conferência na Filial</h3>
+                  <p className="cd-subtitle">
+                    Selecione uma remessa com status "Em Trânsito" para iniciar a contagem cega física
+                  </p>
+                </div>
+                <button className="btn-secondary" onClick={fetchTransfers} disabled={loading}>
+                  <RefreshCw size={16} /> Atualizar Lista
+                </button>
+              </div>
+
+              <div className="table-responsive">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: '90px' }}>Romaneio</th>
+                      <th style={{ width: '180px' }}>Origem</th>
+                      <th style={{ width: '180px' }}>Destino</th>
+                      <th style={{ width: '110px' }}>Data Envio</th>
+                      <th style={{ width: '140px', textAlign: 'center' }}>Status</th>
+                      <th>Observações</th>
+                      <th style={{ width: '160px', textAlign: 'center' }}>Ação</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pendingReceptionTransfers.map((item, idx) => (
+                      <tr key={item.id || idx}>
+                        <td><span className="item-code">#{item.id}</span></td>
+                        <td>{getUnitName(item.origem)}</td>
+                        <td><strong>{getUnitName(item.destino)}</strong></td>
+                        <td>{formatDate(item.data)}</td>
+                        <td style={{ textAlign: 'center' }}>{getStatusBadge(item.status)}</td>
+                        <td>{item.obs || '-'}</td>
+                        <td style={{ textAlign: 'center' }}>
+                          <button 
+                            className="btn-primary small" 
+                            onClick={() => handleOpenConference(item)}
+                            title="Iniciar Conferência Cega"
+                          >
+                            <ShieldCheck size={14} /> Iniciar Conferência
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                    {pendingReceptionTransfers.length === 0 && (
+                      <tr>
+                        <td colSpan="7" style={{ textAlign: 'center', padding: '2.5rem', color: '#94a3b8' }}>
+                          Nenhuma remessa em trânsito aguardando conferência no momento.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
 
         </div>
       )}

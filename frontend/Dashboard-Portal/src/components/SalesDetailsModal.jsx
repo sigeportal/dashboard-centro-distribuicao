@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, AlertTriangle, ReceiptText } from 'lucide-react';
+import { X, AlertTriangle, ReceiptText, Printer } from 'lucide-react';
 import { formatCurrency, formatDate, formatExcelDate, formatExcelTime, formatPercentage } from '../utils/formatters';
 import { logError } from '../utils/logger';
 import { createApi } from '../services/api';
@@ -89,20 +89,27 @@ export default function SalesDetailsModal({ isOpen, onClose, sale }) {
         aria-modal="true"
         aria-labelledby="sales-modal-title"
       >
+        {/* Header */}
         <div className="sales-modal-header">
-          <h3 id="sales-modal-title">
-            <ReceiptText size={22} className="header-icon" />
-            <span>Detalhes da Venda #{saleCode}</span>
-          </h3>
+          <div className="sales-modal-title-group">
+            <div className="sales-modal-icon-badge">
+              <ReceiptText size={22} />
+            </div>
+            <div>
+              <h3 id="sales-modal-title">Detalhes da Venda</h3>
+              <span className="sales-modal-subtitle">Comprovante #{saleCode} • Lançamento de PDV</span>
+            </div>
+          </div>
           <button className="sales-modal-close" onClick={onClose} aria-label="Fechar detalhes da venda">
             <X size={20} />
           </button>
         </div>
 
+        {/* Modal Body */}
         <div className="sales-modal-body">
           {isPendingReturn && (
             <div className="sales-modal-warning">
-              <AlertTriangle size={20} className="warning-icon" />
+              <AlertTriangle size={18} className="warning-icon" />
               <div>
                 <strong>Devolução Pendente:</strong> Há um processo de devolução em aberto para esta venda.
               </div>
@@ -111,27 +118,27 @@ export default function SalesDetailsModal({ isOpen, onClose, sale }) {
 
           {/* Metadata Grid */}
           <div className="sales-metadata-grid">
-            <div className="metadata-card">
+            <div className="metadata-card glass">
               <span className="metadata-label">Código</span>
-              <span className="metadata-value">{saleCode}</span>
+              <span className="metadata-value">#{saleCode}</span>
             </div>
-            <div className="metadata-card">
+            <div className="metadata-card glass">
               <span className="metadata-label">Data / Hora</span>
               <span className="metadata-value">{dateTimeStr}</span>
             </div>
-            <div className="metadata-card">
+            <div className="metadata-card glass">
               <span className="metadata-label">Vendedor</span>
               <span className="metadata-value">{saleVendor}</span>
             </div>
-            <div className="metadata-card">
+            <div className="metadata-card glass">
               <span className="metadata-label">PDV</span>
               <span className="metadata-value">PDV {salePdv}</span>
             </div>
-            <div className="metadata-card">
+            <div className="metadata-card glass">
               <span className="metadata-label">Cliente</span>
-              <span className="metadata-value">{saleClient}</span>
+              <span className="metadata-value" title={saleClient}>{saleClient}</span>
             </div>
-            <div className="metadata-card highlight">
+            <div className="metadata-card highlight glass">
               <span className="metadata-label">Valor Total</span>
               <span className="metadata-value total">{formatCurrency(saleTotal)}</span>
             </div>
@@ -140,12 +147,14 @@ export default function SalesDetailsModal({ isOpen, onClose, sale }) {
           {/* Tabs Section */}
           <div className="sales-modal-tabs">
             <button
+              type="button"
               className={`sales-modal-tab-btn ${activeTab === 'itens' ? 'active' : ''}`}
               onClick={() => setActiveTab('itens')}
             >
-              Itens da Venda
+              Itens da Venda ({itens.length})
             </button>
             <button
+              type="button"
               className={`sales-modal-tab-btn ${activeTab === 'parcelamento' ? 'active' : ''}`}
               onClick={() => setActiveTab('parcelamento')}
             >
@@ -160,13 +169,13 @@ export default function SalesDetailsModal({ isOpen, onClose, sale }) {
                 <table className="sales-items-table">
                   <thead>
                     <tr>
-                      <th>Cód. Produto</th>
-                      <th>Nome</th>
-                      <th>GTIN/Código de Barras</th>
-                      <th className="text-center">Quantidade</th>
-                      <th className="text-right">Val. Bruto</th>
-                      <th className="text-right">Desconto</th>
-                      <th className="text-right">Val. Líquido</th>
+                      <th style={{ width: '110px' }}>Cód. Produto</th>
+                      <th>Nome / Descrição</th>
+                      <th style={{ width: '160px' }}>GTIN / Cód. Barras</th>
+                      <th className="text-center" style={{ width: '110px' }}>Quantidade</th>
+                      <th className="text-right" style={{ width: '120px' }}>Val. Bruto</th>
+                      <th className="text-right" style={{ width: '100px' }}>Desconto</th>
+                      <th className="text-right" style={{ width: '120px' }}>Val. Líquido</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -190,7 +199,7 @@ export default function SalesDetailsModal({ isOpen, onClose, sale }) {
                         return (
                           <tr key={idx}>
                             <td data-label="Cód. Produto" className="item-code-cell">
-                              {proCode && <span className="item-code">#{proCode}</span>}
+                              {proCode ? <span className="item-code">#{proCode}</span> : '-'}
                             </td>
                             <td data-label="Nome" className="item-name" title={name}>{name}</td>
                             <td data-label="GTIN">{barcode}</td>
@@ -282,8 +291,34 @@ export default function SalesDetailsModal({ isOpen, onClose, sale }) {
             </div>
           )}
         </div>
+
+        {/* Modal Footer */}
+        <div className="sales-modal-footer">
+          <div className="shortcut-hint">
+            <kbd>ESC</kbd> <span>Fechar</span>
+          </div>
+          <div className="sales-modal-footer-actions">
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => window.print()}
+              title="Imprimir Comprovante de Venda"
+            >
+              <Printer size={16} />
+              <span>Imprimir</span>
+            </button>
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={onClose}
+            >
+              Fechar
+            </button>
+          </div>
+        </div>
       </div>
     </div>,
     document.body
   );
 }
+

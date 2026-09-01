@@ -1,15 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
 import { 
-  FileSpreadsheet, Plus, Trash2, Edit2, Eye, Printer, Send, 
+  FileSpreadsheet, Plus, Trash2, Edit2, Printer, 
   Search, RefreshCw, CheckCircle2, AlertCircle, Building2, 
-  Calendar, DollarSign, Package, Sparkles, X, Save, Share2, 
-  ArrowRight, Layers, FileText
+  DollarSign, Package, X, Save, Share2, Layers, Calendar,
+  CreditCard, Truck, FileText, Check, Hash
 } from 'lucide-react';
 import { createApi } from '../../services/api';
 import SearchBar from '../SearchBar';
 import Pagination from '../Pagination';
 import LookupSelect from '../LookupSelect';
+import { toast } from '../../contexts/ToastContext';
 import { formatCurrency } from '../../utils/formatters';
 import './PurchaseOrdersTab.css';
 
@@ -82,6 +82,21 @@ export default function PurchaseOrdersTab() {
     fetchPedidos(1);
     fetchAuxiliaryData();
   }, []);
+
+  // Atalhos de teclado (F2 para Novo Pedido, ESC para fechar modais)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'F2') {
+        e.preventDefault();
+        handleOpenCreateOrder();
+      } else if (e.key === 'Escape') {
+        if (showOrderModal) setShowOrderModal(false);
+        if (showPrintModal) setShowPrintModal(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showOrderModal, showPrintModal, fornecedores]);
 
   const fetchPedidos = async (targetPage = 1) => {
     setLoading(true);
@@ -202,7 +217,7 @@ export default function PurchaseOrdersTab() {
       setShowOrderModal(true);
     } catch (err) {
       console.error(err);
-      alert('Erro ao carregar detalhes do pedido de compra.');
+      toast.error('Erro ao carregar detalhes do pedido de compra.');
     } finally {
       setLoading(false);
     }
@@ -218,7 +233,7 @@ export default function PurchaseOrdersTab() {
       setTimeout(() => setSuccessMsg(''), 4000);
     } catch (err) {
       console.error(err);
-      alert('Erro ao excluir pedido de compra.');
+      toast.error('Erro ao excluir pedido de compra.');
     } finally {
       setLoading(false);
     }
@@ -240,12 +255,12 @@ export default function PurchaseOrdersTab() {
   // Inclusão de Linha na Matriz do Pedido
   const handleAddLinhaItem = () => {
     if (!itemLinhaForm.produto_nome.trim()) {
-      alert('Informe a descrição do produto.');
+      toast.warning('Informe a descrição do produto.');
       return;
     }
     const vu = parseFloat(itemLinhaForm.valor_unitario) || 0;
     if (vu <= 0) {
-      alert('Informe o preço de custo unitário.');
+      toast.warning('Informe o preço de custo unitário.');
       return;
     }
 
@@ -257,7 +272,7 @@ export default function PurchaseOrdersTab() {
     });
 
     if (totalPecasLinha <= 0) {
-      alert('Informe a quantidade para pelo menos um tamanho na grade.');
+      toast.warning('Informe a quantidade para pelo menos um tamanho na grade.');
       return;
     }
 
@@ -355,12 +370,12 @@ export default function PurchaseOrdersTab() {
   // Salvar Ordem de Compra
   const handleSaveOrder = async () => {
     if (!orderForm.marca.trim() && !orderForm.fornecedor_nome.trim()) {
-      alert('Informe a Marca ou Fornecedor do pedido.');
+      toast.warning('Informe a Marca ou Fornecedor do pedido.');
       return;
     }
 
     if (orderForm.itens.length === 0) {
-      alert('Adicione pelo menos um produto na matriz da ordem de compra.');
+      toast.warning('Adicione pelo menos um produto na matriz da ordem de compra.');
       return;
     }
 
@@ -380,13 +395,14 @@ export default function PurchaseOrdersTab() {
       };
 
       await api.post('/v1/pedidos-compra', payload);
+      toast.success('Ordem de Compra salva com sucesso!');
       setSuccessMsg('Ordem de Compra salva com sucesso!');
       setShowOrderModal(false);
       fetchPedidos(page);
       setTimeout(() => setSuccessMsg(''), 4000);
     } catch (err) {
       console.error(err);
-      alert('Erro ao salvar Ordem de Compra.');
+      toast.error('Erro ao salvar Ordem de Compra.');
     } finally {
       setLoading(false);
     }
@@ -401,11 +417,10 @@ export default function PurchaseOrdersTab() {
   const handleSendWhatsApp = (order) => {
     const repTel = (order.contato_representante || '').replace(/\D/g, '');
     if (!repTel) {
-      alert('Telefone do representante não informado.');
+      toast.warning('Telefone do representante não informado.');
       return;
     }
 
-    const totais = calcularTotaisPedido();
     const textoMsg = `*ORDEM DE COMPRA Nº ${order.numero_ordem}*\n` +
       `*Marca:* ${order.marca}\n` +
       `*Empresa:* ${order.empresa_nome} (CNPJ: ${order.empresa_cnpj})\n` +
@@ -421,8 +436,26 @@ export default function PurchaseOrdersTab() {
 
   const totaisGerais = calcularTotaisPedido();
 
+  const formatOrderNumber = (ordem) => {
+    if (!ordem) return '#ORD-000';
+    if (ordem.startsWith('#ORD-') || ordem.startsWith('ORD-')) return ordem;
+    if (ordem.startsWith('#')) return `#ORD-${ordem.substring(1)}`;
+    return `#ORD-${ordem}`;
+  };
+
+  const getStatusBadge = (status) => {
+    const st = (status || 'RASCUNHO').toUpperCase();
+    if (st === 'ENVIADO' || st === 'APROVADO' || st === 'EMITIDO') {
+      return <span className="badge badge-success">{st}</span>;
+    }
+    if (st === 'CANCELADO' || st === 'REJEITADO') {
+      return <span className="badge badge-danger">{st}</span>;
+    }
+    return <span className="badge badge-warning">{st}</span>;
+  };
+
   return (
-    <div className="tab-container">
+    <div className="crud-container orders-container">
       
       {/* CABEÇALHO DA ABA ORDENS DE COMPRA */}
       <div className="orders-header glass">
@@ -437,7 +470,7 @@ export default function PurchaseOrdersTab() {
           </button>
           
           <button className="btn-primary" onClick={handleOpenCreateOrder}>
-            <Plus size={16} /> + Nova Ordem de Compra
+            <Plus size={16} /> Nova Ordem de Compra
           </button>
         </div>
       </div>
@@ -446,7 +479,7 @@ export default function PurchaseOrdersTab() {
       <div className="orders-kpis">
         <div className="orders-kpi-card glass">
           <div className="orders-kpi-icon">
-            <FileSpreadsheet size={24} />
+            <FileSpreadsheet size={22} />
           </div>
           <div className="orders-kpi-data">
             <span className="orders-kpi-label">Ordens de Compra</span>
@@ -455,12 +488,12 @@ export default function PurchaseOrdersTab() {
         </div>
 
         <div className="orders-kpi-card glass">
-          <div className="orders-kpi-icon info">
-            <Layers size={24} />
+          <div className="orders-kpi-icon">
+            <Layers size={22} />
           </div>
           <div className="orders-kpi-data">
             <span className="orders-kpi-label">Total de Peças/Pares</span>
-            <span className="orders-kpi-value" style={{ color: 'var(--info)' }}>
+            <span className="orders-kpi-value">
               {pedidos.reduce((acc, p) => acc + (Number(p.total_pecas) || 0), 0)}
             </span>
           </div>
@@ -468,7 +501,7 @@ export default function PurchaseOrdersTab() {
 
         <div className="orders-kpi-card glass">
           <div className="orders-kpi-icon success">
-            <DollarSign size={24} />
+            <DollarSign size={22} />
           </div>
           <div className="orders-kpi-data">
             <span className="orders-kpi-label">Valor Total Pedidos</span>
@@ -480,7 +513,7 @@ export default function PurchaseOrdersTab() {
 
         <div className="orders-kpi-card glass">
           <div className="orders-kpi-icon">
-            <Building2 size={24} />
+            <Building2 size={22} />
           </div>
           <div className="orders-kpi-data">
             <span className="orders-kpi-label">Fornecedores / Marcas</span>
@@ -525,34 +558,54 @@ export default function PurchaseOrdersTab() {
             <tbody>
               {pedidos.length === 0 ? (
                 <tr>
-                  <td colSpan="9" style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
-                    Nenhuma ordem de compra registrada. Clique em "+ Nova Ordem de Compra" para criar.
+                  <td colSpan="9" style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text-secondary)' }}>
+                    Nenhuma ordem de compra registrada. Clique em "Nova Ordem de Compra" para criar.
                   </td>
                 </tr>
               ) : (
                 pedidos.map(p => (
                   <tr key={p.id}>
-                    <td><strong>{p.numero_ordem || `#${p.id}`}</strong></td>
+                    <td>
+                      <span className="item-code">{formatOrderNumber(p.numero_ordem || p.id)}</span>
+                    </td>
                     <td><span className="badge badge-info">{p.marca || p.fornecedor_nome}</span></td>
                     <td>
-                      <div>{p.representante || '-'}</div>
-                      <small style={{ color: '#64748b' }}>{p.contato_representante}</small>
+                      <div><strong>{p.representante || '-'}</strong></div>
+                      {p.contato_representante && (
+                        <small style={{ color: 'var(--text-secondary)' }}>{p.contato_representante}</small>
+                      )}
                     </td>
                     <td>{p.empresa_nome || p.local_pedido}</td>
                     <td>{p.data_entrega || '-'}</td>
                     <td style={{ textAlign: 'center' }}><strong>{p.total_pecas}</strong></td>
-                    <td style={{ textAlign: 'right', fontWeight: 800, color: '#16a34a' }}>{formatCurrency(p.valor_total)}</td>
-                    <td><span className={`badge ${p.status === 'ENVIADO' ? 'badge-success' : 'badge-warning'}`}>{p.status}</span></td>
+                    <td style={{ textAlign: 'right', fontWeight: 800, color: 'var(--success)' }}>
+                      {formatCurrency(p.valor_total)}
+                    </td>
+                    <td>{getStatusBadge(p.status)}</td>
                     <td style={{ textAlign: 'center' }}>
-                      <button className="crud-row-btn" onClick={() => handleOpenPrintPreview(p)} title="Imprimir / Relatório Timbrado A4" style={{ color: '#2563eb' }}>
-                        <Printer size={14} />
-                      </button>
-                      <button className="crud-row-btn edit" onClick={() => handleOpenEditOrder(p)} title="Editar Ordem">
-                        <Edit2 size={14} />
-                      </button>
-                      <button className="crud-row-btn delete" onClick={() => handleDeleteOrder(p.id)} title="Excluir Ordem">
-                        <Trash2 size={14} />
-                      </button>
+                      <div className="actions-cell" style={{ justifyContent: 'center' }}>
+                        <button 
+                          className="action-btn" 
+                          onClick={() => handleOpenPrintPreview(p)} 
+                          title="Visualizar / Imprimir Espelho do Pedido"
+                        >
+                          <Printer size={15} />
+                        </button>
+                        <button 
+                          className="action-btn edit" 
+                          onClick={() => handleOpenEditOrder(p)} 
+                          title="Editar Ordem de Compra"
+                        >
+                          <Edit2 size={15} />
+                        </button>
+                        <button 
+                          className="action-btn delete" 
+                          onClick={() => handleDeleteOrder(p.id)} 
+                          title="Excluir Ordem de Compra"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -570,12 +623,25 @@ export default function PurchaseOrdersTab() {
         />
       </div>
 
+      {/* RODAPÉ COM ATALHOS DE TECLADO */}
+      <div className="orders-footer-shortcuts">
+        <div className="orders-shortcut-item">
+          <kbd>F2</kbd> Nova Ordem de Compra
+        </div>
+        <div className="orders-shortcut-item">
+          <kbd>F5</kbd> Atualizar Lista
+        </div>
+        <div className="orders-shortcut-item">
+          <kbd>ESC</kbd> Fechar Modal
+        </div>
+      </div>
+
       {/* ========================================================================= */}
-      {/* MODAL DE CRIAÇÃO / EDIÇÃO DA ORDEM DE COMPRA (PADRÃO MOONCITY EXCEL)     */}
+      {/* MODAL DE CRIAÇÃO / EDIÇÃO DA ORDEM DE COMPRA (PADRÃO MATRIZ EXCEL)       */}
       {/* ========================================================================= */}
       {showOrderModal && (
-        <div className="product-form-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowOrderModal(false); }}>
-          <div className="product-form-modal-container glass" style={{ maxWidth: '1250px', maxHeight: '92vh' }}>
+        <div className="product-form-modal-overlay modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowOrderModal(false); }}>
+          <div className="product-form-modal-container modal-content glass" style={{ maxWidth: '1280px', maxHeight: '92vh' }}>
             
             {/* CABEÇALHO DO MODAL */}
             <div className="product-modal-header">
@@ -584,17 +650,19 @@ export default function PurchaseOrdersTab() {
                   <FileSpreadsheet size={22} />
                 </div>
                 <div>
-                  <h3>Ordem de Compra Nº {orderForm.numero_ordem}</h3>
+                  <h3>Ordem de Compra Nº {orderForm.numero_ordem || 'NOVA'}</h3>
                   <span className="product-modal-subtitle">Matriz de Grade por Produto & 3 Preços de Venda • Fornecedores</span>
                 </div>
               </div>
-              <button className="btn-close" onClick={() => setShowOrderModal(false)}><X size={20} /></button>
+              <button className="btn-close" onClick={() => setShowOrderModal(false)} title="Fechar (ESC)">
+                <X size={20} />
+              </button>
             </div>
 
             <div className="product-modal-body">
               
               {/* CABEÇALHO COMERCIAL DA ORDEM DE COMPRA */}
-              <div className="product-section-card">
+              <div className="list-card glass order-section-card">
                 <div className="product-section-title">
                   <Building2 size={16} color="var(--accent)" /> Dados do Pedido & Condições Comerciais
                 </div>
@@ -739,28 +807,28 @@ export default function PurchaseOrdersTab() {
               </div>
 
               {/* SELETOR DE PRESETS DE GRADE DE TAMANHOS */}
-              <div className="product-section-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.8rem' }}>
+              <div className="list-card glass order-section-card" style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.8rem' }}>
                 <div className="grade-preset-group">
-                  <span style={{ fontWeight: 700, fontSize: '0.88rem' }}>Configuração de Grade da Matriz:</span>
+                  <span style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--text-primary)' }}>Configuração de Grade da Matriz:</span>
                   <button type="button" className={`grade-preset-chip ${colunasTamanhos.join('') === '343536373839' ? 'active' : ''}`} onClick={() => handleSetTamanhosPreset('calcados')}>
-                    👟 Calçados (34 a 39)
+                    Calçados (34 a 39)
                   </button>
                   <button type="button" className={`grade-preset-chip ${colunasTamanhos.join('') === '3738394041424344' ? 'active' : ''}`} onClick={() => handleSetTamanhosPreset('calcados_grandes')}>
-                    👟 Calçados Grandes (37 a 44)
+                    Calçados Grandes (37 a 44)
                   </button>
                   <button type="button" className={`grade-preset-chip ${colunasTamanhos.join('') === 'PMGXXG' || colunasTamanhos.join('') === 'PMGGG' ? 'active' : ''}`} onClick={() => handleSetTamanhosPreset('roupas')}>
-                    👕 Vestuário (P a XG)
+                    Vestuário (P a XG)
                   </button>
                   <button type="button" className={`grade-preset-chip ${colunasTamanhos.join('') === '363840424446' ? 'active' : ''}`} onClick={() => handleSetTamanhosPreset('numeros')}>
-                    👖 Calças (36 a 46)
+                    Calças (36 a 46)
                   </button>
                 </div>
               </div>
 
               {/* FORMULÁRIO DE INCLUSÃO DE PRODUTO NA GRADE MATRIZ */}
-              <div className="product-section-card">
+              <div className="list-card glass order-section-card">
                 <div className="product-section-title">
-                  <Package size={16} color="#059669" /> Adicionar Produto / Referência na Matriz
+                  <Package size={16} color="var(--success)" /> Adicionar Produto / Referência na Matriz
                 </div>
 
                 <div className="orders-quick-add-grid">
@@ -865,7 +933,7 @@ export default function PurchaseOrdersTab() {
 
                   <div>
                     <button type="button" className="btn-primary" onClick={handleAddLinhaItem} style={{ height: '38px', padding: '0 1.2rem', whiteSpace: 'nowrap' }}>
-                      + Incluir Linha
+                      <Plus size={16} /> Incluir Linha
                     </button>
                   </div>
                 </div>
@@ -883,20 +951,20 @@ export default function PurchaseOrdersTab() {
                         
                         {/* COLUNAS DE TAMANHOS DINÂMICAS */}
                         {colunasTamanhos.map(col => (
-                          <th key={col} style={{ textAlign: 'center', minWidth: '45px', background: '#f1f5f9' }}>
+                          <th key={col} style={{ textAlign: 'center', minWidth: '48px', background: 'rgba(0, 0, 0, 0.03)' }}>
                             {col}
                           </th>
                         ))}
 
-                        <th style={{ textAlign: 'center', background: '#e2e8f0', fontWeight: 800 }}>TOTAL</th>
-                        <th style={{ textAlign: 'right', background: '#e2e8f0', fontWeight: 800 }}>VALOR R$</th>
+                        <th style={{ textAlign: 'center', background: 'rgba(249, 115, 22, 0.08)', fontWeight: 800, color: 'var(--accent)' }}>TOTAL</th>
+                        <th style={{ textAlign: 'right', background: 'rgba(0, 108, 73, 0.08)', fontWeight: 800, color: 'var(--success)' }}>VALOR R$</th>
                         <th style={{ textAlign: 'center' }}>Ações</th>
                       </tr>
                     </thead>
                     <tbody>
                       {orderForm.itens.length === 0 ? (
                         <tr>
-                          <td colSpan={colunasTamanhos.length + 8} style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
+                          <td colSpan={colunasTamanhos.length + 8} style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text-secondary)' }}>
                             Nenhum produto adicionado na ordem de compra. Use o formulário acima para adicionar linhas.
                           </td>
                         </tr>
@@ -907,29 +975,29 @@ export default function PurchaseOrdersTab() {
                             <td><span className="sigla-tag">{it.cor || 'UNICA'}</span></td>
                             <td><code>{it.referencia || '-'}</code></td>
                             <td style={{ textAlign: 'right' }}>{formatCurrency(it.valor_unitario)}</td>
-                            <td style={{ textAlign: 'right', color: '#64748b' }}>{formatCurrency(it.valor_imposto)}</td>
+                            <td style={{ textAlign: 'right', color: 'var(--text-secondary)' }}>{formatCurrency(it.valor_imposto)}</td>
 
                             {/* CÉLULAS DA GRADE DE TAMANHOS */}
                             {colunasTamanhos.map(col => (
-                              <td key={col} style={{ textAlign: 'center', padding: '2px' }}>
+                              <td key={col} style={{ textAlign: 'center', padding: '4px' }}>
                                 <input 
                                   type="number" 
                                   min="0"
+                                  className="matrix-input-cell"
                                   value={it.grade_tamanhos?.[col] || 0} 
                                   onChange={(e) => handleUpdateLinhaGradeQtd(idx, col, e.target.value)} 
-                                  style={{ width: '45px', textAlign: 'center', padding: '2px', fontWeight: 700 }}
                                 />
                               </td>
                             ))}
 
-                            <td style={{ textAlign: 'center', fontWeight: 800, background: '#f8fafc' }}>
+                            <td style={{ textAlign: 'center', fontWeight: 800, background: 'rgba(249, 115, 22, 0.04)' }}>
                               {it.total_pecas}
                             </td>
-                            <td style={{ textAlign: 'right', fontWeight: 800, color: '#16a34a', background: '#f8fafc' }}>
+                            <td style={{ textAlign: 'right', fontWeight: 800, color: 'var(--success)', background: 'rgba(0, 108, 73, 0.04)' }}>
                               {formatCurrency(it.valor_total)}
                             </td>
                             <td style={{ textAlign: 'center' }}>
-                              <button className="crud-row-btn delete" onClick={() => handleRemoveLinha(idx)} title="Remover Linha">
+                              <button className="action-btn delete" onClick={() => handleRemoveLinha(idx)} title="Remover Linha">
                                 <Trash2 size={14} />
                               </button>
                             </td>
@@ -941,17 +1009,17 @@ export default function PurchaseOrdersTab() {
                     {/* RODAPÉ COM TOTALIZADORES POR COLUNA */}
                     {orderForm.itens.length > 0 && (
                       <tfoot>
-                        <tr style={{ background: '#f1f5f9', fontWeight: 800 }}>
+                        <tr className="matrix-total-row">
                           <td colSpan="5" style={{ textAlign: 'right' }}>TOTAL DE PEÇAS / TAMANHO:</td>
                           {colunasTamanhos.map(col => (
-                            <td key={col} style={{ textAlign: 'center', color: '#2563eb' }}>
+                            <td key={col} style={{ textAlign: 'center', color: 'var(--text-primary)', fontWeight: 800 }}>
                               {totaisGerais.somasPorTamanho[col]}
                             </td>
                           ))}
-                          <td style={{ textAlign: 'center', color: '#7c3aed', fontSize: '1rem' }}>
+                          <td style={{ textAlign: 'center', color: 'var(--accent)', fontSize: '1rem', fontWeight: 800 }}>
                             {totaisGerais.totalPecas}
                           </td>
-                          <td style={{ textAlign: 'right', color: '#16a34a', fontSize: '1.1rem' }}>
+                          <td style={{ textAlign: 'right', color: 'var(--success)', fontSize: '1.05rem', fontWeight: 800 }}>
                             {formatCurrency(totaisGerais.totalValorBruto)}
                           </td>
                           <td></td>
@@ -967,21 +1035,21 @@ export default function PurchaseOrdersTab() {
 
             {/* RODAPÉ DO MODAL */}
             <div className="product-modal-footer">
-              <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: '2rem', alignItems: 'center', flexWrap: 'wrap' }}>
                 <div>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block' }}>TOTAL DE PEÇAS:</span>
-                  <strong style={{ fontSize: '1.2rem', color: 'var(--accent)' }}>{totaisGerais.totalPecas} pares/peças</strong>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', fontWeight: 600 }}>TOTAL DE PEÇAS:</span>
+                  <strong style={{ fontSize: '1.25rem', color: 'var(--accent)' }}>{totaisGerais.totalPecas} pares/peças</strong>
                 </div>
 
                 <div>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block' }}>VALOR TOTAL DA ORDEM:</span>
-                  <strong style={{ fontSize: '1.3rem', color: 'var(--success)' }}>{formatCurrency(totaisGerais.valorLiquido)}</strong>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', fontWeight: 600 }}>VALOR TOTAL DA ORDEM:</span>
+                  <strong style={{ fontSize: '1.35rem', color: 'var(--success)' }}>{formatCurrency(totaisGerais.valorLiquido)}</strong>
                 </div>
               </div>
 
-              <div style={{ display: 'flex', gap: '0.8rem' }}>
+              <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center' }}>
                 <button type="button" className="btn-secondary" onClick={() => setShowOrderModal(false)}>Cancelar</button>
-                <button type="button" className="btn-primary" onClick={handleSaveOrder} disabled={loading} style={{ minWidth: '180px' }}>
+                <button type="button" className="btn-primary" onClick={handleSaveOrder} disabled={loading} style={{ minWidth: '190px' }}>
                   {loading ? <RefreshCw size={18} className="spinner" /> : <Save size={18} />} Salvar Ordem de Compra
                 </button>
               </div>
@@ -995,8 +1063,8 @@ export default function PurchaseOrdersTab() {
       {/* MODAL DE IMPRESSÃO / RELATÓRIO TIMBRADO A4 (PARA FORNECEDOR)             */}
       {/* ========================================================================= */}
       {showPrintModal && (
-        <div className="product-form-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowPrintModal(null); }}>
-          <div className="product-form-modal-container glass" style={{ maxWidth: '950px', background: '#ffffff' }}>
+        <div className="product-form-modal-overlay modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowPrintModal(null); }}>
+          <div className="product-form-modal-container modal-content glass" style={{ maxWidth: '980px', background: '#ffffff', borderRadius: '1.5rem' }}>
             
             <div className="product-modal-header">
               <div className="product-modal-title-group">
@@ -1008,31 +1076,33 @@ export default function PurchaseOrdersTab() {
                   <span className="product-modal-subtitle">Pronto para Impressão A4 ou Envio via WhatsApp ao Representante</span>
                 </div>
               </div>
-              <button className="btn-close" onClick={() => setShowPrintModal(null)}><X size={20} /></button>
+              <button className="btn-close" onClick={() => setShowPrintModal(null)} title="Fechar (ESC)">
+                <X size={20} />
+              </button>
             </div>
 
             {/* ÁREA DE IMPRESSÃO A4 */}
             <div className="product-modal-body" style={{ background: '#ffffff', padding: '2rem' }}>
-              <div ref={printRef} style={{ border: '2px solid #0f172a', padding: '1.5rem', fontFamily: 'Arial, sans-serif' }}>
+              <div ref={printRef} className="orders-print-sheet">
                 
                 {/* CABEÇALHO TIMBRADO */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '2px solid #0f172a', paddingBottom: '1rem', marginBottom: '1rem' }}>
+                <div className="orders-print-header">
                   <div>
-                    <h2 style={{ margin: 0, fontSize: '1.4rem', color: '#0f172a' }}>ORDEM DE COMPRA: {showPrintModal.numero_ordem || `#${showPrintModal.id}`}</h2>
-                    <div style={{ fontSize: '0.9rem', color: '#475569', marginTop: '4px' }}>
+                    <h2 className="orders-print-title">ORDEM DE COMPRA: {showPrintModal.numero_ordem || `#${showPrintModal.id}`}</h2>
+                    <div className="orders-print-subtitle">
                       <strong>Marca:</strong> {showPrintModal.marca} | <strong>Representante:</strong> {showPrintModal.representante} ({showPrintModal.contato_representante})
                     </div>
                   </div>
 
                   <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontWeight: 800, fontSize: '1.1rem' }}>{showPrintModal.empresa_nome}</div>
+                    <div style={{ fontWeight: 800, fontSize: '1.1rem', color: '#0f172a' }}>{showPrintModal.empresa_nome}</div>
                     <div style={{ fontSize: '0.8rem', color: '#64748b' }}>CNPJ: {showPrintModal.empresa_cnpj}</div>
                     <div style={{ fontSize: '0.8rem', color: '#64748b' }}>Data: {new Date(showPrintModal.data_pedido || Date.now()).toLocaleDateString('pt-BR')}</div>
                   </div>
                 </div>
 
                 {/* CONDIÇÕES COMERCIAIS */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', background: '#f8fafc', padding: '0.75rem', borderRadius: '0.5rem', marginBottom: '1.5rem', fontSize: '0.85rem' }}>
+                <div className="orders-print-conditions">
                   <div><strong>Local do Pedido:</strong> {showPrintModal.local_pedido}</div>
                   <div><strong>Previsão de Entrega:</strong> {showPrintModal.data_entrega}</div>
                   <div><strong>Local de Entrega:</strong> {showPrintModal.local_entrega}</div>
@@ -1042,18 +1112,18 @@ export default function PurchaseOrdersTab() {
                 </div>
 
                 {/* TABELA DA MATRIZ DE ITENS */}
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem', marginBottom: '1.5rem' }}>
+                <table className="orders-print-table">
                   <thead>
-                    <tr style={{ background: '#0f172a', color: '#ffffff' }}>
-                      <th style={{ padding: '6px', border: '1px solid #0f172a', textAlign: 'left' }}>Produto</th>
-                      <th style={{ padding: '6px', border: '1px solid #0f172a', textAlign: 'left' }}>Cor</th>
-                      <th style={{ padding: '6px', border: '1px solid #0f172a', textAlign: 'left' }}>REF</th>
-                      <th style={{ padding: '6px', border: '1px solid #0f172a', textAlign: 'right' }}>Preço</th>
+                    <tr>
+                      <th style={{ textAlign: 'left' }}>Produto</th>
+                      <th style={{ textAlign: 'left' }}>Cor</th>
+                      <th style={{ textAlign: 'left' }}>REF</th>
+                      <th style={{ textAlign: 'right' }}>Preço</th>
                       {colunasTamanhos.map(col => (
-                        <th key={col} style={{ padding: '6px', border: '1px solid #0f172a', textAlign: 'center' }}>{col}</th>
+                        <th key={col} style={{ textAlign: 'center' }}>{col}</th>
                       ))}
-                      <th style={{ padding: '6px', border: '1px solid #0f172a', textAlign: 'center' }}>Total</th>
-                      <th style={{ padding: '6px', border: '1px solid #0f172a', textAlign: 'right' }}>Valor R$</th>
+                      <th style={{ textAlign: 'center' }}>Total</th>
+                      <th style={{ textAlign: 'right' }}>Valor R$</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1064,25 +1134,25 @@ export default function PurchaseOrdersTab() {
                       } catch (e) { grade = {}; }
 
                       return (
-                        <tr key={idx} style={{ background: idx % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
-                          <td style={{ padding: '6px', border: '1px solid #cbd5e1' }}><strong>{it.produto_nome}</strong></td>
-                          <td style={{ padding: '6px', border: '1px solid #cbd5e1' }}>{it.cor}</td>
-                          <td style={{ padding: '6px', border: '1px solid #cbd5e1' }}>{it.referencia}</td>
-                          <td style={{ padding: '6px', border: '1px solid #cbd5e1', textAlign: 'right' }}>{formatCurrency(it.valor_unitario)}</td>
+                        <tr key={idx}>
+                          <td><strong>{it.produto_nome}</strong></td>
+                          <td>{it.cor}</td>
+                          <td>{it.referencia}</td>
+                          <td style={{ textAlign: 'right' }}>{formatCurrency(it.valor_unitario)}</td>
                           {colunasTamanhos.map(col => (
-                            <td key={col} style={{ padding: '6px', border: '1px solid #cbd5e1', textAlign: 'center' }}>
+                            <td key={col} style={{ textAlign: 'center' }}>
                               {grade[col] || 0}
                             </td>
                           ))}
-                          <td style={{ padding: '6px', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 800 }}>{it.total_pecas}</td>
-                          <td style={{ padding: '6px', border: '1px solid #cbd5e1', textAlign: 'right', fontWeight: 800 }}>{formatCurrency(it.valor_total)}</td>
+                          <td style={{ textAlign: 'center', fontWeight: 800 }}>{it.total_pecas}</td>
+                          <td style={{ textAlign: 'right', fontWeight: 800 }}>{formatCurrency(it.valor_total)}</td>
                         </tr>
                       );
                     })}
                   </tbody>
                   <tfoot>
                     <tr style={{ background: '#e2e8f0', fontWeight: 800 }}>
-                      <td colSpan="4" style={{ padding: '6px', border: '1px solid #cbd5e1', textAlign: 'right' }}>TOTAIS:</td>
+                      <td colSpan="4" style={{ textAlign: 'right' }}>TOTAIS:</td>
                       {colunasTamanhos.map(col => {
                         let som = 0;
                         (showPrintModal.itens || []).forEach(it => {
@@ -1091,21 +1161,21 @@ export default function PurchaseOrdersTab() {
                             som += Number(g[col] || 0);
                           } catch (e) {}
                         });
-                        return <td key={col} style={{ padding: '6px', border: '1px solid #cbd5e1', textAlign: 'center' }}>{som}</td>;
+                        return <td key={col} style={{ textAlign: 'center' }}>{som}</td>;
                       })}
-                      <td style={{ padding: '6px', border: '1px solid #cbd5e1', textAlign: 'center', fontSize: '0.9rem' }}>{showPrintModal.total_pecas}</td>
-                      <td style={{ padding: '6px', border: '1px solid #cbd5e1', textAlign: 'right', fontSize: '0.95rem', color: '#16a34a' }}>{formatCurrency(showPrintModal.valor_total)}</td>
+                      <td style={{ textAlign: 'center', fontSize: '0.9rem' }}>{showPrintModal.total_pecas}</td>
+                      <td style={{ textAlign: 'right', fontSize: '0.95rem', color: '#16a34a' }}>{formatCurrency(showPrintModal.valor_total)}</td>
                     </tr>
                   </tfoot>
                 </table>
 
                 {/* ASSINATURAS */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3rem', marginTop: '3rem', textAlign: 'center', fontSize: '0.85rem' }}>
-                  <div style={{ borderTop: '1px solid #0f172a', paddingTop: '0.5rem' }}>
+                <div className="orders-print-signatures">
+                  <div>
                     <strong>{showPrintModal.empresa_nome}</strong>
                     <div>Comprador Responsável</div>
                   </div>
-                  <div style={{ borderTop: '1px solid #0f172a', paddingTop: '0.5rem' }}>
+                  <div>
                     <strong>{showPrintModal.representante} ({showPrintModal.marca})</strong>
                     <div>Representante Comercial</div>
                   </div>
@@ -1116,14 +1186,24 @@ export default function PurchaseOrdersTab() {
 
             {/* RODAPÉ DO MODAL DE IMPRESSÃO */}
             <div className="product-modal-footer">
-              <button type="button" className="btn-secondary" onClick={() => setShowPrintModal(null)}>Fechar</button>
+              <button type="button" className="btn-secondary" onClick={() => setShowPrintModal(null)}>
+                Fechar
+              </button>
 
-              <div style={{ display: 'flex', gap: '0.8rem' }}>
-                <button type="button" className="btn-secondary" onClick={() => handleSendWhatsApp(showPrintModal)} style={{ color: '#16a34a', borderColor: '#86efac', background: '#dcfce7' }}>
+              <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center' }}>
+                <button 
+                  type="button" 
+                  className="btn-secondary btn-whatsapp" 
+                  onClick={() => handleSendWhatsApp(showPrintModal)}
+                >
                   <Share2 size={16} /> Enviar via WhatsApp
                 </button>
-                <button type="button" className="btn-primary" onClick={() => window.print()}>
-                  <Printer size={16} /> Imprimir / PDF
+                <button 
+                  type="button" 
+                  className="btn-secondary btn-print-primary" 
+                  onClick={() => window.print()}
+                >
+                  <Printer size={16} /> Imprimir Espelho (A4)
                 </button>
               </div>
             </div>

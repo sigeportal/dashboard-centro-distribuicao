@@ -21,16 +21,21 @@ export default function ServiceOrdersTab({
 
   return (
     <div className="list-card glass full-width">
-      <h3>
-        <Wrench size={20} /> Tabela de OS
-      </h3>
+      <div className="crud-title-row" style={{ marginBottom: '0.5rem', borderBottom: 'none' }}>
+        <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <Wrench size={20} style={{ color: 'var(--accent)' }} /> 
+          Tabela de Ordens de Serviço (OS)
+        </h3>
+      </div>
+
       <SearchBar
         value={searchTerms.os || ''}
         onChange={(val) => setSearchTerms(prev => ({ ...prev, os: val }))}
         onSearch={() => handleSearchClick('os')}
         onClear={() => handleClearSearch('os')}
-        placeholder="Buscar por código, vendedor..."
+        placeholder="Buscar por código, vendedor, cliente..."
       />
+
       <DateRangeFilter
         onFilterChange={onDateChange}
         initialStartDate={startDate}
@@ -47,14 +52,14 @@ export default function ServiceOrdersTab({
               <th scope="col">Vendedor</th>
               <th scope="col">PDV</th>
               <th scope="col">Cliente</th>
-              <th scope="col">Ações</th>
+              <th scope="col" className="text-center">Ações</th>
             </tr>
           </thead>
           <tbody>
             {serviceOrders.length === 0 ? (
               <tr>
-                <td colSpan="7" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
-                  Nenhuma OS encontrada.
+                <td colSpan="7" style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text-secondary)' }}>
+                  Nenhuma Ordem de Serviço encontrada.
                 </td>
               </tr>
             ) : (
@@ -64,7 +69,9 @@ export default function ServiceOrdersTab({
 
                 return (
                   <tr key={item.codigo || idx}>
-                    <td data-label="Código">{item.codigo}</td>
+                    <td data-label="Código">
+                      <span className="item-code">#{item.codigo}</span>
+                    </td>
                     <td data-label="Data/Hora">
                       {dateStr} {timeStr}
                     </td>
@@ -74,33 +81,25 @@ export default function ServiceOrdersTab({
                     <td data-label="Vendedor">
                       {typeof item.fun === 'object' && item.fun !== null
                         ? (item.fun.nome || '-')
-                        : `Vendedor ${item.vendedor}`}
+                        : `Vendedor ${item.vendedor || '-'}`}
                     </td>
-                    <td data-label="PDV">PDV {item.pdv}</td>
+                    <td data-label="PDV">
+                      <span className="badge badge-info">PDV {item.pdv}</span>
+                    </td>
                     <td data-label="Cliente">
                       {typeof item.cli === 'object' && item.cli !== null
                         ? (item.cli.nome || '-')
-                        : `Cliente ${item.cli}`}
+                        : (item.cli ? `Cliente ${item.cli}` : '-')}
                     </td>
-                    <td data-label="Ações">
+                    <td data-label="Ações" className="text-center" onClick={(e) => e.stopPropagation()}>
                       <button
                         type="button"
                         disabled
+                        className="action-btn"
                         style={{
-                          background: 'rgba(249, 115, 22, 0.1)',
-                          border: 'none',
-                          color: 'var(--accent)',
-                          padding: '6px 12px',
-                          borderRadius: '6px',
-                          cursor: 'not-allowed',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          fontSize: '0.85rem',
-                          fontWeight: 500,
-                          opacity: 0.55,
+                          opacity: 0.5,
+                          cursor: 'not-allowed'
                         }}
-                        className="view-details-btn"
                         aria-label="Detalhes de OS indisponíveis"
                         title="Detalhes de OS indisponíveis"
                       >

@@ -1,9 +1,20 @@
 import { useCallback, useEffect, useState } from 'react';
 import axios from 'axios';
-import { ArrowRight, Building2, Link2, LoaderCircle, LogOut, Plus, PlugZap, RefreshCw, X } from 'lucide-react';
+import {
+  ArrowRight,
+  ArrowRightLeft,
+  Building2,
+  Link2,
+  LoaderCircle,
+  LogOut,
+  Plus,
+  PlugZap,
+  RefreshCw,
+  X
+} from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { AUTH_API_BASE, normalizeBaseUrl, createApi } from '../services/api';
-import { getAccessToken, setBaseUrl, setCnpj } from '../services/auth';
+import { AUTH_API_BASE, createApi } from '../services/api';
+import { getAccessToken, setCnpj } from '../services/auth';
 import { useAuth } from '../contexts/AuthContext';
 import { logError } from '../utils/logger';
 import logo from '/portal_gerencial_logo.svg';
@@ -17,16 +28,6 @@ const formatCnpj = (value = '') => {
     .replace(/(\d{3})(\d)/, '$1.$2')
     .replace(/(\d{3})(\d{1,4})/, '$1/$2')
     .replace(/(\d{4})(\d{1,2})/, '$1-$2');
-};
-
-const isAllowedBaseUrl = (value) => {
-  try {
-    const url = new URL(value);
-    const isLocalHttp = url.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(url.hostname);
-    return url.protocol === 'https:' || isLocalHttp;
-  } catch {
-    return false;
-  }
 };
 
 const getCompanyKey = (company) => company.id || company.cnpj || company.url;
@@ -45,15 +46,16 @@ export default function CompanySelect() {
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
   const [pendingTransfers, setPendingTransfers] = useState({});
 
-  const fetchPendingTransfers = async () => {
+  const fetchPendingTransfers = useCallback(async () => {
     try {
       const api = createApi(true);
       const res = await api.get('/v1/transferencias');
       if (Array.isArray(res.data)) {
         const counts = {};
-        res.data.forEach(t => {
+        res.data.forEach((t) => {
           if (t.status === 'Em Trânsito') {
-            counts[t.destino] = (counts[t.destino] || 0) + 1;
+            const dest = String(t.destino || '');
+            counts[dest] = (counts[dest] || 0) + 1;
           }
         });
         setPendingTransfers(counts);
@@ -61,7 +63,7 @@ export default function CompanySelect() {
     } catch (e) {
       console.warn('Erro ao buscar transferências pendentes para notificação', e);
     }
-  };
+  }, []);
 
   const getAuthHeaders = useCallback(() => {
     const token = getAccessToken();
@@ -100,7 +102,7 @@ export default function CompanySelect() {
     } finally {
       setCompaniesLoading(false);
     }
-  }, [checkCompanyStatus, getAuthHeaders]);
+  }, [checkCompanyStatus, fetchPendingTransfers, getAuthHeaders]);
 
   const refreshCompanyStatuses = async () => {
     if (companies.length === 0) return;
@@ -136,11 +138,13 @@ export default function CompanySelect() {
     // Mapeamento preciso do Código da Empresa
     let compId = Number(company.codigo || company.id) || 5;
     const compName = (company.nome || company.razao_social || company.fantasia || '').toUpperCase();
-    
+
     if (compName.includes('MARACAJU')) compId = 8;
     else if (compName.includes('RIO BRILHANTE')) compId = 6;
-    else if (compName.includes('ITAPORA')) compId = 7;
+    else if (compName.includes('ITAPORA') || compName.includes('ITAPORÃ')) compId = 7;
     else if (compName.includes('NOVA ALVORADA')) compId = 4;
+    else if (compName.includes('DOURADINA') || compName.includes('CD')) compId = 5;
+
     const fallbackCities = {
       5: 'DOURADINA',
       1: 'DOURADINA',
@@ -169,11 +173,22 @@ export default function CompanySelect() {
     setIsLinkModalOpen(true);
   };
 
-  const handleCloseLinkModal = () => {
+  const handleCloseLinkModal = useCallback(() => {
     if (linkLoading) return;
     setStatusMsg({ text: '', type: '' });
     setIsLinkModalOpen(false);
-  };
+  }, [linkLoading]);
+
+  // Suporte ao atalho ESC no Modal
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && isLinkModalOpen && !linkLoading) {
+        handleCloseLinkModal();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isLinkModalOpen, linkLoading, handleCloseLinkModal]);
 
   const handleLinkCompany = async (event) => {
     event.preventDefault();
@@ -206,8 +221,8 @@ export default function CompanySelect() {
     <main className="company-select-page">
       <header className="company-select-topbar">
         <img src={logo} alt="Portal Gerencial" className="company-select-logo" />
-        <button type="button" className="company-select-logout" onClick={handleLogout}>
-          <LogOut size={18} aria-hidden="true" />
+        <button type="button" className="company-select-logout" onClick={handleLogout} title="Encerrar sessão">
+          <LogOut size={16} aria-hidden="true" />
           <span>Sair</span>
         </button>
       </header>
@@ -215,28 +230,29 @@ export default function CompanySelect() {
       <section className="company-select-shell" aria-labelledby="company-select-title">
         <div className="company-select-hero">
           <div className="hero-left">
-            <p className="company-select-eyebrow">Empresas vinculadas</p>
+            <p className="company-select-eyebrow">Centro de Distribuição &amp; Filiais</p>
             <h1 id="company-select-title">
               Escolha uma empresa
               <span className="company-count-badge">{companiesLoading ? 'Carregando' : companyCountLabel}</span>
             </h1>
             <p className="company-select-subtitle">
-              O Dashboard verifica a disponibilidade da API Local de cada empresa antes do acesso.
+              Selecione uma filial ou centro de distribuição para acessar o painel de gestão integrada.
             </p>
           </div>
 
           <div className="hero-right">
             <button
               type="button"
-              className="btn-refresh-companies"
+              className="btn-secondary"
               onClick={refreshCompanyStatuses}
               disabled={companiesLoading || statusRefreshing || companies.length === 0}
+              title="Atualizar disponibilidade das filiais"
             >
-              <RefreshCw size={18} aria-hidden="true" className={statusRefreshing ? 'spinning' : ''} />
-              <span>{statusRefreshing ? 'Atualizando' : 'Atualizar'}</span>
+              <RefreshCw size={16} aria-hidden="true" className={statusRefreshing ? 'spinning' : ''} />
+              <span>{statusRefreshing ? 'Atualizando...' : 'Atualizar'}</span>
             </button>
-            <button type="button" className="btn-add-company" onClick={handleOpenLinkModal}>
-              <Plus size={18} aria-hidden="true" />
+            <button type="button" className="btn-primary" onClick={handleOpenLinkModal}>
+              <Plus size={16} aria-hidden="true" />
               <span>Adicionar Empresa</span>
             </button>
           </div>
@@ -250,7 +266,7 @@ export default function CompanySelect() {
 
         {companiesLoading ? (
           <div className="company-empty-state">
-            <LoaderCircle size={22} aria-hidden="true" className="company-loading-icon" />
+            <LoaderCircle size={24} aria-hidden="true" className="company-loading-icon" />
             <span>Buscando empresas vinculadas...</span>
           </div>
         ) : companies.length === 0 ? (
@@ -274,58 +290,70 @@ export default function CompanySelect() {
               const upperName = rawName.toUpperCase();
               if (upperName.includes('MARACAJU')) compId = 8;
               else if (upperName.includes('RIO BRILHANTE')) compId = 6;
-              else if (upperName.includes('ITAPORA')) compId = 7;
+              else if (upperName.includes('ITAPORA') || upperName.includes('ITAPORÃ')) compId = 7;
               else if (upperName.includes('NOVA ALVORADA')) compId = 4;
               else if (upperName.includes('DOURADINA') || upperName.includes('CD')) compId = 5;
 
               const city = company.municipio || company.cidade || company.emp_municipio || fallbackCities[compId] || '';
               const uf = company.uf || company.emp_uf || (city ? 'MS' : '');
+              const isMatriz =
+                compId === 5 ||
+                compId === 1 ||
+                upperName.includes('MATRIZ') ||
+                upperName.includes('CENTRO DE DISTRIBUICAO') ||
+                upperName.includes('CD ') ||
+                upperName.startsWith('CD');
+
+              const pendingCount =
+                pendingTransfers[company.id] ||
+                pendingTransfers[compId] ||
+                pendingTransfers[String(compId)] ||
+                0;
 
               return (
                 <button
                   key={getCompanyKey(company)}
                   type="button"
-                  className={`company-card company-card--${company.connectivity}`}
+                  className={`company-card glass company-card--${company.connectivity || 'online'}`}
                   onClick={() => handleSelectCompany(company)}
                 >
-                  <span className="company-card-icon">
-                    <Building2 size={24} aria-hidden="true" />
-                  </span>
-                  <span className="company-card-content">
-                    <span className="company-card-header">
-                      <span>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                          <span className="company-name">{rawName}</span>
-                          {city && (
-                            <span style={{
-                              fontSize: '0.74rem',
-                              background: 'rgba(37, 99, 235, 0.08)',
-                              color: '#2563eb',
-                              padding: '1px 6px',
-                              borderRadius: '4px',
-                              fontWeight: 600,
-                              border: '1px solid rgba(37, 99, 235, 0.2)'
-                            }}>
-                              {city}{uf ? ` - ${uf}` : ''}
-                            </span>
-                          )}
-                        </div>
+                  <div className="company-card-left">
+                    <div className="company-card-icon">
+                      <Building2 size={22} aria-hidden="true" />
+                    </div>
+                    <div className="company-card-info">
+                      <div className="company-card-title-row">
+                        <span className="company-name">{rawName}</span>
+                        <span className={`company-type-badge ${isMatriz ? 'matriz' : 'filial'}`}>
+                          {isMatriz ? 'MATRIZ' : 'FILIAL'}
+                        </span>
+                        {city && (
+                          <span className="company-city-badge">
+                            {city}{uf ? ` - ${uf}` : ''}
+                          </span>
+                        )}
+                      </div>
+                      <div className="company-card-sub-row">
                         <span className="company-document">{formatCnpj(company.cnpj)}</span>
-                      </span>
-                      <span className={`company-status company-status--${company.connectivity}`}>
-                        <span className="status-dot"></span>
-                        {company.connectivity === 'online' ? 'Online' : 'Offline'}
-                      </span>
-                    </span>
-                  </span>
-                  <span className="company-card-action" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    {pendingTransfers[company.id] > 0 && (
-                      <span className="notification-badge" style={{ backgroundColor: 'var(--brand-primary)', color: 'white', padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: '600' }}>
-                        {pendingTransfers[company.id]} pendente
+                        <span className={`company-status company-status--${company.connectivity || 'online'}`}>
+                          <span className="status-dot"></span>
+                          {company.connectivity === 'offline' ? 'Offline' : 'Online'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="company-card-right">
+                    {pendingCount > 0 && (
+                      <span className="company-transfer-badge" title="Transferências em trânsito com destino a esta empresa">
+                        <ArrowRightLeft size={12} aria-hidden="true" />
+                        <span>{pendingCount} {pendingCount === 1 ? 'pendente' : 'pendentes'}</span>
                       </span>
                     )}
-                    <ArrowRight size={20} aria-hidden="true" />
-                  </span>
+                    <div className="company-card-arrow">
+                      <ArrowRight size={20} aria-hidden="true" />
+                    </div>
+                  </div>
                 </button>
               );
             })}
@@ -343,13 +371,13 @@ export default function CompanySelect() {
             onClick={(event) => event.stopPropagation()}
           >
             <div className="company-modal-header">
-              <div className="company-form-title">
-                <span className="company-card-icon">
-                  <Link2 size={22} aria-hidden="true" />
-                </span>
+              <div className="company-modal-header-left">
+                <div className="company-modal-icon-badge">
+                  <Link2 size={20} aria-hidden="true" />
+                </div>
                 <div>
                   <h2 id="company-link-modal-title">Vincular empresa ao cliente</h2>
-                  <p>Informe os dados da empresa para concluir o vínculo.</p>
+                  <p className="company-modal-subtitle">Informe os dados da empresa para concluir o vínculo.</p>
                 </div>
               </div>
               <button
@@ -359,7 +387,7 @@ export default function CompanySelect() {
                 aria-label="Fechar vínculo de empresa"
                 disabled={linkLoading}
               >
-                <X size={20} aria-hidden="true" />
+                <X size={18} aria-hidden="true" />
               </button>
             </div>
 
@@ -370,11 +398,12 @@ export default function CompanySelect() {
                 </div>
               )}
 
-              <label className="company-field" htmlFor="company-cnpj">
-                <span>CNPJ da Empresa</span>
+              <div className="company-form-group">
+                <label htmlFor="company-cnpj">CNPJ da Empresa</label>
                 <input
                   id="company-cnpj"
                   type="text"
+                  className="company-input"
                   value={cnpj}
                   onChange={(event) => {
                     setCompanyCnpj(formatCnpj(event.target.value));
@@ -384,13 +413,14 @@ export default function CompanySelect() {
                   required
                   autoFocus
                 />
-              </label>
+              </div>
 
-              <label className="company-field" htmlFor="company-claim">
-                <span>Claim da Empresa</span>
+              <div className="company-form-group">
+                <label htmlFor="company-claim">Claim da Empresa</label>
                 <input
                   id="company-claim"
                   type="text"
+                  className="company-input"
                   value={claim}
                   onChange={(event) => {
                     setClaim(event.target.value);
@@ -399,12 +429,20 @@ export default function CompanySelect() {
                   placeholder="Claim exibido pela API Local"
                   required
                 />
-              </label>
+              </div>
 
-              <button type="submit" className="company-submit-btn" disabled={linkLoading}>
-                <PlugZap size={18} aria-hidden="true" />
-                <span>{linkLoading ? 'Vinculando...' : 'Vincular Empresa'}</span>
-              </button>
+              <div className="company-modal-footer">
+                <div className="company-modal-shortcuts">
+                  <span className="company-shortcut-item">
+                    <kbd>ESC</kbd> Fechar
+                  </span>
+                </div>
+
+                <button type="submit" className="btn-primary company-submit-btn" disabled={linkLoading}>
+                  <PlugZap size={16} aria-hidden="true" />
+                  <span>{linkLoading ? 'Vinculando...' : 'Vincular Empresa'}</span>
+                </button>
+              </div>
             </form>
           </div>
         </div>

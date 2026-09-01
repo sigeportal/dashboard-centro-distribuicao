@@ -3,11 +3,12 @@ import { createPortal } from 'react-dom';
 import {
   Package, Plus, Trash2, Check, X, Edit2, Search, Grid,
   Image as ImageIcon, DollarSign, Layers, ShieldCheck,
-  RefreshCw, Barcode, AlertCircle, TrendingUp, Sparkles,
+  RefreshCw, Barcode, AlertCircle, TrendingUp,
   CheckCircle2, FolderPlus, UserPlus, FileText, Printer,
   Tag, MapPin, Save
 } from 'lucide-react';
 import { createApi } from '../services/api';
+import { toast } from '../contexts/ToastContext';
 import GradesModal from './GradesModal';
 import GruposSubgruposModal from './GruposSubgruposModal';
 import LookupSelect from './LookupSelect';
@@ -613,7 +614,7 @@ export default function ProductFormModal({
   // F10: Gerador de Códigos de Barras EAN13 para todas as Grades
   const handleGerarCodigosBarrasGrades = () => {
     if (grades.length === 0) {
-      alert('Nenhuma grade cadastrada para gerar códigos de barras.');
+      toast.warning('Nenhuma grade cadastrada para gerar códigos de barras.');
       return;
     }
     const prodCod = Number(form.codigo) || 1;
@@ -639,7 +640,7 @@ export default function ProductFormModal({
   // Gerador Rápido e Preciso de Grades Baseado nos TAMANHOS Reais do Banco
   const handleGerarGradeAutomatica = (tipo) => {
     if (tamanhosList.length === 0) {
-      alert('Nenhum tamanho cadastrado no sistema central.');
+      toast.warning('Nenhum tamanho cadastrado no sistema central.');
       return;
     }
 
@@ -749,7 +750,7 @@ export default function ProductFormModal({
       setSuccessMsg(`Modelo "${created.nome}" cadastrado com sucesso!`);
       setTimeout(() => setSuccessMsg(''), 3000);
     } catch (err) {
-      alert('Erro ao salvar modelo: ' + (err.response?.data?.error || err.message));
+      toast.error('Erro ao salvar modelo: ' + (err.response?.data?.error || err.message));
     }
   };
 
@@ -757,7 +758,7 @@ export default function ProductFormModal({
   const handleSaveQuickVendor = async (e) => {
     e.preventDefault();
     if (!quickVendorForm.nome.trim()) {
-      alert('Informe o Nome / Razão Social do fornecedor.');
+      toast.warning('Informe o Nome / Razão Social do fornecedor.');
       return;
     }
     try {
@@ -790,14 +791,14 @@ export default function ProductFormModal({
       setSuccessMsg(`Fornecedor #${created.codigo} cadastrado com sucesso!`);
       setTimeout(() => setSuccessMsg(''), 3000);
     } catch (err) {
-      alert('Erro ao salvar fornecedor: ' + (err.response?.data?.error || err.message));
+      toast.error('Erro ao salvar fornecedor: ' + (err.response?.data?.error || err.message));
     }
   };
 
   // Adicionar / Salvar Item na Grade
   const handleAddOrUpdateGradeItem = () => {
     if (!gradeForm.tam) {
-      alert('Selecione o tamanho.');
+      toast.warning('Selecione o tamanho.');
       return;
     }
     const matchTam = tamanhosList.find(t => 
@@ -902,7 +903,7 @@ export default function ProductFormModal({
   // Salvar Produto Completo
   const handleSave = async () => {
     if (!form.nome.trim()) {
-      alert('Por favor, informe o Nome do Produto.');
+      toast.warning('Por favor, informe o Nome do Produto.');
       setActiveTab('geral');
       return;
     }
@@ -1067,19 +1068,19 @@ export default function ProductFormModal({
           </div>
 
           <div className="product-modal-header-actions">
-            <button className="btn-close" onClick={onClose} title="Fechar (ESC)"><X size={20} /></button>
+            <button className="product-modal-close" onClick={onClose} title="Fechar (ESC)"><X size={20} /></button>
           </div>
         </div>
 
         {/* MENSAGENS DE ALERTA */}
         {successMsg && (
           <div className="product-alert success">
-            <CheckCircle2 size={18} /> {successMsg}
+            <CheckCircle2 size={18} /> <span>{successMsg}</span>
           </div>
         )}
         {errorMsg && (
           <div className="product-alert error">
-            <AlertCircle size={18} /> {errorMsg}
+            <AlertCircle size={18} /> <span>{errorMsg}</span>
           </div>
         )}
 
@@ -1090,7 +1091,7 @@ export default function ProductFormModal({
             className={`product-tab-btn ${activeTab === 'geral' ? 'active' : ''}`}
             onClick={() => setActiveTab('geral')}
           >
-            <Layers size={18} /> Dados Gerais
+            <Layers size={17} /> Dados Gerais
           </button>
 
           <button
@@ -1098,7 +1099,7 @@ export default function ProductFormModal({
             className={`product-tab-btn ${activeTab === 'precos' ? 'active' : ''}`}
             onClick={() => setActiveTab('precos')}
           >
-            <DollarSign size={18} /> Estoque & 3 Preços (Grades)
+            <DollarSign size={17} /> Estoque & 3 Preços
           </button>
 
           <button
@@ -1106,7 +1107,7 @@ export default function ProductFormModal({
             className={`product-tab-btn ${activeTab === 'imagens' ? 'active' : ''}`}
             onClick={() => setActiveTab('imagens')}
           >
-            <ImageIcon size={18} /> Imagens
+            <ImageIcon size={17} /> Imagens
           </button>
 
           <button
@@ -1114,7 +1115,7 @@ export default function ProductFormModal({
             className={`product-tab-btn ${activeTab === 'fiscal' ? 'active' : ''}`}
             onClick={() => setActiveTab('fiscal')}
           >
-            <ShieldCheck size={18} /> Outros & Fiscal
+            <ShieldCheck size={17} /> Outros & Fiscal
           </button>
         </div>
 
@@ -1140,7 +1141,7 @@ export default function ProductFormModal({
                       onClick={() => setShowGruposSubgruposModal(true)}
                       title="Atalho F4: Gerenciar Grupos e Subgrupos"
                     >
-                      <FolderPlus size={14} /> F4 Grupos/Sub
+                      <FolderPlus size={14} /> <kbd style={{ marginRight: '4px', fontSize: '0.68rem', padding: '1px 4px', background: '#f8fafc', border: '1px solid rgba(0,0,0,0.12)', borderBottom: '2px solid rgba(0,0,0,0.18)', borderRadius: '3px' }}>F4</kbd> Grupos/Sub
                     </button>
                     <button
                       type="button"
@@ -1149,12 +1150,12 @@ export default function ProductFormModal({
                       title="Atalho F7: Cadastrar Novo Fornecedor Rápido"
                       style={{ color: '#ea580c', borderColor: '#fed7aa', background: '#fff7ed' }}
                     >
-                      <UserPlus size={14} /> F7 + Fornecedor
+                      <UserPlus size={14} /> <kbd style={{ marginRight: '4px', fontSize: '0.68rem', padding: '1px 4px', background: '#f8fafc', border: '1px solid rgba(0,0,0,0.12)', borderBottom: '2px solid rgba(0,0,0,0.18)', borderRadius: '3px' }}>F7</kbd> + Fornecedor
                     </button>
                   </div>
                 </div>
 
-                <div className="product-row-classification" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+                <div className="product-row-classification">
 
                   {/* GRUPO */}
                   <div className="form-group">
@@ -1279,15 +1280,14 @@ export default function ProductFormModal({
                     type="button"
                     className="btn-secondary small"
                     onClick={handleApplySuggestedName}
-                    style={{ color: '#2563eb', borderColor: '#bfdbfe', background: '#eff6ff', display: 'flex', alignItems: 'center', gap: '4px' }}
                     title="Recalcular e sugerir nome baseado em Grupo + Subgrupo + Modelo + Marca"
                   >
-                    <Sparkles size={14} /> ✨ Sugerir Nome
+                    <RefreshCw size={14} /> Sugerir Nome
                   </button>
                 </div>
 
                 {/* LINHA 1: NOME DO PRODUTO (DESTAQUE) */}
-                <div className="product-row-ident-1" style={{ display: 'grid', gridTemplateColumns: '2.5fr 1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                <div className="product-row-ident-1">
                   <div className="form-group">
                     <label style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span>Nome do Produto (Caixa Alta) *</span>
@@ -1330,7 +1330,7 @@ export default function ProductFormModal({
                 </div>
 
                 {/* LINHA 2: COR, CODIGO DE BARRAS + GERAR EAN */}
-                <div className="product-row-ident-2" style={{ display: 'grid', gridTemplateColumns: '1fr 2fr 1fr', gap: '1rem' }}>
+                <div className="product-row-ident-2">
                   <div className="form-group">
                     <label>Cor Padrão</label>
                     <input
@@ -1370,9 +1370,9 @@ export default function ProductFormModal({
                       value={form.estado}
                       onChange={(e) => setForm({ ...form, estado: e.target.value })}
                     >
-                      <option value="ATIVO">🟢 ATIVO</option>
-                      <option value="INATIVO">🔴 INATIVO</option>
-                      <option value="FORA_LINHA">⚪ FORA DE LINHA</option>
+                      <option value="ATIVO">Ativo</option>
+                      <option value="INATIVO">Inativo</option>
+                      <option value="FORA_LINHA">Fora de Linha</option>
                     </select>
                   </div>
                 </div>
@@ -1395,56 +1395,68 @@ export default function ProductFormModal({
                     <DollarSign size={16} color="#16a34a" /> Formação dos 3 Preços & Custos
                   </div>
                   {margemCalculada > 0 && (
-                    <div style={{ fontSize: '0.85rem', color: '#16a34a', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(22, 163, 74, 0.1)', padding: '0.25rem 0.65rem', borderRadius: '0.5rem' }}>
+                    <div className="margin-badge">
                       <TrendingUp size={15} /> Margem de Lucro sobre Custo: {margemCalculada.toFixed(2)}%
                     </div>
                   )}
                 </div>
 
                 <div className="product-grid-precos">
-                  <div className="form-group">
-                    <label>Custo Entrada (R$)</label>
+                  {/* CUSTO DE ENTRADA */}
+                  <div className="price-card custo">
+                    <label className="price-card-label">Custo Entrada (R$)</label>
                     <input
                       type="number"
                       step="0.01"
+                      className="price-card-input"
                       value={form.custo}
                       onChange={(e) => handlePrecoOuCustoChange('custo', e.target.value)}
                       placeholder="0.00"
                     />
+                    <span className="price-card-desc">Custo de compra / nota</span>
                   </div>
 
-                  <div className="form-group">
-                    <label style={{ color: '#16a34a' }}>Vlr Dinheiro (R$)</label>
+                  {/* PREÇO 1: DINHEIRO */}
+                  <div className="price-card money">
+                    <label className="price-card-label">1. Vlr Dinheiro (R$)</label>
                     <input
                       type="number"
                       step="0.01"
+                      className="price-card-input"
                       value={form.pro_valor_dinheiro}
                       onChange={(e) => handlePrecoOuCustoChange('pro_valor_dinheiro', e.target.value)}
                       placeholder="0.00"
                     />
+                    <span className="price-card-desc">Pagamento à vista em espécie</span>
                   </div>
 
-                  <div className="form-group">
-                    <label style={{ color: '#ea580c' }}>Vlr à Vista (Débito/PIX) (R$) *</label>
+                  {/* PREÇO 2: À VISTA (PIX / DÉBITO) */}
+                  <div className="price-card vista">
+                    <label className="price-card-label">2. Vlr à Vista (PIX/Débito) *</label>
                     <input
                       type="number"
                       step="0.01"
                       required
+                      className="price-card-input"
                       value={form.valorv}
                       onChange={(e) => handlePrecoOuCustoChange('valorv', e.target.value)}
                       placeholder="0.00"
                     />
+                    <span className="price-card-desc">Preço base do produto</span>
                   </div>
 
-                  <div className="form-group">
-                    <label style={{ color: '#2563eb' }}>Vlr a Prazo (Cartão Prazo) (R$)</label>
+                  {/* PREÇO 3: A PRAZO (CARTÃO PRAZO) */}
+                  <div className="price-card prazo">
+                    <label className="price-card-label">3. Vlr a Prazo (Cartão) (R$)</label>
                     <input
                       type="number"
                       step="0.01"
+                      className="price-card-input"
                       value={form.pro_valorv_prazo}
                       onChange={(e) => handlePrecoOuCustoChange('pro_valorv_prazo', e.target.value)}
                       placeholder="0.00"
                     />
+                    <span className="price-card-desc">Venda a prazo / parcelado</span>
                   </div>
                 </div>
               </div>
@@ -1464,7 +1476,7 @@ export default function ProductFormModal({
                       onClick={() => handleGerarGradeAutomatica('letras')}
                       title="Gerar variações com tamanhos de confecção cadastrados (ex: P, M, G, GG)"
                     >
-                      <Sparkles size={14} /> ✨ Grade P-GG
+                      <Grid size={14} /> Grade P-GG
                     </button>
                     <button
                       type="button"
@@ -1472,7 +1484,7 @@ export default function ProductFormModal({
                       onClick={() => handleGerarGradeAutomatica('calcados')}
                       title="Gerar variações com tamanhos numéricos cadastrados (ex: 34..44)"
                     >
-                      <Sparkles size={14} /> ✨ Grade 34..44
+                      <Grid size={14} /> Grade 34..44
                     </button>
                     <button
                       type="button"
@@ -1480,7 +1492,7 @@ export default function ProductFormModal({
                       onClick={() => handleGerarGradeAutomatica('todos')}
                       title="Gerar variações com todos os tamanhos cadastrados no banco"
                     >
-                      <Layers size={14} /> ✨ Todos Tamanhos
+                      <Layers size={14} /> Todos Tamanhos
                     </button>
                     <button
                       type="button"
@@ -1489,13 +1501,13 @@ export default function ProductFormModal({
                       title="Atalho F10: Gerar EAN13 para todas as grades"
                       style={{ color: '#2563eb' }}
                     >
-                      <Barcode size={14} /> F10 Gerar EANs
+                      <Barcode size={14} /> <kbd style={{ marginRight: '4px', fontSize: '0.68rem', padding: '1px 4px', background: '#f8fafc', border: '1px solid rgba(0,0,0,0.12)', borderBottom: '2px solid rgba(0,0,0,0.18)', borderRadius: '3px' }}>F10</kbd> Gerar EANs
                     </button>
                   </div>
                 </div>
 
                 {/* FORMULÁRIO DE INCLUSÃO RÁPIDA DE ITEM NA GRADE */}
-                <div className="product-grade-quick-add" style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr 1.5fr 1fr 1fr 1fr auto', gap: '0.5rem', alignItems: 'end', marginBottom: '1rem' }}>
+                <div className="product-grade-quick-add">
                   <div className="form-group">
                     <label>Tamanho *</label>
                     <select
@@ -1555,7 +1567,7 @@ export default function ProductFormModal({
                   </div>
 
                   <div className="form-group">
-                    <label>Vlr Dinheiro</label>
+                    <label style={{ color: '#16a34a' }}>Vlr Dinheiro</label>
                     <input
                       type="number"
                       step="0.01"
@@ -1565,7 +1577,7 @@ export default function ProductFormModal({
                   </div>
 
                   <div className="form-group">
-                    <label>Vlr Vista</label>
+                    <label style={{ color: '#ea580c' }}>Vlr Vista</label>
                     <input
                       type="number"
                       step="0.01"
@@ -1575,7 +1587,7 @@ export default function ProductFormModal({
                   </div>
 
                   <div className="form-group">
-                    <label>Vlr Prazo</label>
+                    <label style={{ color: '#2563eb' }}>Vlr Prazo</label>
                     <input
                       type="number"
                       step="0.01"
@@ -1588,7 +1600,7 @@ export default function ProductFormModal({
                     type="button"
                     className="btn-primary"
                     onClick={handleAddOrUpdateGradeItem}
-                    style={{ height: '40px', padding: '0 1rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                    style={{ height: '42px', padding: '0 1.15rem', display: 'inline-flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}
                   >
                     {editingGradeIndex !== null ? <Save size={16} /> : <Plus size={16} />}
                     {editingGradeIndex !== null ? 'Atualizar' : 'Adicionar'}
@@ -1596,61 +1608,63 @@ export default function ProductFormModal({
                 </div>
 
                 {/* TABELA DE GRADES CADASTRADAS */}
-                <div className="table-responsive" style={{ maxHeight: '300px', overflowY: 'auto' }}>
-                  <table className="data-table">
-                    <thead>
-                      <tr>
-                        <th>Tamanho</th>
-                        <th>Cor</th>
-                        <th style={{ textAlign: 'center' }}>Qtd</th>
-                        <th>Cód. Barras</th>
-                        <th style={{ textAlign: 'right', color: '#16a34a' }}>Dinheiro</th>
-                        <th style={{ textAlign: 'right', color: '#ea580c' }}>À Vista</th>
-                        <th style={{ textAlign: 'right', color: '#2563eb' }}>A Prazo</th>
-                        <th style={{ textAlign: 'center' }}>Ações</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {grades.map((g, idx) => {
-                        const tamObj = tamanhosList.find(t =>
-                          Number(t.codigo) === Number(g.tam || g.gra_tam) ||
-                          (t.sigla && String(t.sigla).trim().toUpperCase() === String(g.tam_nome || g.tam).trim().toUpperCase())
-                        );
+                <div className="product-grade-table-wrap">
+                  <div className="table-responsive" style={{ maxHeight: '300px', overflowY: 'auto', margin: 0 }}>
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>Tamanho</th>
+                          <th>Cor</th>
+                          <th style={{ textAlign: 'center' }}>Qtd</th>
+                          <th>Cód. Barras</th>
+                          <th style={{ textAlign: 'right', color: '#16a34a' }}>Dinheiro</th>
+                          <th style={{ textAlign: 'right', color: '#ea580c' }}>À Vista</th>
+                          <th style={{ textAlign: 'right', color: '#2563eb' }}>A Prazo</th>
+                          <th style={{ textAlign: 'center' }}>Ações</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {grades.map((g, idx) => {
+                          const tamObj = tamanhosList.find(t =>
+                            Number(t.codigo) === Number(g.tam || g.gra_tam) ||
+                            (t.sigla && String(t.sigla).trim().toUpperCase() === String(g.tam_nome || g.tam).trim().toUpperCase())
+                          );
 
-                        let tamNome = g.tam_nome || '';
-                        if (tamObj) {
-                          tamNome = tamObj.sigla && tamObj.tamanho && tamObj.sigla.toUpperCase() !== tamObj.tamanho.toUpperCase()
-                            ? `${tamObj.sigla} - ${tamObj.tamanho}`
-                            : (tamObj.sigla || tamObj.tamanho);
-                        } else if (!tamNome || tamNome.startsWith('Tam #')) {
-                          tamNome = g.tamanho?.sigla || g.tamanho?.tamanho || `Tam #${g.tam || g.gra_tam}`;
-                        }
+                          let tamNome = g.tam_nome || '';
+                          if (tamObj) {
+                            tamNome = tamObj.sigla && tamObj.tamanho && tamObj.sigla.toUpperCase() !== tamObj.tamanho.toUpperCase()
+                              ? `${tamObj.sigla} - ${tamObj.tamanho}`
+                              : (tamObj.sigla || tamObj.tamanho);
+                          } else if (!tamNome || tamNome.startsWith('Tam #')) {
+                            tamNome = g.tamanho?.sigla || g.tamanho?.tamanho || `Tam #${g.tam || g.gra_tam}`;
+                          }
 
-                        return (
-                          <tr key={idx}>
-                            <td><strong>{tamNome}</strong></td>
-                            <td>{g.cor || 'UNICA'}</td>
-                            <td style={{ textAlign: 'center' }}><strong>{g.quantidade || 0}</strong></td>
-                            <td><code>{g.codbarra || '-'}</code></td>
-                            <td style={{ textAlign: 'right' }}>{formatCurrency(g.valor_dinheiro ?? g.valorDinheiro ?? form.pro_valor_dinheiro ?? form.valorv ?? 0)}</td>
-                            <td style={{ textAlign: 'right', fontWeight: 700 }}>{formatCurrency(g.valor ?? form.valorv ?? 0)}</td>
-                            <td style={{ textAlign: 'right' }}>{formatCurrency(g.valor_prazo ?? g.valorPrazo ?? form.pro_valorv_prazo ?? form.valorv ?? 0)}</td>
-                            <td className="actions-cell" style={{ textAlign: 'center' }}>
-                              <button type="button" className="crud-row-btn edit" onClick={() => handleEditGradeItem(idx)}><Edit2 size={14} /></button>
-                              <button type="button" className="crud-row-btn delete" onClick={() => handleDeleteGradeItem(idx)}><Trash2 size={14} /></button>
+                          return (
+                            <tr key={idx}>
+                              <td><strong>{tamNome}</strong></td>
+                              <td>{g.cor || 'UNICA'}</td>
+                              <td style={{ textAlign: 'center' }}><strong>{g.quantidade || 0}</strong></td>
+                              <td><code>{g.codbarra || '-'}</code></td>
+                              <td style={{ textAlign: 'right' }}>{formatCurrency(g.valor_dinheiro ?? g.valorDinheiro ?? form.pro_valor_dinheiro ?? form.valorv ?? 0)}</td>
+                              <td style={{ textAlign: 'right', fontWeight: 700 }}>{formatCurrency(g.valor ?? form.valorv ?? 0)}</td>
+                              <td style={{ textAlign: 'right' }}>{formatCurrency(g.valor_prazo ?? g.valorPrazo ?? form.pro_valorv_prazo ?? form.valorv ?? 0)}</td>
+                              <td className="actions-cell" style={{ textAlign: 'center' }}>
+                                <button type="button" className="crud-row-btn edit" onClick={() => handleEditGradeItem(idx)}><Edit2 size={14} /></button>
+                                <button type="button" className="crud-row-btn delete" onClick={() => handleDeleteGradeItem(idx)}><Trash2 size={14} /></button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        {grades.length === 0 && (
+                          <tr>
+                            <td colSpan="8" style={{ textAlign: 'center', padding: '1.75rem', color: '#64748b' }}>
+                              Nenhuma grade cadastrada. Use os botões acima para sugestões rápidas ou adicione manualmente.
                             </td>
                           </tr>
-                        );
-                      })}
-                      {grades.length === 0 && (
-                        <tr>
-                          <td colSpan="8" style={{ textAlign: 'center', padding: '1.5rem', color: '#64748b' }}>
-                            Nenhuma grade cadastrada. Use os botões acima para sugestões rápidas ou adicione manualmente.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
 
               </div>
@@ -1679,11 +1693,10 @@ export default function ProductFormModal({
                 </div>
 
                 {form.url_Imagem && (
-                  <div style={{ marginTop: '1rem', textAlign: 'center', padding: '1rem', background: '#f8fafc', borderRadius: '0.5rem' }}>
+                  <div className="product-image-preview-card">
                     <img
                       src={form.url_Imagem}
                       alt="Preview"
-                      style={{ maxHeight: '200px', maxWidth: '100%', objectFit: 'contain', borderRadius: '0.5rem' }}
                       onError={(e) => { e.target.style.display = 'none'; }}
                     />
                   </div>
@@ -1697,12 +1710,13 @@ export default function ProductFormModal({
           {/* ========================================================= */}
           {activeTab === 'fiscal' && (
             <div className="product-tab-content">
+              {/* SEÇÃO 1: CLASSIFICAÇÃO FISCAL & PAF-ECF */}
               <div className="product-section-card">
                 <div className="product-section-title">
-                  <ShieldCheck size={16} color="#0284c7" /> Classificação Fiscal & PAF-ECF
+                  <ShieldCheck size={16} color="#006591" /> Classificação Fiscal & PAF-ECF
                 </div>
 
-                <div className="product-grid-3">
+                <div className="product-grid-fiscal">
                   <div className="form-group">
                     <label>NCM (Classificação Fiscal) *</label>
                     <input
@@ -1759,85 +1773,19 @@ export default function ProductFormModal({
                       <option value="2">02T1200 - ICMS 12%</option>
                       <option value="3">03T2500 - ICMS 25%</option>
                       <option value="4">F1 - Substituição Tributária</option>
-                      <option value="5">I1 - Isento / Não Trib</option>
+                      <option value="5">I1 - Isento / Não Tributado</option>
                       <option value="6">N1 - Não Incidência</option>
                     </select>
                   </div>
-                </div>
-              </div>
-
-              {/* VÍNCULO COM A BASE FISCAL (PRO_COD_FISCAL) */}
-              <div className="product-section-card">
-                <div className="product-section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <ShieldCheck size={16} color="#059669" /> Vínculo com a Base Fiscal (PRO_COD_FISCAL)
-                  </div>
-                  {form.pro_cod_fiscal && Number(form.pro_cod_fiscal) > 0 ? (
-                    <span className="badge badge-success" style={{ fontSize: '0.8rem' }}>
-                      Vinculado ao Fiscal #{form.pro_cod_fiscal}
-                    </span>
-                  ) : (
-                    <span className="badge badge-info" style={{ fontSize: '0.8rem' }}>
-                      Próprio Mestre Fiscal (Sem Vínculo Externo)
-                    </span>
-                  )}
-                </div>
-
-                <div className="product-grid-3">
-                  <div className="form-group" style={{ gridColumn: 'span 2' }}>
-                    <label>Produto Fiscal Vinculado (Código Fiscal Mestre)</label>
-                    <LookupSelect
-                      value={form.pro_cod_fiscal}
-                      displayValue={
-                        form.pro_cod_fiscal && Number(form.pro_cod_fiscal) > 0
-                          ? `#${form.pro_cod_fiscal}`
-                          : ''
-                      }
-                      placeholder="Buscar Produto na Base Fiscal para Vincular..."
-                      title="Selecionar Produto Fiscal (PRO_COD_FISCAL)"
-                      subtitle="Busca na base fiscal por código, descrição ou código de barras"
-                      icon={ShieldCheck}
-                      searchPlaceholder="Digite o nome, código ou código de barras do produto fiscal..."
-                      fetchData={async (termo, targetPage, limit) => {
-                        let url = `/v1/conciliacao/fiscais?page=${targetPage}&limit=${limit}`;
-                        if (termo) url += `&busca=${encodeURIComponent(termo)}&termo=${encodeURIComponent(termo)}`;
-                        const res = await api.get(url);
-                        return res.data;
-                      }}
-                      columns={[
-                        { key: 'codigo', label: 'Código Fiscal', width: '100px', render: (p) => <span className="item-code">#{p.codigo || p.PRO_CODIGO}</span> },
-                        { key: 'nome', label: 'Descrição Fiscal', render: (p) => <strong>{p.nome || p.PRO_NOME}</strong> },
-                        { key: 'codbarra', label: 'Cód. Barras', render: (p) => <code>{p.codbarra || p.PRO_CODBARRA || '-'}</code> },
-                        { key: 'ncm', label: 'NCM', width: '90px' },
-                        { key: 'quantidade', label: 'Estoque Fiscal', align: 'center', width: '100px' }
-                      ]}
-                      onSelect={(fiscProd) => {
-                        const fId = fiscProd.codigo || fiscProd.PRO_CODIGO;
-                        setForm(prev => ({
-                          ...prev,
-                          pro_cod_fiscal: Number(fId),
-                          ncm: fiscProd.ncm || prev.ncm,
-                          cfop: fiscProd.cfop || prev.cfop,
-                          cest: fiscProd.cest || prev.cest
-                        }));
-                      }}
-                      onClear={() => {
-                        setForm(prev => ({ ...prev, pro_cod_fiscal: 0 }));
-                      }}
-                    />
-                    <small style={{ color: '#64748b', marginTop: '4px', display: 'block' }}>
-                      Se este produto for vinculado a outro produto fiscal, as baixas contábeis/fiscais serão unificadas no código mestre.
-                    </small>
-                  </div>
 
                   <div className="form-group">
-                    <label>Gerar Cupom/Nota Fiscal (PRO_FISCAL_GERAR)</label>
+                    <label>Gerar Documento Fiscal</label>
                     <select
                       value={form.pro_fiscal_gerar || 'S'}
                       onChange={(e) => setForm({ ...form, pro_fiscal_gerar: e.target.value })}
                     >
-                      <option value="S">🟢 Sim (Gerar Documento Fiscal)</option>
-                      <option value="N">🔴 Não (Apenas Controle Físico)</option>
+                      <option value="S">Sim (Emitir Fiscal)</option>
+                      <option value="N">Não (Controle Interno)</option>
                     </select>
                   </div>
 
@@ -1847,9 +1795,132 @@ export default function ProductFormModal({
                       value={form.pro_emitir_negativo || 'N'}
                       onChange={(e) => setForm({ ...form, pro_emitir_negativo: e.target.value })}
                     >
-                      <option value="N">🔴 Não (Bloquear Negativo)</option>
-                      <option value="S">🟢 Sim (Permitir Venda Negativa)</option>
+                      <option value="N">Não (Bloquear Venda)</option>
+                      <option value="S">Sim (Permitir Negativo)</option>
                     </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label>Balança de Checkout</label>
+                    <select
+                      value={form.balanca || 'N'}
+                      onChange={(e) => setForm({ ...form, balanca: e.target.value })}
+                    >
+                      <option value="N">Não (Produto Padrão)</option>
+                      <option value="S">Sim (Produto Pesável)</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* SEÇÃO 2: VÍNCULO COM A BASE FISCAL & PARÂMETROS OPERACIONAIS */}
+              <div className="product-section-card">
+                <div className="product-section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <FileText size={16} color="#f97316" /> Vínculo com a Base Fiscal & Parâmetros Operacionais
+                  </div>
+                  {form.pro_cod_fiscal && Number(form.pro_cod_fiscal) > 0 ? (
+                    <span className="badge badge-success">
+                      Vinculado ao Fiscal #{form.pro_cod_fiscal}
+                    </span>
+                  ) : (
+                    <span className="badge badge-neutral">
+                      Próprio Mestre Fiscal (Sem Vínculo)
+                    </span>
+                  )}
+                </div>
+
+                <div className="form-group" style={{ marginBottom: '1.25rem' }}>
+                  <label>Produto Fiscal Vinculado (Código Fiscal Mestre)</label>
+                  <LookupSelect
+                    value={form.pro_cod_fiscal}
+                    displayValue={
+                      form.pro_cod_fiscal && Number(form.pro_cod_fiscal) > 0
+                        ? `#${form.pro_cod_fiscal}`
+                        : ''
+                    }
+                    placeholder="Buscar Produto na Base Fiscal para Vincular..."
+                    title="Selecionar Produto Fiscal (PRO_COD_FISCAL)"
+                    subtitle="Busca na base fiscal por código, descrição ou código de barras"
+                    icon={ShieldCheck}
+                    searchPlaceholder="Digite o nome, código ou código de barras do produto fiscal..."
+                    fetchData={async (termo, targetPage, limit) => {
+                      let url = `/v1/conciliacao/fiscais?page=${targetPage}&limit=${limit}`;
+                      if (termo) url += `&busca=${encodeURIComponent(termo)}&termo=${encodeURIComponent(termo)}`;
+                      const res = await api.get(url);
+                      return res.data;
+                    }}
+                    columns={[
+                      { key: 'codigo', label: 'Código Fiscal', width: '100px', render: (p) => <span className="item-code">#{p.codigo || p.PRO_CODIGO}</span> },
+                      { key: 'nome', label: 'Descrição Fiscal', render: (p) => <strong>{p.nome || p.PRO_NOME}</strong> },
+                      { key: 'codbarra', label: 'Cód. Barras', render: (p) => <code>{p.codbarra || p.PRO_CODBARRA || '-'}</code> },
+                      { key: 'ncm', label: 'NCM', width: '90px' },
+                      { key: 'quantidade', label: 'Estoque Fiscal', align: 'center', width: '100px' }
+                    ]}
+                    onSelect={(fiscProd) => {
+                      const fId = fiscProd.codigo || fiscProd.PRO_CODIGO;
+                      setForm(prev => ({
+                        ...prev,
+                        pro_cod_fiscal: Number(fId),
+                        ncm: fiscProd.ncm || prev.ncm,
+                        cfop: fiscProd.cfop || prev.cfop,
+                        cest: fiscProd.cest || prev.cest
+                      }));
+                    }}
+                    onClear={() => {
+                      setForm(prev => ({ ...prev, pro_cod_fiscal: 0 }));
+                    }}
+                  />
+                  <small style={{ color: '#64748b', marginTop: '4px', display: 'block' }}>
+                    Se este produto for vinculado a outro produto fiscal, as baixas contábeis/fiscais serão unificadas no código mestre.
+                  </small>
+                </div>
+
+                <div className="product-grid-operacional">
+                  <div className="form-group">
+                    <label>Localização / Prateleira</label>
+                    <input
+                      type="text"
+                      value={form.local}
+                      onChange={(e) => setForm({ ...form, local: e.target.value.toUpperCase() })}
+                      placeholder="Ex: PRAT-A01, GERAL"
+                      style={{ textTransform: 'uppercase' }}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Curva ABC</label>
+                    <select
+                      value={form.abc || 'N'}
+                      onChange={(e) => setForm({ ...form, abc: e.target.value })}
+                    >
+                      <option value="A">Curva A (Alta Rotatividade)</option>
+                      <option value="B">Curva B (Média Rotatividade)</option>
+                      <option value="C">Curva C (Baixa Rotatividade)</option>
+                      <option value="N">Neutro / Não Definido</option>
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label>Estoque Mínimo</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={form.quant_min}
+                      onChange={(e) => setForm({ ...form, quant_min: Number(e.target.value) || 0 })}
+                      placeholder="0"
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Validade (Dias)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={form.dias_validade}
+                      onChange={(e) => setForm({ ...form, dias_validade: Number(e.target.value) || 0 })}
+                      placeholder="0 (Sem validade)"
+                    />
                   </div>
                 </div>
               </div>
@@ -1859,18 +1930,30 @@ export default function ProductFormModal({
         </div>
 
         {/* RODAPÉ DO MODAL COM ATALHOS */}
-        <div className="product-modal-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.75rem', background: '#ffffff', borderTop: '1px solid rgba(0,0,0,0.06)' }}>
-          <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div className="product-modal-footer">
+          <div className="product-modal-shortcuts">
             <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>Atalhos:</span>
-            <span className="badge badge-info" style={{ fontSize: '0.75rem' }}>F2 Novo</span>
-            <span className="badge badge-info" style={{ fontSize: '0.75rem' }}>F4 Grupos</span>
-            <span className="badge badge-info" style={{ fontSize: '0.75rem' }}>F7 Fornecedor</span>
-            <span className="badge badge-info" style={{ fontSize: '0.75rem' }}>F10 EANs</span>
-            <span className="badge badge-info" style={{ fontSize: '0.75rem' }}>Ctrl+S Salvar</span>
-            <span className="badge badge-info" style={{ fontSize: '0.75rem' }}>ESC Fechar</span>
+            <div className="product-shortcut-item">
+              <kbd>F2</kbd> <span>Novo</span>
+            </div>
+            <div className="product-shortcut-item">
+              <kbd>F4</kbd> <span>Grupos</span>
+            </div>
+            <div className="product-shortcut-item">
+              <kbd>F7</kbd> <span>Fornecedor</span>
+            </div>
+            <div className="product-shortcut-item">
+              <kbd>F10</kbd> <span>EANs</span>
+            </div>
+            <div className="product-shortcut-item">
+              <kbd>Ctrl+S</kbd> <span>Salvar</span>
+            </div>
+            <div className="product-shortcut-item">
+              <kbd>ESC</kbd> <span>Fechar</span>
+            </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <div className="product-modal-actions">
             <button type="button" className="btn-secondary" onClick={onClose}>Cancelar</button>
             <button type="button" className="btn-primary" onClick={handleSave} disabled={loading} style={{ minWidth: '150px' }}>
               {loading ? <RefreshCw size={18} className="spinner" /> : <Save size={18} />} Salvar Produto
@@ -1888,15 +1971,17 @@ export default function ProductFormModal({
           <div className="product-form-modal-container glass" style={{ maxWidth: '460px' }}>
             <div className="product-modal-header">
               <div className="product-modal-title-group">
-                <Tag size={20} color="var(--accent)" />
+                <div className="product-modal-icon-badge" style={{ width: '38px', height: '38px' }}>
+                  <Tag size={18} color="#ffffff" />
+                </div>
                 <div>
                   <h4 style={{ margin: 0 }}>Cadastrar Novo Modelo</h4>
                   <span className="product-modal-subtitle">Gera sugestão automática de produto</span>
                 </div>
               </div>
-              <button className="btn-close" onClick={() => setShowQuickModeloModal(false)}><X size={18} /></button>
+              <button className="product-modal-close" onClick={() => setShowQuickModeloModal(false)}><X size={18} /></button>
             </div>
-            <form onSubmit={handleSaveQuickModelo} style={{ padding: '1.25rem' }}>
+            <form onSubmit={handleSaveQuickModelo} className="submodal-form-body">
               <div className="form-group">
                 <label>Nome do Modelo *</label>
                 <input
@@ -1909,7 +1994,7 @@ export default function ProductFormModal({
                   style={{ textTransform: 'uppercase' }}
                 />
               </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1.25rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.65rem', marginTop: '1.25rem' }}>
                 <button type="button" className="btn-secondary" onClick={() => setShowQuickModeloModal(false)}>Cancelar</button>
                 <button type="submit" className="btn-primary"><Save size={16} /> Salvar Modelo</button>
               </div>
@@ -1926,15 +2011,17 @@ export default function ProductFormModal({
           <div className="product-form-modal-container glass" style={{ maxWidth: '650px' }}>
             <div className="product-modal-header">
               <div className="product-modal-title-group">
-                <UserPlus size={20} color="var(--accent)" />
+                <div className="product-modal-icon-badge" style={{ width: '38px', height: '38px' }}>
+                  <UserPlus size={18} color="#ffffff" />
+                </div>
                 <div>
                   <h4 style={{ margin: 0 }}>Novo Fornecedor Rápido</h4>
                   <span className="product-modal-subtitle">Com máscara CNPJ e vínculo de Cidade/UF (FOR_CID)</span>
                 </div>
               </div>
-              <button className="btn-close" onClick={() => setShowQuickVendorModal(false)}><X size={18} /></button>
+              <button className="product-modal-close" onClick={() => setShowQuickVendorModal(false)}><X size={18} /></button>
             </div>
-            <form onSubmit={handleSaveQuickVendor} style={{ padding: '1.25rem' }}>
+            <form onSubmit={handleSaveQuickVendor} className="submodal-form-body">
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div className="form-group" style={{ gridColumn: 'span 2' }}>
                   <label>Razão Social / Nome *</label>
@@ -2028,7 +2115,7 @@ export default function ProductFormModal({
                 </div>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1.25rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.65rem', marginTop: '1.25rem' }}>
                 <button type="button" className="btn-secondary" onClick={() => setShowQuickVendorModal(false)}>Cancelar</button>
                 <button type="submit" className="btn-primary"><Save size={16} /> Salvar Fornecedor</button>
               </div>

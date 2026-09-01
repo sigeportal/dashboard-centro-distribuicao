@@ -1,13 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Folder, Plus, Trash2, Check, X, Edit2, Search, Printer, Layers } from 'lucide-react';
+import { Folder, Plus, Trash2, Check, X, Edit2, Search, Layers } from 'lucide-react';
 import { createApi } from '../services/api';
+import { toast } from '../contexts/ToastContext';
 import './GruposSubgruposModal.css';
 
 export default function GruposSubgruposModal({ isOpen, onClose, onSelectGrupoSubgrupo }) {
   if (!isOpen) return null;
 
   const api = createApi(true);
+  const searchInputRef = useRef(null);
 
   // Estados dos Grupos (Painel Esquerdo)
   const [grupos, setGrupos] = useState([]);
@@ -38,8 +40,9 @@ export default function GruposSubgruposModal({ isOpen, onClose, onSelectGrupoSub
         if (grupoMode === 'browse') handleGrupoInsert();
       } else if (e.key === 'F9') {
         e.preventDefault();
-        const searchEl = document.querySelector('.gru-modal-body input[type="text"]');
-        if (searchEl) searchEl.focus();
+        if (searchInputRef.current) {
+          searchInputRef.current.focus();
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -64,7 +67,7 @@ export default function GruposSubgruposModal({ isOpen, onClose, onSelectGrupoSub
 
   const fetchSubgrupos = async (grupoCodigo) => {
     try {
-      const res = await api.get(`/v1/subgrupos?limit=500`);
+      const res = await api.get('/v1/subgrupos?limit=500');
       const items = Array.isArray(res.data) ? res.data : (res.data?.data || []);
       // Filtra por g1 (código do grupo pai)
       const filtered = items.filter(sg => String(sg.g1 || sg.gru_g1 || sg.grupo_id) === String(grupoCodigo));
@@ -109,7 +112,7 @@ export default function GruposSubgruposModal({ isOpen, onClose, onSelectGrupoSub
 
   const handleGrupoConfirm = async () => {
     if (!grupoForm.nome.trim()) {
-      alert('Informe o nome do grupo.');
+      toast.warning('Informe o nome do grupo.');
       return;
     }
     setLoading(true);
@@ -126,7 +129,7 @@ export default function GruposSubgruposModal({ isOpen, onClose, onSelectGrupoSub
       setGrupoMode('browse');
       await fetchGrupos();
     } catch (err) {
-      alert('Erro ao salvar grupo.');
+      toast.error('Erro ao salvar grupo.');
     } finally {
       setLoading(false);
     }
@@ -142,7 +145,7 @@ export default function GruposSubgruposModal({ isOpen, onClose, onSelectGrupoSub
       setGrupoForm({ codigo: '', nome: '' });
       await fetchGrupos();
     } catch (err) {
-      alert('Erro ao excluir grupo.');
+      toast.error('Erro ao excluir grupo.');
     } finally {
       setLoading(false);
     }
@@ -151,7 +154,7 @@ export default function GruposSubgruposModal({ isOpen, onClose, onSelectGrupoSub
   // CRUD SUBGRUPOS
   const handleSubgrupoInsert = () => {
     if (!selectedGrupo) {
-      alert('Selecione um Grupo primeiro.');
+      toast.warning('Selecione um Grupo primeiro.');
       return;
     }
     setSubgrupoMode('insert');
@@ -168,7 +171,7 @@ export default function GruposSubgruposModal({ isOpen, onClose, onSelectGrupoSub
   const handleSubgrupoConfirm = async () => {
     if (!selectedGrupo) return;
     if (!subgrupoForm.nome.trim()) {
-      alert('Informe o nome do subgrupo.');
+      toast.warning('Informe o nome do subgrupo.');
       return;
     }
     setLoading(true);
@@ -187,7 +190,7 @@ export default function GruposSubgruposModal({ isOpen, onClose, onSelectGrupoSub
       setSubgrupoMode('browse');
       await fetchSubgrupos(selectedGrupo.codigo);
     } catch (err) {
-      alert('Erro ao salvar subgrupo.');
+      toast.error('Erro ao salvar subgrupo.');
     } finally {
       setLoading(false);
     }
@@ -203,7 +206,7 @@ export default function GruposSubgruposModal({ isOpen, onClose, onSelectGrupoSub
       setSubgrupoForm({ codigo: '', nome: '' });
       await fetchSubgrupos(selectedGrupo.codigo);
     } catch (err) {
-      alert('Erro ao excluir subgrupo.');
+      toast.error('Erro ao excluir subgrupo.');
     } finally {
       setLoading(false);
     }
@@ -221,30 +224,39 @@ export default function GruposSubgruposModal({ isOpen, onClose, onSelectGrupoSub
   };
 
   const filteredGrupos = grupos.filter(g => 
-    g.nome.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    (g.nome && g.nome.toLowerCase().includes(searchTerm.toLowerCase())) || 
     String(g.codigo).includes(searchTerm)
   );
 
   return createPortal(
-    <div className="legacy-modal-overlay">
-      <div className="legacy-modal-window gru-modal-window">
-        {/* Header do Pop-up */}
-        <div className="legacy-modal-header">
-          <div className="legacy-modal-title">
-            <Folder size={18} />
-            <span>Cadastro de Grupos e SubGrupos de Produtos</span>
+    <div className="gru-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="gru-modal-container glass">
+        {/* Cabeçalho Padronizado */}
+        <div className="gru-modal-header">
+          <div className="gru-title-wrap">
+            <div className="gru-icon-badge">
+              <Folder size={20} />
+            </div>
+            <div>
+              <h3>Cadastro de Grupos & SubGrupos</h3>
+              <span>Categorização e hierarquia de produtos e relatórios</span>
+            </div>
           </div>
-          <button className="legacy-modal-close-btn" onClick={onClose}>
-            <X size={18} />
+          <button className="gru-btn-close" onClick={onClose} title="Fechar (ESC)">
+            <X size={20} />
           </button>
         </div>
 
         {/* Corpo Dual Side-by-Side */}
-        <div className="legacy-modal-body gru-modal-body">
+        <div className="gru-modal-body">
           {/* Painel de Grupos (Esquerda) */}
           <div className="gru-panel">
             <div className="gru-panel-header">
-              <Layers size={16} /> Grupos
+              <div className="gru-panel-title">
+                <Layers size={16} />
+                <span>Grupos Principais</span>
+              </div>
+              <span className="gru-count-badge">{filteredGrupos.length} cadastrados</span>
             </div>
 
             <div className="gru-inputs-row">
@@ -254,49 +266,71 @@ export default function GruposSubgruposModal({ isOpen, onClose, onSelectGrupoSub
                   type="text" 
                   value={grupoForm.codigo} 
                   readOnly 
-                  className="legacy-input read-only" 
+                  className="gru-input gru-input-readonly" 
                 />
               </div>
               <div className="gru-input-group flex-1">
-                <label>*Nome</label>
+                <label>*Nome do Grupo</label>
                 <input 
                   type="text" 
                   value={grupoForm.nome} 
                   onChange={(e) => setGrupoForm({ ...grupoForm, nome: e.target.value })}
                   disabled={grupoMode === 'browse'}
-                  className="legacy-input"
-                  placeholder="Nome do grupo"
+                  className="gru-input"
+                  placeholder="Nome do grupo principal"
                   required
                 />
               </div>
             </div>
 
+            {/* Busca Rápida de Grupos */}
+            <div className="gru-search-wrap">
+              <Search size={15} className="gru-search-icon" />
+              <input
+                ref={searchInputRef}
+                type="text"
+                className="gru-search-input"
+                placeholder="Filtrar grupos (F9)..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+              {searchTerm && (
+                <button className="gru-search-clear" onClick={() => setSearchTerm('')} title="Limpar">
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+
             <div className="gru-table-and-actions">
               <div className="gru-table-container">
-                <table className="legacy-data-table">
+                <table className="gru-data-table">
                   <thead>
                     <tr>
-                      <th style={{ width: '70px' }}>Código</th>
-                      <th>Nome</th>
+                      <th style={{ width: '80px' }}>CÓDIGO</th>
+                      <th>DESCRIÇÃO DO GRUPO</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredGrupos.map((g) => {
-                      const isSelected = selectedGrupo && selectedGrupo.codigo === g.codigo;
+                      const isSelected = selectedGrupo && String(selectedGrupo.codigo) === String(g.codigo);
                       return (
                         <tr 
                           key={g.codigo} 
                           className={isSelected ? 'selected-row' : ''}
                           onClick={() => handleSelectGrupo(g)}
                         >
-                          <td style={{ textAlign: 'center' }}><strong>{g.codigo}</strong></td>
-                          <td>{g.nome}</td>
+                          <td>
+                            <span className="gru-item-code">#{g.codigo}</span>
+                          </td>
+                          <td className="gru-name-cell">{g.nome}</td>
                         </tr>
                       );
                     })}
                     {filteredGrupos.length === 0 && (
                       <tr>
-                        <td colSpan="2" className="empty-table-cell">Nenhum grupo cadastrado.</td>
+                        <td colSpan="2" className="empty-table-cell">
+                          {loading ? 'Carregando grupos...' : 'Nenhum grupo encontrado.'}
+                        </td>
                       </tr>
                     )}
                   </tbody>
@@ -306,39 +340,44 @@ export default function GruposSubgruposModal({ isOpen, onClose, onSelectGrupoSub
               {/* Botões de Ação Laterais (Grupos) */}
               <div className="gru-side-buttons">
                 <button 
-                  className="legacy-cmd-btn btn-insert" 
+                  className="gru-cmd-btn btn-insert" 
                   onClick={handleGrupoInsert}
                   disabled={grupoMode !== 'browse'}
+                  title="Inserir novo grupo (F2)"
                 >
-                  <Plus size={16} /> Inserir
+                  <Plus size={15} /> Inserir
                 </button>
                 <button 
-                  className="legacy-cmd-btn btn-delete" 
-                  onClick={handleGrupoDelete}
-                  disabled={grupoMode !== 'browse' || !selectedGrupo}
-                >
-                  <Trash2 size={16} /> Excluir
-                </button>
-                <button 
-                  className="legacy-cmd-btn btn-confirm" 
-                  onClick={handleGrupoConfirm}
-                  disabled={grupoMode === 'browse'}
-                >
-                  <Check size={16} /> Confirmar
-                </button>
-                <button 
-                  className="legacy-cmd-btn btn-cancel" 
-                  onClick={() => setGrupoMode('browse')}
-                  disabled={grupoMode === 'browse'}
-                >
-                  <X size={16} /> Cancelar
-                </button>
-                <button 
-                  className="legacy-cmd-btn btn-edit" 
+                  className="gru-cmd-btn btn-edit" 
                   onClick={handleGrupoEdit}
                   disabled={grupoMode !== 'browse' || !selectedGrupo}
+                  title="Editar grupo selecionado"
                 >
-                  <Edit2 size={16} /> Editar
+                  <Edit2 size={15} /> Editar
+                </button>
+                <button 
+                  className="gru-cmd-btn btn-confirm" 
+                  onClick={handleGrupoConfirm}
+                  disabled={grupoMode === 'browse'}
+                  title="Salvar alterações"
+                >
+                  <Check size={15} /> Gravar
+                </button>
+                <button 
+                  className="gru-cmd-btn btn-cancel" 
+                  onClick={() => setGrupoMode('browse')}
+                  disabled={grupoMode === 'browse'}
+                  title="Cancelar edição"
+                >
+                  <X size={15} /> Cancelar
+                </button>
+                <button 
+                  className="gru-cmd-btn btn-delete" 
+                  onClick={handleGrupoDelete}
+                  disabled={grupoMode !== 'browse' || !selectedGrupo}
+                  title="Excluir grupo selecionado"
+                >
+                  <Trash2 size={15} /> Excluir
                 </button>
               </div>
             </div>
@@ -347,7 +386,13 @@ export default function GruposSubgruposModal({ isOpen, onClose, onSelectGrupoSub
           {/* Painel de SubGrupos (Direita) */}
           <div className="gru-panel">
             <div className="gru-panel-header">
-              <Folder size={16} /> SubGrupos {selectedGrupo ? `[Grupo: ${selectedGrupo.nome}]` : ''}
+              <div className="gru-panel-title">
+                <Folder size={16} />
+                <span>
+                  SubGrupos {selectedGrupo ? <span className="gru-parent-tag">↳ {selectedGrupo.nome}</span> : ''}
+                </span>
+              </div>
+              <span className="gru-count-badge">{subgrupos.length} vinculados</span>
             </div>
 
             <div className="gru-inputs-row">
@@ -357,49 +402,57 @@ export default function GruposSubgruposModal({ isOpen, onClose, onSelectGrupoSub
                   type="text" 
                   value={subgrupoForm.codigo} 
                   readOnly 
-                  className="legacy-input read-only" 
+                  className="gru-input gru-input-readonly" 
                 />
               </div>
               <div className="gru-input-group flex-1">
-                <label>*Nome</label>
+                <label>*Nome do SubGrupo</label>
                 <input 
                   type="text" 
                   value={subgrupoForm.nome} 
                   onChange={(e) => setSubgrupoForm({ ...subgrupoForm, nome: e.target.value })}
                   disabled={subgrupoMode === 'browse'}
-                  className="legacy-input"
-                  placeholder="Nome do subgrupo"
+                  className="gru-input"
+                  placeholder={selectedGrupo ? `Subgrupo de ${selectedGrupo.nome}` : 'Selecione um grupo primeiro'}
                   required
                 />
               </div>
             </div>
 
+            <div className="gru-info-callout">
+              <span>Pertence ao Grupo Mestre: <strong>{selectedGrupo ? `[#${selectedGrupo.codigo}] ${selectedGrupo.nome}` : 'Nenhum grupo selecionado'}</strong></span>
+            </div>
+
             <div className="gru-table-and-actions">
               <div className="gru-table-container">
-                <table className="legacy-data-table">
+                <table className="gru-data-table">
                   <thead>
                     <tr>
-                      <th style={{ width: '70px' }}>Código</th>
-                      <th>Nome</th>
+                      <th style={{ width: '80px' }}>CÓDIGO</th>
+                      <th>DESCRIÇÃO DO SUBGRUPO</th>
                     </tr>
                   </thead>
                   <tbody>
                     {subgrupos.map((sg) => {
-                      const isSelected = selectedSubgrupo && selectedSubgrupo.codigo === sg.codigo;
+                      const isSelected = selectedSubgrupo && String(selectedSubgrupo.codigo) === String(sg.codigo);
                       return (
                         <tr 
                           key={sg.codigo} 
                           className={isSelected ? 'selected-row' : ''}
                           onClick={() => handleSelectSubgrupo(sg)}
                         >
-                          <td style={{ textAlign: 'center' }}><strong>{sg.codigo}</strong></td>
-                          <td>{sg.nome}</td>
+                          <td>
+                            <span className="gru-item-code">#{sg.codigo}</span>
+                          </td>
+                          <td className="gru-name-cell">{sg.nome}</td>
                         </tr>
                       );
                     })}
                     {subgrupos.length === 0 && (
                       <tr>
-                        <td colSpan="2" className="empty-table-cell">Nenhum subgrupo para este grupo.</td>
+                        <td colSpan="2" className="empty-table-cell">
+                          {selectedGrupo ? 'Nenhum subgrupo para este grupo.' : 'Selecione um grupo ao lado.'}
+                        </td>
                       </tr>
                     )}
                   </tbody>
@@ -409,56 +462,61 @@ export default function GruposSubgruposModal({ isOpen, onClose, onSelectGrupoSub
               {/* Botões de Ação Laterais (SubGrupos) */}
               <div className="gru-side-buttons">
                 <button 
-                  className="legacy-cmd-btn btn-insert" 
+                  className="gru-cmd-btn btn-insert" 
                   onClick={handleSubgrupoInsert}
                   disabled={subgrupoMode !== 'browse' || !selectedGrupo}
+                  title="Inserir novo subgrupo"
                 >
-                  <Plus size={16} /> Inserir
+                  <Plus size={15} /> Inserir
                 </button>
                 <button 
-                  className="legacy-cmd-btn btn-delete" 
-                  onClick={handleSubgrupoDelete}
-                  disabled={subgrupoMode !== 'browse' || !selectedSubgrupo}
-                >
-                  <Trash2 size={16} /> Excluir
-                </button>
-                <button 
-                  className="legacy-cmd-btn btn-confirm" 
-                  onClick={handleSubgrupoConfirm}
-                  disabled={subgrupoMode === 'browse'}
-                >
-                  <Check size={16} /> Confirmar
-                </button>
-                <button 
-                  className="legacy-cmd-btn btn-cancel" 
-                  onClick={() => setSubgrupoMode('browse')}
-                  disabled={subgrupoMode === 'browse'}
-                >
-                  <X size={16} /> Cancelar
-                </button>
-                <button 
-                  className="legacy-cmd-btn btn-edit" 
+                  className="gru-cmd-btn btn-edit" 
                   onClick={handleSubgrupoEdit}
                   disabled={subgrupoMode !== 'browse' || !selectedSubgrupo}
+                  title="Editar subgrupo selecionado"
                 >
-                  <Edit2 size={16} /> Editar
+                  <Edit2 size={15} /> Editar
+                </button>
+                <button 
+                  className="gru-cmd-btn btn-confirm" 
+                  onClick={handleSubgrupoConfirm}
+                  disabled={subgrupoMode === 'browse'}
+                  title="Salvar alterações"
+                >
+                  <Check size={15} /> Gravar
+                </button>
+                <button 
+                  className="gru-cmd-btn btn-cancel" 
+                  onClick={() => setSubgrupoMode('browse')}
+                  disabled={subgrupoMode === 'browse'}
+                  title="Cancelar edição"
+                >
+                  <X size={15} /> Cancelar
+                </button>
+                <button 
+                  className="gru-cmd-btn btn-delete" 
+                  onClick={handleSubgrupoDelete}
+                  disabled={subgrupoMode !== 'browse' || !selectedSubgrupo}
+                  title="Excluir subgrupo selecionado"
+                >
+                  <Trash2 size={15} /> Excluir
                 </button>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Rodapé do Modal com Atalhos */}
-        <div className="legacy-modal-footer">
-          <div className="legacy-shortcuts">
-            <span className="shortcut-tag"><kbd>ESC</kbd> Sair</span>
-            <span className="shortcut-tag"><kbd>F1</kbd> Imprimir</span>
-            <span className="shortcut-tag"><kbd>F9</kbd> Pesquisar</span>
-            <span className="shortcut-required">*Campos obrigatórios</span>
+        {/* Rodapé do Modal com Atalhos Raycast/Linear */}
+        <div className="gru-modal-footer">
+          <div className="gru-shortcuts">
+            <span className="gru-shortcut-item"><kbd>ESC</kbd> Sair</span>
+            <span className="gru-shortcut-item"><kbd>F2</kbd> Inserir Grupo</span>
+            <span className="gru-shortcut-item"><kbd>F9</kbd> Pesquisar</span>
+            <span className="gru-shortcut-required">*Campos obrigatórios</span>
           </div>
 
           {onSelectGrupoSubgrupo && selectedGrupo && selectedSubgrupo && (
-            <button className="legacy-select-btn" onClick={handleConfirmSelection}>
+            <button className="gru-select-btn" onClick={handleConfirmSelection}>
               <Check size={16} /> Selecionar [{selectedGrupo.nome} &gt; {selectedSubgrupo.nome}]
             </button>
           )}

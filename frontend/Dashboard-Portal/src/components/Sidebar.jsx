@@ -57,8 +57,9 @@ export default function Sidebar({
             to={to}
             className={`nav-item ${currentTab === tab ? 'active' : ''}`}
             onClick={onCloseMobileMenu}
+            title={isCollapsed ? label : undefined}
           >
-            <Icon size={20} />
+            <Icon size={20} className="nav-item-icon" />
             <span>{label}</span>
           </Link>
         ))}

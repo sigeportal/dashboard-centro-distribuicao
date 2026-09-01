@@ -1,89 +1,535 @@
-.gra-modal-window {
-  width: 96%;
-  max-width: 1150px;
-  background: var(--bg-card, #ffffff);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 1.25rem;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35);
+/* GradesModal.css - Premium Glassmorphism & Portal Design System Standard */
+
+.grades-modal-overlay {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  background-color: rgba(11, 28, 48, 0.45) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  z-index: 999999 !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  padding: 1.25rem !important;
+  box-sizing: border-box;
+  animation: gradesFadeIn 0.2s ease-out;
 }
 
-.gra-modal-body {
-  padding: 1.25rem 1.5rem;
-  background-color: var(--bg-primary, #f8fafc);
+@keyframes gradesFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes gradesSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.grades-modal-container {
+  width: 96vw;
+  max-width: 1160px;
+  max-height: 92vh;
+  background: var(--bg-secondary, #ffffff);
+  border: 1px solid var(--glass-border, rgba(0, 0, 0, 0.08));
+  border-radius: var(--radius-xl, 1.5rem);
+  box-shadow: var(--shadow-level-3, 0px 12px 32px rgba(0, 0, 0, 0.14));
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
-  overflow-y: auto;
+  overflow: hidden;
+  animation: gradesSlideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.gra-inputs-grid {
-  display: grid;
-  grid-template-columns: 75px 105px 115px 80px 105px 105px 105px minmax(190px, 1fr);
-  gap: 0.6rem;
+/* Header */
+.grades-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.25rem 1.75rem;
   background: var(--bg-secondary, #ffffff);
-  padding: 1rem;
-  border-radius: 1rem;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.03);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  flex-shrink: 0;
 }
 
-.gra-input-field {
+.grades-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.grades-icon-badge {
+  width: 42px;
+  height: 42px;
+  border-radius: var(--radius-md, 0.75rem);
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 14px rgba(249, 115, 22, 0.28);
+  flex-shrink: 0;
+}
+
+.grades-header-title-line {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.grades-header-title-line h3 {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 750;
+  color: var(--text-primary, #0b1c30);
+  letter-spacing: -0.02em;
+}
+
+.grades-total-badge {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: #006c49;
+  background: rgba(0, 108, 73, 0.08);
+  border: 1px solid rgba(0, 108, 73, 0.2);
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.grades-subtitle {
+  font-size: 0.8rem;
+  color: var(--text-secondary, #584237);
+  font-weight: 500;
+  margin-top: 2px;
+  display: block;
+}
+
+.grades-btn-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.04);
+  color: var(--text-secondary, #584237);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.grades-btn-close:hover {
+  background: rgba(186, 26, 26, 0.1);
+  color: var(--danger, #ba1a1a);
+  transform: rotate(90deg);
+}
+
+/* Modal Body */
+.grades-modal-body {
+  padding: 1.25rem 1.5rem;
+  background-color: var(--bg-primary, #f8f9ff);
+  display: flex;
+  flex-direction: column;
+  gap: 1.15rem;
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* Top Form Card */
+.grades-form-card {
+  background: var(--bg-secondary, #ffffff);
+  border: 1px solid rgba(0, 0, 0, 0.07);
+  border-radius: var(--radius-lg, 1rem);
+  padding: 1rem 1.25rem;
+  box-shadow: var(--shadow-level-1, 0px 4px 12px rgba(0, 0, 0, 0.03));
+}
+
+.grades-inputs-grid {
+  display: grid;
+  grid-template-columns: 80px 115px 125px 85px 110px 110px 110px minmax(200px, 1fr);
+  gap: 0.65rem;
+  align-items: flex-end;
+}
+
+.grades-input-field {
   display: flex;
   flex-direction: column;
   gap: 0.3rem;
+  min-width: 0;
 }
 
-.gra-input-field label {
+.grades-input-field label {
   font-size: 0.72rem;
   font-weight: 700;
-  color: var(--text-secondary, #64748b);
+  color: var(--text-secondary, #584237);
   text-transform: uppercase;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.03em;
 }
 
-.btn-barcode-gen {
-  background: var(--accent-primary, #2563eb);
+.grades-input {
+  height: 38px;
+  padding: 0 0.75rem;
+  border-radius: 0.6rem;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  background: #ffffff;
+  color: var(--text-primary, #0b1c30);
+  font-family: inherit;
+  font-size: 0.88rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  outline: none;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.grades-input:focus {
+  border-color: var(--accent, #f97316);
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
+}
+
+.grades-input:disabled {
+  background: #f8fafc;
+  color: #64748b;
+  cursor: not-allowed;
+}
+
+.grades-input-readonly {
+  background-color: rgba(249, 115, 22, 0.06);
+  color: var(--accent, #f97316);
+  font-weight: 800;
+  text-align: center;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+}
+
+.grades-barcode-col {
+  min-width: 190px;
+}
+
+.grades-barcode-input-wrap {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.grades-btn-barcode {
+  height: 38px;
+  width: 38px;
+  background: var(--accent, #f97316);
   color: #ffffff;
   border: none;
   border-radius: 0.6rem;
-  padding: 0 0.6rem;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
   transition: all 0.2s ease;
+  box-shadow: 0 2px 6px rgba(249, 115, 22, 0.2);
 }
 
-.btn-barcode-gen:hover:not(:disabled) {
-  background: #1d4ed8;
+.grades-btn-barcode:hover:not(:disabled) {
+  background: #ea580c;
   transform: translateY(-1px);
 }
 
-.btn-barcode-gen:disabled {
-  opacity: 0.5;
+.grades-btn-barcode:disabled {
+  opacity: 0.4;
   cursor: not-allowed;
 }
 
-.gra-table-and-actions {
+/* Table & Actions Grid */
+.grades-table-and-actions {
   display: grid;
-  grid-template-columns: 1fr 130px;
-  gap: 1rem;
+  grid-template-columns: 1fr 115px;
+  gap: 0.85rem;
   height: 340px;
 }
 
-.gra-table-container {
+.grades-table-container {
   border: 1px solid rgba(0, 0, 0, 0.08);
-  border-radius: 0.85rem;
+  border-radius: var(--radius-lg, 1rem);
   overflow-y: auto;
-  background: var(--bg-secondary, #ffffff);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+  background: #ffffff;
+  box-shadow: var(--shadow-level-1, 0px 4px 12px rgba(0, 0, 0, 0.03));
 }
 
-.grade-badge {
-  background: rgba(3, 105, 161, 0.12);
-  color: #0369a1;
+.grades-data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.84rem;
+}
+
+.grades-data-table th {
+  position: sticky;
+  top: 0;
+  background: var(--bg-primary, #f8f9ff);
+  color: var(--text-secondary, #584237);
+  font-weight: 700;
+  padding: 0.65rem 0.85rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  text-align: left;
+  font-size: 0.73rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  z-index: 2;
+}
+
+.grades-data-table td {
+  padding: 0.65rem 0.85rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+  color: var(--text-primary, #0b1c30);
+  vertical-align: middle;
+}
+
+.grades-data-table tbody tr {
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.grades-data-table tbody tr:hover {
+  background-color: rgba(249, 115, 22, 0.04);
+}
+
+.grades-data-table tbody tr.selected-row {
+  background-color: rgba(249, 115, 22, 0.1) !important;
+  font-weight: 600;
+}
+
+.grades-item-code {
+  display: inline-block;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-secondary, #584237);
+  background: rgba(0, 0, 0, 0.05);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.grades-size-badge {
+  display: inline-block;
+  background: rgba(37, 99, 235, 0.08);
+  color: #2563eb;
+  border: 1px solid rgba(37, 99, 235, 0.18);
   font-weight: 800;
-  padding: 0.2rem 0.5rem;
-  border-radius: 0.4rem;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 0.78rem;
+}
+
+.grades-qty-badge {
+  display: inline-block;
+  font-weight: 800;
+  color: #0b1c30;
+  background: rgba(0, 0, 0, 0.05);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.82rem;
+}
+
+.grades-ean-cell {
+  font-family: ui-monospace, SFMono-Regular, monospace;
   font-size: 0.8rem;
+  color: #475569;
+  letter-spacing: 0.02em;
+}
+
+/* Side Buttons */
+.grades-side-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  background: var(--bg-primary, #f8f9ff);
+  padding: 0.45rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.grades-cmd-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.55rem 0.6rem;
+  border-radius: 0.5rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.18s ease;
+  font-family: inherit;
+}
+
+.grades-cmd-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+.grades-cmd-btn.btn-insert {
+  background: #16a34a;
+  color: #ffffff;
+}
+.grades-cmd-btn.btn-insert:hover:not(:disabled) {
+  background: #15803d;
+  transform: translateY(-1px);
+}
+
+.grades-cmd-btn.btn-edit {
+  background: #d97706;
+  color: #ffffff;
+}
+.grades-cmd-btn.btn-edit:hover:not(:disabled) {
+  background: #b45309;
+  transform: translateY(-1px);
+}
+
+.grades-cmd-btn.btn-confirm {
+  background: var(--accent, #f97316);
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(249, 115, 22, 0.25);
+}
+.grades-cmd-btn.btn-confirm:hover:not(:disabled) {
+  background: #ea580c;
+  transform: translateY(-1px);
+}
+
+.grades-cmd-btn.btn-cancel {
+  background: #e2e8f0;
+  color: #475569;
+}
+.grades-cmd-btn.btn-cancel:hover:not(:disabled) {
+  background: #cbd5e1;
+  color: #1e293b;
+}
+
+.grades-cmd-btn.btn-delete {
+  background: #fee2e2;
+  color: #b91c1c;
+  border-color: #fca5a5;
+}
+.grades-cmd-btn.btn-delete:hover:not(:disabled) {
+  background: #dc2626;
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+/* Footer & Shortcuts */
+.grades-modal-footer {
+  background: var(--bg-secondary, #ffffff);
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  padding: 0.9rem 1.75rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.grades-shortcuts {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.grades-shortcut-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: rgba(0, 0, 0, 0.03);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 6px;
+  padding: 2px 7px;
+  font-size: 0.76rem;
+  color: #64748b;
+  font-weight: 500;
+  user-select: none;
+}
+
+.grades-shortcut-item kbd {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: #ffffff;
+  color: var(--text-primary, #0b1c30);
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-bottom: 2px solid rgba(0, 0, 0, 0.2);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  padding: 1px 5px;
+  border-radius: 4px;
+  line-height: 1.2;
+}
+
+.grades-btn-batch-barcode {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.55rem 0.9rem;
+  border-radius: 0.5rem;
+  background: rgba(37, 99, 235, 0.08);
+  color: #2563eb;
+  border: 1px solid rgba(37, 99, 235, 0.2);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.grades-btn-batch-barcode:hover:not(:disabled) {
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.grades-btn-batch-barcode:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.grades-btn-secondary {
+  padding: 0.55rem 1rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  background: #ffffff;
+  color: var(--text-primary, #0b1c30);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.grades-btn-secondary:hover {
+  background: #f1f5f9;
+}
+
+@media (max-width: 1024px) {
+  .grades-inputs-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+  .grades-table-and-actions {
+    grid-template-columns: 1fr 100px;
+  }
+}
+
+@media (max-width: 680px) {
+  .grades-inputs-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .grades-table-and-actions {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+  .grades-side-buttons {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
 }
