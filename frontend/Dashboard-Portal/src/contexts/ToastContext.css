@@ -1,14 +1,14 @@
 .toast-container {
-  position: fixed;
-  top: 1.5rem;
-  right: 1.5rem;
-  z-index: 99999;
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  max-width: 440px;
-  width: calc(100vw - 3rem);
-  pointer-events: none;
+  position: fixed !important;
+  top: 1.5rem !important;
+  right: 1.5rem !important;
+  z-index: 9999999 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0.75rem !important;
+  max-width: 440px !important;
+  width: calc(100vw - 3rem) !important;
+  pointer-events: none !important;
 }
 
 .toast-card {
