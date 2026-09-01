@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { CheckCircle2, AlertTriangle, AlertCircle, Info, X } from 'lucide-react';
 import './ToastContext.css';
 
@@ -59,24 +60,28 @@ export function ToastProvider({ children }) {
   return (
     <ToastContext.Provider value={{ toast, toasts, removeToast }}>
       {children}
-      <div className="toast-container" aria-live="polite">
-        {toasts.map((item) => (
-          <div key={item.id} className={`toast-card toast-${item.type} glass`}>
-            <div className="toast-content">
-              {getIcon(item.type)}
-              <div className="toast-message">{item.message}</div>
-            </div>
-            <button
-              type="button"
-              className="toast-close-btn"
-              onClick={() => removeToast(item.id)}
-              aria-label="Fechar notificação"
-            >
-              <X size={16} />
-            </button>
-          </div>
-        ))}
-      </div>
+      {typeof document !== 'undefined' &&
+        createPortal(
+          <div className="toast-container" aria-live="polite">
+            {toasts.map((item) => (
+              <div key={item.id} className={`toast-card toast-${item.type} glass`}>
+                <div className="toast-content">
+                  {getIcon(item.type)}
+                  <div className="toast-message">{item.message}</div>
+                </div>
+                <button
+                  type="button"
+                  className="toast-close-btn"
+                  onClick={() => removeToast(item.id)}
+                  aria-label="Fechar notificação"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            ))}
+          </div>,
+          document.body
+        )}
     </ToastContext.Provider>
   );
 }
