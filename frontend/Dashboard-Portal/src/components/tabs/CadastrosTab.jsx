@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Package, Folder, Layers, Ruler, Plus, Edit, Trash2, Save, X, RefreshCw, Grid, AlertCircle, History, Search, FileCheck2, UserPlus, Users, Tag } from 'lucide-react';
+import { 
+  Package, Folder, Layers, Ruler, Plus, Edit, Trash2, Save, X, 
+  Grid, AlertCircle, History, FileCheck2, Users, Tag 
+} from 'lucide-react';
 import { createApi } from '../../services/api';
 import { formatCurrency, formatDatehora } from '../../utils/formatters';
 import Pagination from '../Pagination';
@@ -47,7 +50,7 @@ export default function CadastrosTab() {
     codbarra: ''
   });
 
-  // Novos Modais de Cadastro Legados (Pop-ups)
+  // Novos Modais de Cadastro Legados
   const [showProductModal, setShowProductModal] = useState(false);
   const [productToEditModal, setProductToEditModal] = useState(null);
   const [showGruposSubgruposModal, setShowGruposSubgruposModal] = useState(false);
@@ -56,10 +59,8 @@ export default function CadastrosTab() {
 
   // Saldo de Estoque Consolidado (Soma de Todas as Filiais)
   const [consolidatedStocks, setConsolidatedStocks] = useState({});
-  const [activeUnitStocks, setActiveUnitStocks] = useState({});
+  const [, setActiveUnitStocks] = useState({});
   const activeUnitId = Number(localStorage.getItem('selected_company_id')) || 1;
-  const activeUnitName = localStorage.getItem('selected_company_name') || (activeUnitId === 1 ? 'CD DOURADINA' : `Unidade #${activeUnitId}`);
-  const isMatriz = activeUnitId === 1 || activeUnitName.toUpperCase().includes('CD') || activeUnitName.toUpperCase().includes('DOURADINA');
 
   const fetchStocks = async () => {
     try {
@@ -122,7 +123,7 @@ export default function CadastrosTab() {
   const [totalizadores, setTotalizadores] = useState([]);
   const [fornecedores, setFornecedores] = useState([]);
   const [cidades, setCidades] = useState([]);
-  const [estados, setEstados] = useState([]);
+  const [, setEstados] = useState([]);
 
   // Estados de Formulário
   const [editingItem, setEditingItem] = useState(null);
@@ -700,6 +701,8 @@ export default function CadastrosTab() {
         cor: '',
         quantidade: '',
         valor: selectedProductGrades.valorv || 0,
+        valor_dinheiro: selectedProductGrades.pro_valor_dinheiro || selectedProductGrades.valorv || 0,
+        valor_prazo: selectedProductGrades.pro_valorv_prazo || selectedProductGrades.valorv || 0,
         codbarra: selectedProductGrades.codbarra || ''
       });
       await fetchProductGrades(selectedProductGrades.codigo);
@@ -751,11 +754,10 @@ export default function CadastrosTab() {
           <Package size={18} /> Produtos
         </button>
         <button className={`crud-tab-btn ${activeSubTab === 'fornecedores' ? 'active' : ''}`} onClick={() => { setActiveSubTab('fornecedores'); setShowForm(false); }}>
-          <UserPlus size={18} /> Fornecedores
+          <Users size={18} /> Fornecedores
         </button>
         <button 
-          className="crud-tab-btn" 
-          style={{ background: 'linear-gradient(135deg, #1e40af, #2563eb)', color: '#ffffff', marginLeft: 'auto', gap: '6px' }}
+          className="crud-tab-btn btn-conciliacao" 
           onClick={() => setShowConciliacaoModal(true)}
           title="Abrir Relatório Comparativo de Estoque Fiscal vs Físico"
         >
@@ -767,10 +769,10 @@ export default function CadastrosTab() {
 
       {/* TELA DE FORMULÁRIO (Criação ou Edição) */}
       {showForm && (
-        <div className="list-card glass">
+        <div className="list-card glass crud-form-card">
           <div className="crud-title-row">
             <h4>{editingItem ? 'Editar Registro' : 'Cadastrar Novo Registro'}</h4>
-            <button className="crud-close-btn" onClick={() => setShowForm(false)}><X size={18} /></button>
+            <button className="crud-close-btn" onClick={() => setShowForm(false)} title="Fechar formulário"><X size={18} /></button>
           </div>
 
           <form onSubmit={handleSave}>
@@ -909,7 +911,7 @@ export default function CadastrosTab() {
               </div>
             )}
 
-            {/* FORM: MODELOS (NOVO) */}
+            {/* FORM: MODELOS */}
             {activeSubTab === 'modelos' && (
               <div className="grid-form">
                 <label className="crud-input">
@@ -1064,7 +1066,9 @@ export default function CadastrosTab() {
 
             <div className="crud-form-actions">
               <button type="button" className="btn-secondary" onClick={() => setShowForm(false)}>Cancelar</button>
-              <button type="submit" className="btn-primary" disabled={loading}><Save size={16} /> Salvar Registro</button>
+              <button type="submit" className="btn-primary" disabled={loading}>
+                <Save size={16} /> {editingItem ? 'Atualizar Registro' : 'Salvar Registro'}
+              </button>
             </div>
           </form>
         </div>
@@ -1072,36 +1076,39 @@ export default function CadastrosTab() {
 
       {/* BARRA DE PESQUISA E BOTÃO DE NOVO REGISTRO */}
       <div className="crud-actions-bar">
-        <SearchBar
-          value={searchTerm}
-          onChange={(val) => {
-            setSearchTerm(val);
-            fetchData(1, val);
-          }}
-          placeholder={`Buscar em ${activeSubTab}...`}
-        />
+        <div className="crud-search-wrapper">
+          <SearchBar
+            value={searchTerm}
+            onChange={(val) => {
+              setSearchTerm(val);
+              fetchData(1, val);
+            }}
+            placeholder={`Buscar em ${activeSubTab}...`}
+          />
+        </div>
 
-        {activeSubTab === 'grades' && (
-          <select 
-            value={gradeProductFilter}
-            onChange={(e) => setGradeProductFilter(e.target.value)}
-            className="filter-select"
-            style={{ maxWidth: '300px' }}
-          >
-            <option value="">Todos os Produtos</option>
-            {produtos.map(p => (
-              <option key={p.codigo} value={p.codigo}>#{p.codigo} - {p.nome}</option>
-            ))}
-          </select>
-        )}
+        <div className="crud-actions-right">
+          {activeSubTab === 'grades' && (
+            <select 
+              value={gradeProductFilter}
+              onChange={(e) => setGradeProductFilter(e.target.value)}
+              className="filter-select"
+            >
+              <option value="">Todos os Produtos</option>
+              {produtos.map(p => (
+                <option key={p.codigo} value={p.codigo}>#{p.codigo} - {p.nome}</option>
+              ))}
+            </select>
+          )}
 
-        <button className="btn-primary" onClick={handleOpenCreate}>
-          <Plus size={16} /> + Novo Registro
-        </button>
+          <button className="btn-primary" onClick={handleOpenCreate}>
+            <Plus size={16} /> Novo Registro
+          </button>
+        </div>
       </div>
 
       {/* TABELA DE REGISTROS */}
-      <div className="list-card glass">
+      <div className="list-card glass full-width">
         <div className="table-responsive">
           <table className="data-table">
             
@@ -1121,14 +1128,14 @@ export default function CadastrosTab() {
                       <td><span className="item-code">#{item.codigo}</span></td>
                       <td><strong>{item.nome}</strong></td>
                       <td className="actions-cell">
-                        <button className="crud-row-btn edit" onClick={() => handleOpenEdit(item)}><Edit size={14} /></button>
-                        <button className="crud-row-btn delete" onClick={() => handleDelete(item.codigo)}><Trash2 size={14} /></button>
+                        <button className="crud-row-btn edit" onClick={() => handleOpenEdit(item)} title="Editar Grupo"><Edit size={14} /></button>
+                        <button className="crud-row-btn delete" onClick={() => handleDelete(item.codigo)} title="Excluir Grupo"><Trash2 size={14} /></button>
                       </td>
                     </tr>
                   ))}
                   {(!grupos || grupos.length === 0) && (
                     <tr>
-                      <td colSpan="3" style={{ textAlign: 'center', padding: '2rem', color: '#64748b' }}>
+                      <td colSpan="3" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
                         Nenhum grupo cadastrado.
                       </td>
                     </tr>
@@ -1167,15 +1174,15 @@ export default function CadastrosTab() {
                         </td>
                         <td>{item.tr}</td>
                         <td className="actions-cell">
-                          <button className="crud-row-btn edit" onClick={() => handleOpenEdit(item)}><Edit size={14} /></button>
-                          <button className="crud-row-btn delete" onClick={() => handleDelete(item.codigo)}><Trash2 size={14} /></button>
+                          <button className="crud-row-btn edit" onClick={() => handleOpenEdit(item)} title="Editar Subgrupo"><Edit size={14} /></button>
+                          <button className="crud-row-btn delete" onClick={() => handleDelete(item.codigo)} title="Excluir Subgrupo"><Trash2 size={14} /></button>
                         </td>
                       </tr>
                     );
                   })}
                   {(!subgrupos || subgrupos.length === 0) && (
                     <tr>
-                      <td colSpan="5" style={{ textAlign: 'center', padding: '2rem', color: '#64748b' }}>
+                      <td colSpan="5" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
                         Nenhum subgrupo cadastrado.
                       </td>
                     </tr>
@@ -1184,7 +1191,7 @@ export default function CadastrosTab() {
               </>
             )}
 
-            {/* LIST: MODELOS (NOVO) */}
+            {/* LIST: MODELOS */}
             {activeSubTab === 'modelos' && (
               <>
                 <thead>
@@ -1200,14 +1207,14 @@ export default function CadastrosTab() {
                       <td><span className="item-code">#{item.codigo}</span></td>
                       <td><strong>{item.nome}</strong></td>
                       <td className="actions-cell">
-                        <button className="crud-row-btn edit" onClick={() => handleOpenEdit(item)}><Edit size={14} /></button>
-                        <button className="crud-row-btn delete" onClick={() => handleDelete(item.codigo)}><Trash2 size={14} /></button>
+                        <button className="crud-row-btn edit" onClick={() => handleOpenEdit(item)} title="Editar Modelo"><Edit size={14} /></button>
+                        <button className="crud-row-btn delete" onClick={() => handleDelete(item.codigo)} title="Excluir Modelo"><Trash2 size={14} /></button>
                       </td>
                     </tr>
                   ))}
                   {(!modelos || modelos.length === 0) && (
                     <tr>
-                      <td colSpan="3" style={{ textAlign: 'center', padding: '2rem', color: '#64748b' }}>
+                      <td colSpan="3" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
                         Nenhum modelo cadastrado.
                       </td>
                     </tr>
@@ -1257,15 +1264,15 @@ export default function CadastrosTab() {
                           <td>{item.cor ? <span className="sigla-tag">{item.cor}</span> : '-'}</td>
                           <td className="codbarra-cell">{item.codbarra || '-'}</td>
                           <td className="actions-cell">
-                            <button className="crud-row-btn edit" onClick={() => handleOpenEdit(item)}><Edit size={14} /></button>
-                            <button className="crud-row-btn delete" onClick={() => handleDelete(item.codigo)}><Trash2 size={14} /></button>
+                            <button className="crud-row-btn edit" onClick={() => handleOpenEdit(item)} title="Editar Grade"><Edit size={14} /></button>
+                            <button className="crud-row-btn delete" onClick={() => handleDelete(item.codigo)} title="Excluir Grade"><Trash2 size={14} /></button>
                           </td>
                         </tr>
                       );
                     })}
                   {(!grades || grades.length === 0) && (
                     <tr>
-                      <td colSpan="8" style={{ textAlign: 'center', padding: '2rem', color: '#64748b' }}>
+                      <td colSpan="8" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
                         Nenhuma grade cadastrada.
                       </td>
                     </tr>
@@ -1274,7 +1281,7 @@ export default function CadastrosTab() {
               </>
             )}
 
-            {/* LIST: TAMANHOS (SEQUENCIAIS) */}
+            {/* LIST: TAMANHOS */}
             {activeSubTab === 'tamanhos' && (
               <>
                 <thead>
@@ -1296,14 +1303,14 @@ export default function CadastrosTab() {
                       <td>{item.valor || 0}</td>
                       <td>{item.pro || 0}</td>
                       <td className="actions-cell">
-                        <button className="crud-row-btn edit" onClick={() => handleOpenEdit(item)}><Edit size={14} /></button>
-                        <button className="crud-row-btn delete" onClick={() => handleDelete(item.codigo)}><Trash2 size={14} /></button>
+                        <button className="crud-row-btn edit" onClick={() => handleOpenEdit(item)} title="Editar Tamanho"><Edit size={14} /></button>
+                        <button className="crud-row-btn delete" onClick={() => handleDelete(item.codigo)} title="Excluir Tamanho"><Trash2 size={14} /></button>
                       </td>
                     </tr>
                   ))}
                   {(!tamanhos || tamanhos.length === 0) && (
                     <tr>
-                      <td colSpan="6" style={{ textAlign: 'center', padding: '2rem', color: '#64748b' }}>
+                      <td colSpan="6" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
                         Nenhum tamanho cadastrado.
                       </td>
                     </tr>
@@ -1335,33 +1342,35 @@ export default function CadastrosTab() {
                         <td><strong>{item.nome}</strong></td>
                         <td>{item.fabricante || item.marca || '-'}</td>
                         <td style={{ textAlign: 'center' }}>
-                          <strong style={{ color: stockTotal > 0 ? '#10b981' : '#ef4444' }}>
+                          <strong className={stockTotal > 0 ? 'stock-positive' : 'stock-zero'}>
                             {stockTotal}
                           </strong>
                         </td>
                         <td className="prices-cell">
-                        <div className="price-badge-container">
-                          <div className="price-primary" title="Preço Vista (Débito / PIX)">
-                            <span className="price-label">Vista:</span> {formatCurrency(item.valorv || 0)}
+                          <div className="price-badge-container">
+                            <div className="price-primary" title="Preço Vista (Débito / PIX)">
+                              <span className="price-label">Vista:</span> {formatCurrency(item.valorv || 0)}
+                            </div>
+                            <div className="price-secondary-row">
+                              <span className="price-tag" title="Valor Dinheiro">Din: {formatCurrency(item.pro_valor_dinheiro ?? item.valorv ?? 0)}</span>
+                              <span className="price-tag" title="Preço a Prazo">Prazo: {formatCurrency(item.pro_valorv_prazo ?? item.valorv ?? 0)}</span>
+                            </div>
                           </div>
-                          <div className="price-secondary-row">
-                            <span className="price-tag" title="Valor Dinheiro">Din: {formatCurrency(item.pro_valor_dinheiro ?? item.valorv ?? 0)}</span>
-                            <span className="price-tag" title="Preço a Prazo">Prazo: {formatCurrency(item.pro_valorv_prazo ?? item.valorv ?? 0)}</span>
-                          </div>
-                        </div>
-                      </td>
-                      <td><code>{item.codbarra || '-'}</code></td>
-                      <td className="actions-cell">
-                        <button className="crud-row-btn edit" onClick={() => handleOpenEdit(item)} title="Editar Produto"><Edit size={14} /></button>
-                        <button className="crud-row-btn delete" onClick={() => handleDelete(item.codigo)} title="Excluir Produto"><Trash2 size={14} /></button>
-                      </td>
-                    </tr>
-                  );
-                })}
+                        </td>
+                        <td className="codbarra-cell">{item.codbarra || '-'}</td>
+                        <td className="actions-cell">
+                          <button className="crud-row-btn grades" onClick={() => handleOpenProductGradesModal(item)} title="Gerenciar Grades / Variações"><Grid size={14} /></button>
+                          <button className="crud-row-btn history" onClick={() => handleOpenHistoryModal(item)} title="Histórico de Movimentações (HIS_PRO)"><History size={14} /></button>
+                          <button className="crud-row-btn edit" onClick={() => handleOpenEdit(item)} title="Editar Produto"><Edit size={14} /></button>
+                          <button className="crud-row-btn delete" onClick={() => handleDelete(item.codigo)} title="Excluir Produto"><Trash2 size={14} /></button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                   {(!produtos || produtos.length === 0) && (
                     <tr>
-                      <td colSpan="7" style={{ textAlign: 'center', padding: '2.5rem', color: '#64748b' }}>
-                        Nenhum produto cadastrado no catálogo. Clique em <strong>"+ Novo Registro"</strong> para cadastrar.
+                      <td colSpan="7" style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text-secondary)' }}>
+                        Nenhum produto cadastrado no catálogo. Clique em <strong>"Novo Registro"</strong> para cadastrar.
                       </td>
                     </tr>
                   )}
@@ -1398,7 +1407,7 @@ export default function CadastrosTab() {
                         <td><span className="item-code">#{item.codigo}</span></td>
                         <td><strong>{item.nome || item.razao_social}</strong></td>
                         <td>{item.fantasia || item.nome_fantasia || '-'}</td>
-                        <td><code>{maskCnpjCpf(item.cnpj || item.cnpj_cpf || item.cpf_cnpj || '') || '-'}</code></td>
+                        <td className="codbarra-cell">{maskCnpjCpf(item.cnpj || item.cnpj_cpf || item.cpf_cnpj || '') || '-'}</td>
                         <td>{item.telefone || item.fone || item.contato || '-'}</td>
                         <td>{locStr}</td>
                         <td className="actions-cell">
@@ -1410,7 +1419,7 @@ export default function CadastrosTab() {
                   })}
                   {fornecedores.length === 0 && (
                     <tr>
-                      <td colSpan="7" style={{ textAlign: 'center', padding: '2rem', color: '#64748b' }}>
+                      <td colSpan="7" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
                         Nenhum fornecedor cadastrado.
                       </td>
                     </tr>
@@ -1432,16 +1441,19 @@ export default function CadastrosTab() {
       {/* MODAL POPUP DE HISTÓRICO DE MOVIMENTAÇÃO (HIS_PRO) */}
       {selectedHistoryProduct && createPortal(
         <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setSelectedHistoryProduct(null); }}>
-          <div className="modal-content glass" style={{ maxWidth: '900px', width: '92vw' }}>
+          <div className="modal-content glass" style={{ maxWidth: '960px', width: '92vw' }}>
             <div className="modal-header">
-              <h4><History size={20} style={{ color: 'var(--accent-primary)' }} /> Histórico de Movimentações (HIS_PRO): #{selectedHistoryProduct.codigo} - {selectedHistoryProduct.nome}</h4>
-              <button className="btn-close" onClick={() => setSelectedHistoryProduct(null)}><X size={18} /></button>
+              <h4>
+                <History size={20} style={{ color: 'var(--accent)' }} /> 
+                Histórico de Movimentações (HIS_PRO): #{selectedHistoryProduct.codigo} - {selectedHistoryProduct.nome}
+              </h4>
+              <button className="btn-close" onClick={() => setSelectedHistoryProduct(null)} title="Fechar"><X size={18} /></button>
             </div>
-            <div className="modal-body" style={{ padding: '1rem 0' }}>
+            <div className="modal-body">
               {loadingHistory ? (
-                <div style={{ textAlign: 'center', padding: '2rem' }}>Carregando histórico de movimentação...</div>
+                <div style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text-secondary)' }}>Carregando histórico de movimentação...</div>
               ) : historyData.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>Nenhuma movimentação de estoque registrada para este produto.</div>
+                <div style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text-secondary)' }}>Nenhuma movimentação de estoque registrada para este produto.</div>
               ) : (
                 <div className="table-responsive" style={{ maxHeight: '420px', overflowY: 'auto' }}>
                   <table className="data-table">
@@ -1481,8 +1493,261 @@ export default function CadastrosTab() {
                 </div>
               )}
             </div>
-            <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
+            <div className="modal-footer">
               <button className="btn-secondary" onClick={() => setSelectedHistoryProduct(null)}>Fechar</button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* MODAL DE GERENCIAMENTO DE GRADES POR PRODUTO */}
+      {selectedProductGrades && createPortal(
+        <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setSelectedProductGrades(null); }}>
+          <div className="modal-content glass" style={{ maxWidth: '960px', width: '92vw' }}>
+            <div className="modal-header">
+              <h4>
+                <Grid size={20} style={{ color: 'var(--accent)' }} /> 
+                Gerenciar Grades / Variações: #{selectedProductGrades.codigo} - {selectedProductGrades.nome}
+              </h4>
+              <button className="btn-close" onClick={() => setSelectedProductGrades(null)} title="Fechar"><X size={18} /></button>
+            </div>
+
+            <div className="modal-body">
+              <div className="product-grades-modal-header">
+                <div className="product-grades-stats">
+                  <div className="product-grade-stat-item">
+                    <span className="stat-label">Total Variações</span>
+                    <span className="stat-value">{productGradesList.length}</span>
+                  </div>
+                  <div className="product-grade-stat-item">
+                    <span className="stat-label">Estoque Total</span>
+                    <span className="stat-value" style={{ color: productGradesList.reduce((acc, g) => acc + (Number(g.quantidade) || 0), 0) > 0 ? 'var(--success)' : 'var(--danger)' }}>
+                      {productGradesList.reduce((acc, g) => acc + (Number(g.quantidade) || 0), 0)}
+                    </span>
+                  </div>
+                  <div className="product-grade-stat-item">
+                    <span className="stat-label">Preço Base Vista</span>
+                    <span className="stat-value">{formatCurrency(selectedProductGrades.valorv || 0)}</span>
+                  </div>
+                </div>
+
+                <button 
+                  type="button"
+                  className="btn-primary"
+                  style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}
+                  onClick={() => {
+                    if (showProductGradeForm) {
+                      setShowProductGradeForm(false);
+                      setEditingProductGrade(null);
+                    } else {
+                      setEditingProductGrade(null);
+                      setProductGradeForm({
+                        codigo: '',
+                        pro: selectedProductGrades.codigo,
+                        tam: tamanhos[0]?.codigo || '',
+                        cor: '',
+                        quantidade: '',
+                        valor: selectedProductGrades.valorv || 0,
+                        valor_dinheiro: selectedProductGrades.pro_valor_dinheiro || selectedProductGrades.valorv || 0,
+                        valor_prazo: selectedProductGrades.pro_valorv_prazo || selectedProductGrades.valorv || 0,
+                        codbarra: selectedProductGrades.codbarra || ''
+                      });
+                      setShowProductGradeForm(true);
+                    }
+                  }}
+                >
+                  {showProductGradeForm ? <X size={16} /> : <Plus size={16} />}
+                  {showProductGradeForm ? 'Ocultar Formulário' : 'Nova Grade'}
+                </button>
+              </div>
+
+              {showProductGradeForm && (
+                <form onSubmit={handleSaveProductGrade} className="inline-grade-form">
+                  <h5 style={{ margin: '0 0 1rem 0', color: 'var(--text-primary)', fontWeight: 700, fontSize: '0.95rem' }}>
+                    {editingProductGrade ? 'Editar Variação de Grade' : 'Adicionar Nova Variação'}
+                  </h5>
+                  <div className="grid-form" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem', marginBottom: '1rem' }}>
+                    <label className="crud-input">
+                      Tamanho *
+                      <select 
+                        value={productGradeForm.tam} 
+                        onChange={(e) => setProductGradeForm({ ...productGradeForm, tam: e.target.value })}
+                        required
+                      >
+                        <option value="">Selecione...</option>
+                        {tamanhos.map(t => (
+                          <option key={t.codigo} value={t.codigo}>
+                            {t.tamanho} ({t.sigla})
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <label className="crud-input">
+                      Cor / Estampa
+                      <input 
+                        type="text" 
+                        value={productGradeForm.cor} 
+                        onChange={(e) => setProductGradeForm({ ...productGradeForm, cor: e.target.value.toUpperCase() })}
+                        placeholder="Ex: PRETO, AZUL" 
+                        style={{ textTransform: 'uppercase' }}
+                      />
+                    </label>
+
+                    <label className="crud-input">
+                      Quantidade
+                      <input 
+                        type="number" 
+                        value={productGradeForm.quantidade} 
+                        onChange={(e) => setProductGradeForm({ ...productGradeForm, quantidade: e.target.value })}
+                        placeholder="0" 
+                      />
+                    </label>
+
+                    <label className="crud-input">
+                      Preço Vista (R$)
+                      <input 
+                        type="number" 
+                        step="0.01" 
+                        value={productGradeForm.valor} 
+                        onChange={(e) => setProductGradeForm({ ...productGradeForm, valor: e.target.value })}
+                        placeholder="Ex: 59.90" 
+                      />
+                    </label>
+
+                    <label className="crud-input">
+                      Valor Dinheiro (R$)
+                      <input 
+                        type="number" 
+                        step="0.01" 
+                        value={productGradeForm.valor_dinheiro} 
+                        onChange={(e) => setProductGradeForm({ ...productGradeForm, valor_dinheiro: e.target.value })}
+                        placeholder="Ex: 55.00" 
+                      />
+                    </label>
+
+                    <label className="crud-input">
+                      Preço a Prazo (R$)
+                      <input 
+                        type="number" 
+                        step="0.01" 
+                        value={productGradeForm.valor_prazo} 
+                        onChange={(e) => setProductGradeForm({ ...productGradeForm, valor_prazo: e.target.value })}
+                        placeholder="Ex: 65.90" 
+                      />
+                    </label>
+
+                    <label className="crud-input" style={{ gridColumn: 'span 2' }}>
+                      Código de Barras (EAN)
+                      <input 
+                        type="text" 
+                        value={productGradeForm.codbarra} 
+                        onChange={(e) => setProductGradeForm({ ...productGradeForm, codbarra: e.target.value })}
+                        placeholder="EAN / Código específico da variação" 
+                      />
+                    </label>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+                    <button type="button" className="btn-secondary" onClick={() => setShowProductGradeForm(false)}>
+                      Cancelar
+                    </button>
+                    <button type="submit" className="btn-primary" disabled={loadingProductGrades}>
+                      <Save size={16} /> {editingProductGrade ? 'Atualizar Grade' : 'Salvar Grade'}
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {loadingProductGrades ? (
+                <div style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text-secondary)' }}>Buscando variações de grade do produto...</div>
+              ) : productGradesList.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '2.5rem', background: 'rgba(0,0,0,0.02)', borderRadius: '1rem' }}>
+                  <AlertCircle size={32} style={{ color: 'var(--text-secondary)', marginBottom: '0.5rem' }} />
+                  <p style={{ margin: 0, fontWeight: 500, color: 'var(--text-primary)' }}>Nenhuma grade cadastrada para este produto.</p>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Clique no botão "Nova Grade" acima para cadastrar variações de tamanho e cor.</span>
+                </div>
+              ) : (
+                <div className="table-responsive" style={{ maxHeight: '420px', overflowY: 'auto' }}>
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Cód Grade</th>
+                        <th>Tamanho</th>
+                        <th>Cor</th>
+                        <th>Estoque</th>
+                        <th>Preços (Vista / Din. / Prazo)</th>
+                        <th>Cód. Barras</th>
+                        <th>Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {productGradesList.map((item, idx) => {
+                        const tam = tamanhos.find(t => Number(t.codigo) === Number(item.tam));
+                        return (
+                          <tr key={item.codigo || idx}>
+                            <td><span className="item-code">#{item.codigo}</span></td>
+                            <td><strong>{tam ? `${tam.tamanho} (${tam.sigla})` : `Tamanho #${item.tam}`}</strong></td>
+                            <td>{item.cor ? <span className="sigla-tag">{item.cor}</span> : '-'}</td>
+                            <td>
+                              <strong style={{ color: Number(item.quantidade) > 0 ? 'var(--success)' : 'var(--danger)' }}>
+                                {item.quantidade}
+                              </strong>
+                            </td>
+                            <td className="prices-cell">
+                              <div className="price-badge-container">
+                                <div className="price-primary" title="Preço Vista (Débito / PIX)">
+                                  <span className="price-label">Vista:</span> {formatCurrency(item.valor || 0)}
+                                </div>
+                                <div className="price-secondary-row">
+                                  <span className="price-tag" title="Valor Dinheiro">Din: {formatCurrency(item.valor_dinheiro ?? item.valor ?? 0)}</span>
+                                  <span className="price-tag" title="Preço a Prazo">Prazo: {formatCurrency(item.valor_prazo ?? item.valor ?? 0)}</span>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="codbarra-cell">{item.codbarra || '-'}</td>
+                            <td className="actions-cell">
+                              <button 
+                                className="crud-row-btn edit" 
+                                onClick={() => {
+                                  setEditingProductGrade(item);
+                                  setProductGradeForm({
+                                    codigo: item.codigo,
+                                    pro: selectedProductGrades.codigo,
+                                    tam: item.tam,
+                                    cor: item.cor || '',
+                                    quantidade: item.quantidade || 0,
+                                    valor: item.valor || 0,
+                                    valor_dinheiro: item.valor_dinheiro ?? item.valor ?? 0,
+                                    valor_prazo: item.valor_prazo ?? item.valor ?? 0,
+                                    codbarra: item.codbarra || ''
+                                  });
+                                  setShowProductGradeForm(true);
+                                }}
+                                title="Editar variação"
+                              >
+                                <Edit size={14} />
+                              </button>
+                              <button 
+                                className="crud-row-btn delete" 
+                                onClick={() => handleDeleteProductGrade(item.codigo)}
+                                title="Excluir variação"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            <div className="modal-footer">
+              <button className="btn-secondary" onClick={() => setSelectedProductGrades(null)}>Fechar</button>
             </div>
           </div>
         </div>,

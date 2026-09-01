@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react';
-import { FileText, Download, ShieldCheck, RefreshCw, XCircle, Search, Eye, AlertTriangle, CheckCircle, Clock } from 'lucide-react';
+import { 
+  FileText, Download, ShieldCheck, RefreshCw, 
+  XCircle, Search, Eye, AlertTriangle, CheckCircle, Clock, X 
+} from 'lucide-react';
 import { createApi } from '../../services/api';
 import { formatCurrency, formatDatehora } from '../../utils/formatters';
 import SearchBar from '../SearchBar';
@@ -20,6 +23,18 @@ export default function NfeTab() {
   useEffect(() => {
     fetchNotes();
   }, []);
+
+  // Atalho para fechar modal com ESC
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && showCancelModal) {
+        setShowCancelModal(false);
+        setCancelJustification('');
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showCancelModal]);
 
   const fetchNotes = async () => {
     setLoading(true);
@@ -111,143 +126,190 @@ export default function NfeTab() {
   const totalRejeitadas = notes.filter(n => n.status === 'REJEITADA').length;
 
   return (
-    <div className="cadastros-container">
+    <div className="crud-container">
       {/* Cabeçalho Superior */}
-      <div className="crud-title-row" style={{ marginBottom: '1.5rem' }}>
-        <div className="cd-title-with-badge">
-          <h2><FileText size={24} style={{ color: 'var(--accent-primary)' }} /> Painel de Notas Fiscais (NF-e Modelo 55)</h2>
-          <span className="badge badge-success">SEFAZ ONLINE (NT 2025.002)</span>
+      <div className="crud-title-row">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <h2 style={{ fontSize: '1.4rem', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)' }}>
+            <FileText size={24} style={{ color: 'var(--accent)' }} /> 
+            Painel de Notas Fiscais (NF-e Modelo 55)
+          </h2>
+          <span className="badge badge-success" style={{ letterSpacing: '0.5px' }}>
+            SEFAZ ONLINE (NT 2025.002)
+          </span>
         </div>
-        <button className="refresh-btn" onClick={fetchNotes} disabled={loading}>
-          <RefreshCw size={18} className={loading ? 'spin' : ''} /> Atualizar Lista
+        <button 
+          className="btn-secondary" 
+          onClick={fetchNotes} 
+          disabled={loading}
+          style={{ height: '38px', padding: '0 1rem' }}
+        >
+          <RefreshCw size={16} className={loading ? 'spin' : ''} /> 
+          Atualizar Lista
         </button>
       </div>
 
-      {/* Grid de Cards de Estatística no padrão global dashboard-grid */}
-      <div className="dashboard-grid">
+      {/* Grid de Cards de Métricas */}
+      <div className="dashboard-grid" style={{ marginBottom: '1rem' }}>
         <div className="metric-card glass">
           <div className="metric-header">
             <span>Total Emitidas</span>
-            <FileText className="metric-icon" size={24} />
+            <FileText className="metric-icon" size={20} />
           </div>
           <div className="metric-value">{totalEmitidas}</div>
         </div>
 
-        <div className="metric-card glass">
+        <div className="metric-card glass credits-metric-card">
           <div className="metric-header">
-            <span>Autorizadas 🟢</span>
-            <CheckCircle className="metric-icon" size={24} style={{ color: '#10b981', background: 'rgba(16, 185, 129, 0.1)' }} />
+            <span>Autorizadas</span>
+            <CheckCircle className="metric-icon" size={20} />
           </div>
-          <div className="metric-value" style={{ color: '#10b981' }}>{totalAutorizadas}</div>
+          <div className="metric-value">{totalAutorizadas}</div>
         </div>
 
-        <div className="metric-card glass">
+        <div className="metric-card glass" style={{ borderColor: 'rgba(249, 115, 22, 0.3)' }}>
           <div className="metric-header">
-            <span>Canceladas 🟡</span>
-            <Clock className="metric-icon" size={24} style={{ color: '#f59e0b', background: 'rgba(245, 158, 11, 0.1)' }} />
+            <span>Canceladas</span>
+            <Clock className="metric-icon" size={20} />
           </div>
-          <div className="metric-value" style={{ color: '#f59e0b' }}>{totalCanceladas}</div>
+          <div className="metric-value" style={{ color: 'var(--accent)' }}>{totalCanceladas}</div>
         </div>
 
-        <div className="metric-card glass">
+        <div className="metric-card glass debits-metric-card">
           <div className="metric-header">
-            <span>Rejeitadas 🔴</span>
-            <XCircle className="metric-icon" size={24} style={{ color: '#ef4444', background: 'rgba(239, 68, 68, 0.1)' }} />
+            <span>Rejeitadas</span>
+            <XCircle className="metric-icon" size={20} />
           </div>
-          <div className="metric-value" style={{ color: '#ef4444' }}>{totalRejeitadas}</div>
+          <div className="metric-value">{totalRejeitadas}</div>
         </div>
       </div>
 
-      {/* Barra de Filtro e Busca Harmonizada */}
-      <div className="list-card glass" style={{ marginBottom: '1.5rem', padding: '1.25rem' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '1rem', alignItems: 'center' }}>
-          <SearchBar
-            value={searchTerm}
-            onChange={setSearchTerm}
-            onSearch={() => {}}
-            onClear={() => setSearchTerm('')}
-            placeholder="Buscar por número da NF, chave de acesso de 44 dígitos ou protocolo..."
-          />
-          <div style={{ minWidth: '200px' }}>
-            <select 
-              value={statusFilter} 
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="cd-text-input"
-              style={{
-                width: '100%',
-                padding: '0.65rem 0.9rem',
-                borderRadius: '8px',
-                border: '1px solid rgba(0, 0, 0, 0.15)',
-                fontWeight: 600,
-                backgroundColor: '#ffffff'
-              }}
-            >
-              <option value="todos">Todos os Status</option>
-              <option value="AUTORIZADA">🟢 Autorizadas</option>
-              <option value="CANCELADA">🟡 Canceladas</option>
-              <option value="REJEITADA">🔴 Rejeitadas</option>
-            </select>
-          </div>
+      {/* Card Principal com Filtros em Pílula e Tabela */}
+      <div className="list-card glass full-width">
+        {/* Barra de Filtros em Pílula */}
+        <div className="filter-bar" style={{ marginBottom: '1rem' }}>
+          <button 
+            type="button" 
+            className={`filter-btn ${statusFilter === 'todos' ? 'active' : ''}`}
+            onClick={() => setStatusFilter('todos')}
+          >
+            Todas ({totalEmitidas})
+          </button>
+          <button 
+            type="button" 
+            className={`filter-btn filter-pago ${statusFilter === 'AUTORIZADA' ? 'active' : ''}`}
+            onClick={() => setStatusFilter('AUTORIZADA')}
+          >
+            Autorizadas ({totalAutorizadas})
+          </button>
+          <button 
+            type="button" 
+            className={`filter-btn filter-warning ${statusFilter === 'CANCELADA' ? 'active' : ''}`}
+            onClick={() => setStatusFilter('CANCELADA')}
+          >
+            Canceladas ({totalCanceladas})
+          </button>
+          <button 
+            type="button" 
+            className={`filter-btn filter-aberto ${statusFilter === 'REJEITADA' ? 'active' : ''}`}
+            onClick={() => setStatusFilter('REJEITADA')}
+          >
+            Rejeitadas ({totalRejeitadas})
+          </button>
         </div>
-      </div>
 
-      {/* Tabela de Notas Fiscais */}
-      <div className="list-card glass">
+        {/* Campo de Busca */}
+        <SearchBar
+          value={searchTerm}
+          onChange={setSearchTerm}
+          onSearch={() => {}}
+          onClear={() => setSearchTerm('')}
+          placeholder="Buscar por número da NF, chave de acesso de 44 dígitos ou protocolo..."
+        />
+
+        {/* Tabela Responsiva de NF-e */}
         <div className="table-responsive">
           <table className="data-table">
             <thead>
               <tr>
-                <th>Nº Nota / Série</th>
-                <th>Transferência</th>
-                <th>Chave de Acesso NF-e</th>
-                <th>Data Emissão</th>
-                <th>Valor Total</th>
-                <th>Status SEFAZ</th>
-                <th style={{ textAlign: 'right' }}>Ações Fiscais</th>
+                <th scope="col">Nº Nota / Série</th>
+                <th scope="col">Transferência</th>
+                <th scope="col">Chave de Acesso NF-e</th>
+                <th scope="col">Data Emissão</th>
+                <th scope="col">Valor Total</th>
+                <th scope="col">Status SEFAZ</th>
+                <th scope="col" style={{ textAlign: 'right' }}>Ações Fiscais</th>
               </tr>
             </thead>
             <tbody>
               {filteredNotes.map((n) => (
                 <tr key={n.id || n.chave}>
-                  <td><strong>NF-e #{n.numero || n.id} (Série {n.serie || 1})</strong></td>
-                  <td><span className="badge badge-info">Lote #{n.transferencia_id || n.id}</span></td>
-                  <td>
-                    <span style={{ fontFamily: 'monospace', fontSize: '0.85rem', color: 'var(--accent-primary)', fontWeight: 600 }} title={n.chave}>
+                  <td data-label="Nº Nota / Série">
+                    <span className="item-code">
+                      NF-e #{n.numero || n.id} {n.serie ? `(Série ${n.serie})` : ''}
+                    </span>
+                  </td>
+                  <td data-label="Transferência">
+                    <span className="badge badge-info">
+                      Lote #{n.transferencia_id || n.id}
+                    </span>
+                  </td>
+                  <td data-label="Chave de Acesso NF-e">
+                    <span className="item-code" title={n.chave} style={{ fontSize: '0.8rem' }}>
                       {n.chave ? `${n.chave.substring(0, 10)}...${n.chave.substring(34)}` : '-'}
                     </span>
                   </td>
-                  <td>{formatDatehora(n.data_emissao)}</td>
-                  <td><strong>{formatCurrency(n.valor_total)}</strong></td>
-                  <td>
-                    <span className={`badge ${n.status === 'AUTORIZADA' ? 'badge-success' : n.status === 'CANCELADA' ? 'badge-warning' : 'badge-danger'}`}>
-                      {n.status === 'AUTORIZADA' ? '🟢 Autorizada' : n.status === 'CANCELADA' ? '🟡 Cancelada' : n.status || 'Pendente'}
+                  <td data-label="Data Emissão">{formatDatehora(n.data_emissao)}</td>
+                  <td data-label="Valor Total" style={{ fontWeight: 600 }}>
+                    {formatCurrency(n.valor_total)}
+                  </td>
+                  <td data-label="Status SEFAZ">
+                    <span className={`badge ${
+                      n.status === 'AUTORIZADA' 
+                        ? 'badge-success' 
+                        : n.status === 'CANCELADA' 
+                        ? 'badge-warning' 
+                        : n.status === 'REJEITADA' 
+                        ? 'badge-danger' 
+                        : 'badge-info'
+                    }`}>
+                      {n.status === 'AUTORIZADA' ? 'Autorizada' : n.status === 'CANCELADA' ? 'Cancelada' : n.status === 'REJEITADA' ? 'Rejeitada' : (n.status || 'Pendente')}
                     </span>
                   </td>
-                  <td className="actions-cell" style={{ textAlign: 'right' }}>
+                  <td data-label="Ações Fiscais" className="actions-cell" style={{ justifyContent: 'flex-end' }}>
                     <button 
-                      className="cd-action-btn view" 
+                      className="action-btn" 
                       onClick={() => handleDownloadDanfe(n.chave)}
                       title="Baixar DANFE em PDF"
-                      style={{ marginRight: '6px' }}
+                      aria-label="Baixar DANFE em PDF"
+                      style={{ gap: '5px', fontSize: '0.82rem', padding: '6px 12px' }}
                     >
-                      📄 DANFE (PDF)
+                      <FileText size={15} /> DANFE (PDF)
                     </button>
                     <button 
-                      className="cd-action-btn view" 
+                      className="action-btn" 
                       onClick={() => handleDownloadXml(n.chave)}
                       title="Baixar XML Autorizado"
-                      style={{ marginRight: '6px', backgroundColor: '#8b5cf6', color: '#fff' }}
+                      aria-label="Baixar XML Autorizado"
+                      style={{ gap: '5px', fontSize: '0.82rem', padding: '6px 12px' }}
                     >
-                      📥 XML
+                      <Download size={15} /> XML
                     </button>
                     {n.status === 'AUTORIZADA' && (
                       <button 
-                        className="cd-action-btn check" 
+                        className="action-btn" 
                         onClick={() => { setSelectedNote(n); setShowCancelModal(true); }}
                         title="Cancelar NF-e na SEFAZ"
-                        style={{ backgroundColor: '#ef4444', color: '#fff' }}
+                        aria-label="Cancelar NF-e na SEFAZ"
+                        style={{ 
+                          gap: '5px', 
+                          fontSize: '0.82rem', 
+                          padding: '6px 12px',
+                          color: '#ba1a1a', 
+                          background: 'rgba(186, 26, 26, 0.08)' 
+                        }}
                       >
-                        🚫 Cancelar
+                        <XCircle size={15} /> Cancelar
                       </button>
                     )}
                   </td>
@@ -255,7 +317,7 @@ export default function NfeTab() {
               ))}
               {filteredNotes.length === 0 && (
                 <tr>
-                  <td colSpan="7" style={{ textAlign: 'center', padding: '2.5rem', color: '#6b7280' }}>
+                  <td colSpan="7" style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text-secondary)' }}>
                     Nenhuma Nota Fiscal (NF-e) encontrada.
                   </td>
                 </tr>
@@ -265,54 +327,74 @@ export default function NfeTab() {
         </div>
       </div>
 
-      {/* Modal de Cancelamento */}
+      {/* Modal Institucional de Cancelamento com Glassmorphism */}
       {showCancelModal && selectedNote && (
-        <div className="cd-modal-overlay">
-          <div className="cd-modal-content glass" style={{ maxWidth: '520px' }}>
-            <h3><AlertTriangle size={22} style={{ color: '#ef4444' }} /> Cancelar NF-e #{selectedNote.numero}</h3>
-            <p style={{ margin: '0.8rem 0', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-              Atenção: O cancelamento da Nota Fiscal será transmitido diretamente para a SEFAZ. Esta ação não poderá ser desfeita.
-            </p>
+        <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) { setShowCancelModal(false); setCancelJustification(''); } }}>
+          <div className="modal-content glass" style={{ maxWidth: '520px' }}>
+            <div className="modal-header">
+              <h4 style={{ color: 'var(--danger, #ba1a1a)' }}>
+                <AlertTriangle size={20} style={{ color: 'var(--danger, #ba1a1a)' }} /> 
+                Cancelar NF-e #{selectedNote.numero}
+              </h4>
+              <button 
+                className="btn-close" 
+                onClick={() => { setShowCancelModal(false); setCancelJustification(''); }}
+                aria-label="Fechar"
+              >
+                <X size={18} />
+              </button>
+            </div>
             
-            <div className="cd-form">
-              <label className="cd-input-container">
-                Justificativa do Cancelamento (Mínimo 15 caracteres) *
-                <textarea 
-                  value={cancelJustification}
-                  onChange={(e) => setCancelJustification(e.target.value)}
-                  placeholder="Ex: Erro no preenchimento dos valores da transferência..."
-                  className="cd-text-input"
-                  rows={4}
-                  style={{ resize: 'vertical' }}
-                  required
-                />
-              </label>
-
-              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '1.2rem' }}>
-                <button 
-                  type="button" 
-                  className="refresh-btn" 
-                  onClick={() => { setShowCancelModal(false); setCancelJustification(''); }}
-                >
-                  Voltar
-                </button>
-                <button 
-                  type="button" 
-                  onClick={handleCancelNfe}
-                  disabled={actionLoading}
-                  style={{
-                    background: 'linear-gradient(135deg, #ef4444, #dc2626)',
-                    color: '#fff',
-                    border: 'none',
-                    padding: '0.65rem 1.2rem',
-                    borderRadius: '8px',
-                    fontWeight: 600,
-                    cursor: 'pointer'
-                  }}
-                >
-                  {actionLoading ? '⌛ Transmitindo Cancelamento...' : 'Confirmar Cancelamento'}
-                </button>
+            <div className="modal-body" style={{ padding: '1rem 0' }}>
+              <p style={{ margin: '0 0 1rem 0', fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                Atenção: O cancelamento da Nota Fiscal será transmitido diretamente para a SEFAZ. Esta ação não poderá ser desfeita.
+              </p>
+              
+              <div className="crud-input">
+                <label style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <span>Justificativa do Cancelamento (Mínimo 15 caracteres) *</span>
+                  <textarea 
+                    value={cancelJustification}
+                    onChange={(e) => setCancelJustification(e.target.value)}
+                    placeholder="Ex: Erro no preenchimento dos valores da transferência..."
+                    rows={4}
+                    style={{ 
+                      width: '100%',
+                      padding: '0.75rem',
+                      borderRadius: '0.65rem',
+                      border: '1px solid rgba(0, 0, 0, 0.12)',
+                      background: 'var(--bg-secondary, #ffffff)',
+                      color: 'var(--text-primary)',
+                      fontFamily: 'inherit',
+                      fontSize: '0.9rem',
+                      resize: 'vertical'
+                    }}
+                    required
+                  />
+                </label>
               </div>
+            </div>
+
+            <div className="modal-footer" style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', borderTop: '1px solid rgba(0,0,0,0.08)', paddingTop: '1rem' }}>
+              <button 
+                type="button" 
+                className="btn-secondary" 
+                onClick={() => { setShowCancelModal(false); setCancelJustification(''); }}
+              >
+                Fechar <kbd style={{ marginLeft: '4px', fontSize: '0.75rem', padding: '1px 4px', borderRadius: '3px', background: 'rgba(0,0,0,0.08)' }}>ESC</kbd>
+              </button>
+              <button 
+                type="button" 
+                onClick={handleCancelNfe}
+                disabled={actionLoading}
+                className="btn-primary"
+                style={{
+                  background: 'linear-gradient(135deg, #ba1a1a 0%, #93000a 100%)',
+                  boxShadow: '0 4px 12px rgba(186, 26, 26, 0.25)'
+                }}
+              >
+                {actionLoading ? 'Transmitindo Cancelamento...' : 'Confirmar Cancelamento'}
+              </button>
             </div>
           </div>
         </div>

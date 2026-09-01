@@ -1,0 +1,130 @@
+/* Container Fixo no Canto Superior Direito */
+.toast-container {
+  position: fixed;
+  top: 1.25rem;
+  right: 1.25rem;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  pointer-events: none;
+  max-width: calc(100vw - 2.5rem);
+}
+
+/* Card Toast com Glassmorphism Institucional */
+.toast-card {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  min-width: 290px;
+  max-width: 440px;
+  width: fit-content;
+  padding: 0.85rem 1rem;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 0.85rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  animation: toastSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+@keyframes toastSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(30px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+/* Tipos e Cores da Marca */
+.toast-card.toast-success {
+  border-left: 4px solid #006c49;
+}
+
+.toast-card.toast-success .toast-icon-wrapper {
+  color: #006c49;
+  background: rgba(0, 108, 73, 0.12);
+}
+
+.toast-card.toast-warning {
+  border-left: 4px solid #f97316;
+}
+
+.toast-card.toast-warning .toast-icon-wrapper {
+  color: #ea580c;
+  background: rgba(249, 115, 22, 0.14);
+}
+
+.toast-card.toast-error {
+  border-left: 4px solid #ba1a1a;
+}
+
+.toast-card.toast-error .toast-icon-wrapper {
+  color: #ba1a1a;
+  background: rgba(186, 26, 26, 0.12);
+}
+
+.toast-card.toast-info {
+  border-left: 4px solid #006591;
+}
+
+.toast-card.toast-info .toast-icon-wrapper {
+  color: #006591;
+  background: rgba(0, 101, 145, 0.12);
+}
+
+/* Ícone */
+.toast-icon-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* Conteúdo e Mensagem */
+.toast-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.toast-message {
+  font-size: 0.86rem;
+  font-weight: 500;
+  color: #0b1c30;
+  line-height: 1.45;
+  word-break: break-word;
+  white-space: pre-line;
+  margin: 0;
+}
+
+/* Botão Fechar */
+.toast-close-btn {
+  background: transparent;
+  border: none;
+  padding: 4px;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s, background 0.15s;
+  margin-top: 1px;
+  margin-right: -4px;
+  flex-shrink: 0;
+}
+
+.toast-close-btn:hover {
+  color: #334155;
+  background: rgba(0, 0, 0, 0.05);
+}

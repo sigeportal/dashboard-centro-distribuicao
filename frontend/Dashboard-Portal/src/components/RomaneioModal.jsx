@@ -1,10 +1,24 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Printer, X, PackageCheck, Truck, ShieldCheck, FileText } from 'lucide-react';
 import { formatDate, formatCurrency } from '../utils/formatters';
 import './RomaneioModal.css';
 
-export default function RomaneioModal({ transfer, items, products, units, onClose }) {
+export default function RomaneioModal({ transfer, items = [], products = [], units = [], onClose }) {
   if (!transfer) return null;
+
+  // Atalhos de teclado (ESC para fechar, CTRL+P para imprimir)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        if (onClose) onClose();
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p') {
+        e.preventDefault();
+        window.print();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
 
   const cleanName = (str) => {
     if (!str) return '';
@@ -53,195 +67,228 @@ export default function RomaneioModal({ transfer, items, products, units, onClos
   const isConferido = transfer.status === 'Conferido/Aprovado' || transfer.status === 'Aceito Parcialmente' || transfer.status === 'Rejeitado';
 
   return (
-    <div className="romaneio-overlay">
-      <div className="romaneio-modal-container">
-        {/* Barra de Ações (Oculta na Impressão) */}
-        <div className="romaneio-action-bar no-print">
-          <div className="romaneio-action-title">
-            <Printer size={20} />
-            <span>Guia de Romaneio de Transferência #{transfer.id}</span>
+    <div className="romaneio-overlay" onClick={(e) => { if (e.target === e.currentTarget && onClose) onClose(); }}>
+      <div className="romaneio-container glass">
+        
+        {/* Cabeçalho do Modal (Oculto na Impressão) */}
+        <div className="romaneio-header no-print">
+          <div className="romaneio-header-title">
+            <div className="romaneio-icon-badge">
+              <PackageCheck size={22} />
+            </div>
+            <div>
+              <h3>Guia de Romaneio de Transferência</h3>
+              <p>Lote #{transfer.id} • {getUnitName(transfer.origem)} para {getUnitName(transfer.destino)}</p>
+            </div>
           </div>
-          <div className="romaneio-action-buttons">
-            <button className="romaneio-btn print-btn" onClick={handlePrint}>
-              <Printer size={18} /> Imprimir / Salvar PDF
+
+          <div className="romaneio-header-actions">
+            <button className="btn-secondary btn-print" onClick={handlePrint} title="Imprimir Guia A4 (Ctrl+P)">
+              <Printer size={16} /> Imprimir A4
             </button>
-            <button className="romaneio-btn close-btn" onClick={onClose}>
-              <X size={18} /> Fechar
+            <button className="romaneio-btn-close" onClick={onClose} title="Fechar (ESC)">
+              <X size={20} />
             </button>
           </div>
         </div>
 
-        {/* Área de Impressão (Romaneio A4) */}
-        <div className="romaneio-document-sheet romaneio-print-area">
-          {/* Cabeçalho do Documento */}
-          <div className="romaneio-header">
-            <div className="romaneio-header-logo">
-              <div className="romaneio-brand-badge">
-                <PackageCheck size={28} />
+        {/* Corpo do Modal com Folha A4 */}
+        <div className="romaneio-body">
+          <div className="romaneio-document-sheet romaneio-print-area">
+            
+            {/* Cabeçalho Oficial do Documento A4 */}
+            <div className="romaneio-doc-header">
+              <div className="romaneio-doc-brand">
+                <div className="romaneio-brand-symbol">
+                  <PackageCheck size={28} />
+                </div>
                 <div>
                   <h2>CENTRO DE DISTRIBUIÇÃO</h2>
                   <p>SISTEMA DE GESTÃO DE ESTOQUE UNIFICADO</p>
                 </div>
               </div>
-            </div>
-            <div className="romaneio-header-meta">
-              <div className="romaneio-doc-title">ROMANEIO DE TRANSFERÊNCIA</div>
-              <div className="romaneio-doc-number">LOTE #{transfer.id}</div>
-              <div className="romaneio-doc-date">Emissão: {formatDate(transfer.data || new Date().toISOString())}</div>
-            </div>
-          </div>
-
-          <hr className="romaneio-divider" />
-
-          {/* Dados Gerais da Transferência */}
-          <div className="romaneio-info-grid">
-            <div className="romaneio-info-box">
-              <h4><Truck size={16} /> REMETENTE (ORIGEM)</h4>
-              <p className="romaneio-info-highlight">{getUnitName(transfer.origem)}</p>
-              <p className="romaneio-info-sub">Código Origem: #{transfer.origem}</p>
+              <div className="romaneio-doc-meta">
+                <div className="romaneio-doc-type">ROMANEIO DE CARGA</div>
+                <div className="romaneio-doc-lot">LOTE #{transfer.id}</div>
+                <div className="romaneio-doc-timestamp">Emissão: {formatDate(transfer.data || new Date().toISOString())}</div>
+              </div>
             </div>
 
-            <div className="romaneio-info-box">
-              <h4><ShieldCheck size={16} /> DESTINATÁRIO (DESTINO)</h4>
-              <p className="romaneio-info-highlight">{getUnitName(transfer.destino)}</p>
-              <p className="romaneio-info-sub">Código Destino: #{transfer.destino}</p>
-            </div>
+            <hr className="romaneio-doc-divider" />
 
-            <div className="romaneio-info-box">
-              <h4><FileText size={16} /> DETALHES FISCAIS / STATUS</h4>
-              <p><strong>Status:</strong> {transfer.status || 'Em Trânsito'}</p>
-              <p><strong>Tipo:</strong> {transfer.tipoFiscal === 'NAO_FISCAL' ? '📦 Não Fiscal (Interna)' : '📄 Fiscal (Com NF-e)'}</p>
-              {transfer.numeroNf && <p><strong>NF-e Nº:</strong> #{transfer.numeroNf}</p>}
-              {transfer.chaveNfe && <p className="romaneio-info-sub" style={{ wordBreak: 'break-all' }}><strong>Chave NFe:</strong> {transfer.chaveNfe}</p>}
-            </div>
-          </div>
+            {/* Grid de Informações da Carga */}
+            <div className="romaneio-info-grid">
+              <div className="romaneio-info-card">
+                <div className="romaneio-info-card-header">
+                  <Truck size={15} /> REMETENTE (ORIGEM)
+                </div>
+                <div className="romaneio-info-highlight">{getUnitName(transfer.origem)}</div>
+                <div className="romaneio-info-sub">Código Origem: #{transfer.origem}</div>
+              </div>
 
-          {transfer.obs && (
-            <div className="romaneio-obs-box">
-              <strong>Observações Logísticas:</strong> {cleanName(transfer.obs)}
-            </div>
-          )}
+              <div className="romaneio-info-card">
+                <div className="romaneio-info-card-header">
+                  <ShieldCheck size={15} /> DESTINATÁRIO (DESTINO)
+                </div>
+                <div className="romaneio-info-highlight">{getUnitName(transfer.destino)}</div>
+                <div className="romaneio-info-sub">Código Destino: #{transfer.destino}</div>
+              </div>
 
-          {/* Tabela de Produtos / Itens do Lote */}
-          <div className="romaneio-table-container">
-            <table className="romaneio-table">
-              <thead>
-                <tr>
-                  <th style={{ width: '50px' }}>Item</th>
-                  <th style={{ width: '80px' }}>Código</th>
-                  <th>Descrição do Produto</th>
-                  <th style={{ width: '110px', textAlign: 'center' }}>Tam / Grade</th>
-                  <th style={{ width: '90px', textAlign: 'center' }}>Qtd Enviada</th>
-                  <th style={{ width: '90px', textAlign: 'center' }}>Qtd Conf.</th>
-                  <th style={{ width: '110px', textAlign: 'right' }}>Valor Unit.</th>
-                  <th style={{ width: '120px', textAlign: 'right' }}>Subtotal</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((item, idx) => {
-                  const prod = products.find(p => p.codigo === (item.produtoId || item.produto_id));
-                  const prodName = cleanName(prod ? prod.nome : (item.nome || `Produto #${item.produtoId || item.produto_id}`));
-                  const tam = resolveItemSize(item, prod);
-                  const cor = item.cor && item.cor !== 'UNICA' ? item.cor : '';
-                  const qtdEnviada = Number(item.quantidade) || 0;
-                  const qtdConf = isConferido ? (Number(item.quantidadeConferida ?? item.quantidade) || 0) : qtdEnviada;
-                  const valorUnit = Number(item.valor) || 0;
-                  const subtotal = qtdEnviada * valorUnit;
-
-                  return (
-                    <tr key={item.id || idx}>
-                      <td style={{ textAlign: 'center' }}>#{idx + 1}</td>
-                      <td><strong>#{item.produtoId || item.produto_id}</strong></td>
-                      <td>
-                        <strong>{prodName}</strong>
-                        {item.justificativa && (
-                          <div className="romaneio-item-obs">Obs: {item.justificativa}</div>
-                        )}
-                      </td>
-                      <td style={{ textAlign: 'center' }}>
-                        <span style={{ 
-                          fontSize: '0.84rem', 
-                          fontWeight: 700, 
-                          background: '#f8fafc', 
-                          color: '#1e293b', 
-                          padding: '2px 8px', 
-                          borderRadius: '4px',
-                          border: '1px solid #cbd5e1',
-                          display: 'inline-block'
-                        }}>
-                          {tam}{cor ? ` • ${cor}` : ''}
-                        </span>
-                      </td>
-                      <td style={{ textAlign: 'center', fontWeight: 'bold' }}>{qtdEnviada}</td>
-                      <td style={{ textAlign: 'center' }}>{isConferido ? qtdConf : '-'}</td>
-                      <td style={{ textAlign: 'right' }}>{formatCurrency(valorUnit)}</td>
-                      <td style={{ textAlign: 'right', fontWeight: 'bold' }}>{formatCurrency(subtotal)}</td>
-                    </tr>
-                  );
-                })}
-
-                {items.length === 0 && (
-                  <tr>
-                    <td colSpan="8" style={{ textAlign: 'center', padding: '1.5rem' }}>
-                      Nenhum item listado neste lote.
-                    </td>
-                  </tr>
+              <div className="romaneio-info-card">
+                <div className="romaneio-info-card-header">
+                  <FileText size={15} /> DETALHES FISCAIS / STATUS
+                </div>
+                <p><strong>Status:</strong> {transfer.status || 'Em Trânsito'}</p>
+                <p><strong>Tipo:</strong> {transfer.tipoFiscal === 'NAO_FISCAL' ? 'Não Fiscal (Interno)' : 'Fiscal (Com NF-e)'}</p>
+                {transfer.numeroNf && <p><strong>NF-e Nº:</strong> #{transfer.numeroNf}</p>}
+                {transfer.chaveNfe && (
+                  <p className="romaneio-info-sub" style={{ wordBreak: 'break-all', marginTop: '2px' }}>
+                    <strong>Chave:</strong> {transfer.chaveNfe}
+                  </p>
                 )}
-              </tbody>
-            </table>
-          </div>
+              </div>
+            </div>
 
-          {/* Resumo de Totalizadores */}
-          <div className="romaneio-totals-bar">
-            <div className="romaneio-total-item">
-              <span>Itens Distintos:</span>
-              <strong>{totalDistinctItems}</strong>
-            </div>
-            <div className="romaneio-total-item">
-              <span>Total Peças Enviadas:</span>
-              <strong>{totalPiecesSent} un</strong>
-            </div>
-            {isConferido && (
-              <div className="romaneio-total-item">
-                <span>Total Peças Conferidas:</span>
-                <strong>{totalPiecesChecked} un</strong>
+            {transfer.obs && (
+              <div className="romaneio-obs-card">
+                <strong>Observações Logísticas:</strong> {cleanName(transfer.obs)}
               </div>
             )}
-            <div className="romaneio-total-item highlight">
-              <span>Valor Total da Carga:</span>
-              <strong>{formatCurrency(totalValue)}</strong>
-            </div>
-          </div>
 
-          {/* Bloco de Assinaturas e Conferência Física */}
-          <div className="romaneio-signatures-container">
-            <div className="romaneio-signature-box">
-              <div className="romaneio-signature-line"></div>
-              <p className="romaneio-signature-title">Expedição (Origem)</p>
-              <p className="romaneio-signature-sub">{getUnitName(transfer.origem)}</p>
-              <p className="romaneio-signature-sub">Data: ____/____/________</p>
+            {/* Tabela de Produtos do Romaneio */}
+            <div className="romaneio-table-wrap">
+              <table className="romaneio-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: '45px', textAlign: 'center' }}>#</th>
+                    <th style={{ width: '80px' }}>CÓDIGO</th>
+                    <th>DESCRIÇÃO DO PRODUTO</th>
+                    <th style={{ width: '110px', textAlign: 'center' }}>TAM / GRADE</th>
+                    <th style={{ width: '90px', textAlign: 'center' }}>QTD ENVIADA</th>
+                    <th style={{ width: '90px', textAlign: 'center' }}>QTD CONF.</th>
+                    <th style={{ width: '110px', textAlign: 'right' }}>VALOR UNIT.</th>
+                    <th style={{ width: '120px', textAlign: 'right' }}>SUBTOTAL</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((item, idx) => {
+                    const prod = products.find(p => Number(p.codigo) === Number(item.produtoId || item.produto_id));
+                    const prodName = cleanName(prod ? prod.nome : (item.nome || `Produto #${item.produtoId || item.produto_id}`));
+                    const tam = resolveItemSize(item, prod);
+                    const cor = item.cor && item.cor !== 'UNICA' ? item.cor : '';
+                    const qtdEnviada = Number(item.quantidade) || 0;
+                    const qtdConf = isConferido ? (Number(item.quantidadeConferida ?? item.quantidade) || 0) : qtdEnviada;
+                    const valorUnit = Number(item.valor) || 0;
+                    const subtotal = qtdEnviada * valorUnit;
+
+                    return (
+                      <tr key={item.id || idx}>
+                        <td style={{ textAlign: 'center', color: '#64748b' }}>{idx + 1}</td>
+                        <td><strong>#{item.produtoId || item.produto_id}</strong></td>
+                        <td>
+                          <span className="romaneio-item-name">{prodName}</span>
+                          {item.justificativa && (
+                            <div className="romaneio-item-note">Obs: {item.justificativa}</div>
+                          )}
+                        </td>
+                        <td style={{ textAlign: 'center' }}>
+                          <span className="romaneio-tag-size">
+                            {tam}{cor ? ` • ${cor}` : ''}
+                          </span>
+                        </td>
+                        <td style={{ textAlign: 'center', fontWeight: 700 }}>{qtdEnviada}</td>
+                        <td style={{ textAlign: 'center' }}>{isConferido ? qtdConf : '-'}</td>
+                        <td style={{ textAlign: 'right' }}>{formatCurrency(valorUnit)}</td>
+                        <td style={{ textAlign: 'right', fontWeight: 700 }}>{formatCurrency(subtotal)}</td>
+                      </tr>
+                    );
+                  })}
+
+                  {items.length === 0 && (
+                    <tr>
+                      <td colSpan="8" className="romaneio-empty-message">
+                        Nenhum item listado neste lote de transferência.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
 
-            <div className="romaneio-signature-box">
-              <div className="romaneio-signature-line"></div>
-              <p className="romaneio-signature-title">Transportador / Motorista</p>
-              <p className="romaneio-signature-sub">Nome: _______________________</p>
-              <p className="romaneio-signature-sub">Placa: _______________________</p>
+            {/* Resumo de Totalizadores */}
+            <div className="romaneio-totals-bar">
+              <div className="romaneio-total-cell">
+                <span>Itens Distintos:</span>
+                <strong>{totalDistinctItems}</strong>
+              </div>
+              <div className="romaneio-total-cell">
+                <span>Total Peças Enviadas:</span>
+                <strong>{totalPiecesSent} un</strong>
+              </div>
+              {isConferido && (
+                <div className="romaneio-total-cell">
+                  <span>Total Peças Conferidas:</span>
+                  <strong>{totalPiecesChecked} un</strong>
+                </div>
+              )}
+              <div className="romaneio-total-cell highlight">
+                <span>Valor Total da Carga:</span>
+                <strong>{formatCurrency(totalValue)}</strong>
+              </div>
             </div>
 
-            <div className="romaneio-signature-box">
-              <div className="romaneio-signature-line"></div>
-              <p className="romaneio-signature-title">Conferência / Recebimento</p>
-              <p className="romaneio-signature-sub">{getUnitName(transfer.destino)}</p>
-              <p className="romaneio-signature-sub">Data: ____/____/________</p>
-            </div>
-          </div>
+            {/* Assinaturas / Conferência */}
+            <div className="romaneio-signatures">
+              <div className="romaneio-sig-block">
+                <div className="romaneio-sig-line"></div>
+                <p className="romaneio-sig-role">Expedição (Origem)</p>
+                <p className="romaneio-sig-sub">{getUnitName(transfer.origem)}</p>
+                <p className="romaneio-sig-sub">Data: ____/____/________</p>
+              </div>
 
-          {/* Rodapé do Documento */}
-          <div className="romaneio-footer-note">
-            Documento emitido via Dashboard Centro de Distribuição em {new Date().toLocaleString('pt-BR')}.
+              <div className="romaneio-sig-block">
+                <div className="romaneio-sig-line"></div>
+                <p className="romaneio-sig-role">Transportador / Motorista</p>
+                <p className="romaneio-sig-sub">Nome: _______________________</p>
+                <p className="romaneio-sig-sub">Placa: _______________________</p>
+              </div>
+
+              <div className="romaneio-sig-block">
+                <div className="romaneio-sig-line"></div>
+                <p className="romaneio-sig-role">Conferência / Recebimento</p>
+                <p className="romaneio-sig-sub">{getUnitName(transfer.destino)}</p>
+                <p className="romaneio-sig-sub">Data: ____/____/________</p>
+              </div>
+            </div>
+
+            {/* Nota de rodapé da página */}
+            <div className="romaneio-doc-footer-note">
+              Documento emitido via Dashboard Centro de Distribuição em {new Date().toLocaleString('pt-BR')}.
+            </div>
+
           </div>
         </div>
+
+        {/* Rodapé da Janela Modal */}
+        <div className="romaneio-footer no-print">
+          <div className="romaneio-shortcuts">
+            <span className="romaneio-shortcut-item"><kbd>ESC</kbd> Fechar</span>
+            <span className="romaneio-shortcut-item"><kbd>CTRL</kbd> + <kbd>P</kbd> Imprimir</span>
+            <span className="romaneio-count-summary">
+              Total de {totalDistinctItems} itens distintos ({totalPiecesSent} peças)
+            </span>
+          </div>
+
+          <div className="romaneio-footer-actions">
+            <button className="btn-secondary" onClick={handlePrint}>
+              <Printer size={16} /> Imprimir
+            </button>
+            <button className="btn-romaneio-close" onClick={onClose}>
+              Fechar
+            </button>
+          </div>
+        </div>
+
       </div>
     </div>
   );

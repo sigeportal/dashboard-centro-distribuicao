@@ -1,17 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { 
-  ShoppingCart, Upload, Plus, Eye, FileText, UserPlus, PackagePlus, 
+  ShoppingCart, Upload, Plus, Eye, FileText, PackagePlus, 
   X, Save, AlertCircle, Building2, CheckCircle2, DollarSign, Calendar,
-  TrendingUp, Search, Filter, AlertTriangle, RefreshCw, Trash2, ArrowRight, 
-  Package, Calculator, CreditCard, Sparkles, Check, ChevronRight,
-  Link2, Link, ShieldCheck, Edit2
+  RefreshCw, Trash2, Package, Calculator, CreditCard, Check,
+  Link2, ShieldCheck, Edit2, Printer
 } from 'lucide-react';
 import { createApi } from '../../services/api';
 import Pagination from '../Pagination';
 import SearchBar from '../SearchBar';
 import LookupSelect from '../LookupSelect';
 import ProductFormModal from '../ProductFormModal';
+import { toast } from '../../contexts/ToastContext';
 import { formatCurrency } from '../../utils/formatters';
 import './PurchasesTab.css';
 
@@ -22,6 +22,9 @@ export default function PurchasesTab() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+
+  // Drag and drop state para XML
+  const [isDraggingXml, setIsDraggingXml] = useState(false);
 
   // Lista e Paginação de Compras
   const [compras, setCompras] = useState([]);
@@ -38,9 +41,6 @@ export default function PurchasesTab() {
   const [showDetailModal, setShowDetailModal] = useState(null);
   const [showCostAnalysisModal, setShowCostAnalysisModal] = useState(false);
   const [showBillingModal, setShowBillingModal] = useState(false);
-  const [showQuickVendorModal, setShowQuickVendorModal] = useState(false);
-  const [showQuickProductModal, setShowQuickProductModal] = useState(false);
-  const [quickProductTargetIndex, setQuickProductTargetIndex] = useState(null);
 
   // Vínculos e Cadastro Completo de Produto a partir da Compra
   const [showProductModal, setShowProductModal] = useState(false);
@@ -95,26 +95,42 @@ export default function PurchasesTab() {
   );
   const [formaPagamentoPadrao, setFormaPagamentoPadrao] = useState('BOLETO');
 
-  // Quick form states
-  const [quickVendorForm, setQuickVendorForm] = useState({ nome: '', fantasia: '', cnpj: '', telefone: '', uf: 'PR' });
-  const [quickProductForm, setQuickProductForm] = useState({ nome: '', codbarra: '', valorv: 0, ncm: '6109.10.00', um: 'UN' });
-
   useEffect(() => {
     fetchCompras('last');
     fetchAuxiliaryData();
   }, []);
 
-  // Atalho de Teclado F5 para abrir Análise de Custos
+  // Atalhos de Teclado Globais: F5 (Custos), F9 (Faturamento), Ctrl+S (Salvar), ESC (Fechar)
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.key === 'F5' && showPurchaseForm) {
+      const isSubModalOpen = showCostAnalysisModal || showBillingModal || showProductModal || showLinkProductModal || showLinkFiscalModal;
+
+      if (e.key === 'F5' && showPurchaseForm && !isSubModalOpen) {
         e.preventDefault();
         handleOpenCostAnalysis();
+      } else if (e.key === 'F9' && showPurchaseForm && !isSubModalOpen) {
+        e.preventDefault();
+        handleOpenBilling();
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's' && showPurchaseForm && !isSubModalOpen) {
+        e.preventDefault();
+        handleSavePurchase();
+      } else if (e.key === 'Escape') {
+        if (showCostAnalysisModal) setShowCostAnalysisModal(false);
+        else if (showBillingModal) setShowBillingModal(false);
+        else if (showLinkProductModal) setShowLinkProductModal(false);
+        else if (showLinkFiscalModal) setShowLinkFiscalModal(false);
+        else if (showProductModal) setShowProductModal(false);
+        else if (showDetailModal) setShowDetailModal(null);
+        else if (showPurchaseForm) setShowPurchaseForm(false);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showPurchaseForm, purchaseForm]);
+  }, [
+    showPurchaseForm, showCostAnalysisModal, showBillingModal,
+    showProductModal, showLinkProductModal, showLinkFiscalModal,
+    showDetailModal, purchaseForm, analiseItens
+  ]);
 
   const fetchCompras = async (targetPage = 'last') => {
     setLoading(true);
@@ -222,13 +238,13 @@ export default function PurchasesTab() {
   // Inclusão de Item no Formulário de Compra
   const handleAddItemToPurchase = () => {
     if (!itemForm.produto_codigo) {
-      alert('Por favor, selecione um produto.');
+      toast.warning('Por favor, selecione um produto.');
       return;
     }
     const q = parseFloat(itemForm.quantidade) || 0;
     const vu = parseFloat(itemForm.valor_unitario) || 0;
     if (q <= 0 || vu <= 0) {
-      alert('Quantidade e Valor Unitário devem ser maiores que zero.');
+      toast.warning('Quantidade e Valor Unitário devem ser maiores que zero.');
       return;
     }
 
@@ -432,7 +448,7 @@ export default function PurchasesTab() {
   // =========================================================================
   const handleOpenCostAnalysis = () => {
     if (purchaseForm.itens.length === 0) {
-      alert('Adicione itens à compra antes de abrir a Análise de Custos.');
+      toast.warning('Adicione itens à compra antes de abrir a Análise de Custos.');
       return;
     }
 
@@ -523,7 +539,6 @@ export default function PurchasesTab() {
   };
 
   const handleConfirmCostAnalysis = () => {
-    // Atualiza itens do purchaseForm com os dados refinados da Análise de Custos
     const updatedItens = purchaseForm.itens.map((it, idx) => {
       const matchAnalise = analiseItens.find(a => a.index === idx);
       if (matchAnalise) {
@@ -553,7 +568,7 @@ export default function PurchasesTab() {
   const handleOpenBilling = () => {
     const total = calcularTotalForm();
     if (total <= 0) {
-      alert('O valor total da compra deve ser maior que zero para gerar o faturamento.');
+      toast.warning('O valor total da compra deve ser maior que zero para gerar o faturamento.');
       return;
     }
     if (purchaseForm.parcelas.length === 0) {
@@ -612,18 +627,18 @@ export default function PurchasesTab() {
   // =========================================================================
   const handleSavePurchase = async () => {
     if (!purchaseForm.fornecedor_id && !purchaseForm.fornecedor_nome) {
-      alert('Por favor, selecione ou cadastre um Fornecedor antes de finalizar a compra.');
+      toast.warning('Por favor, selecione ou cadastre um Fornecedor antes de finalizar a compra.');
       return;
     }
 
     if (purchaseForm.itens.length === 0) {
-      alert('Adicione pelo menos um item à compra antes de finalizar.');
+      toast.warning('Adicione pelo menos um item à compra antes de finalizar.');
       return;
     }
 
     const unmatched = purchaseForm.itens.find(it => !it.produto_codigo || Number(it.produto_codigo) <= 0);
     if (unmatched) {
-      alert(`O produto "${unmatched.produto_nome}" ainda não possui vínculo de código. Cadastre-o ou vincule-o antes de finalizar.`);
+      toast.warning(`O produto "${unmatched.produto_nome}" ainda não possui vínculo de código. Cadastre-o ou vincule-o antes de finalizar.`);
       return;
     }
 
@@ -660,7 +675,7 @@ export default function PurchasesTab() {
       };
 
       await api.post('/v1/compras', payload);
-      alert('Compra lançada com sucesso! Os custos, estoques, preços e parcelas do Contas a Pagar foram gravados.');
+      toast.success('Compra lançada com sucesso! Os custos, estoques, preços e parcelas do Contas a Pagar foram gravados.');
       setSuccessMsg('Compra lançada com sucesso!');
       setShowPurchaseForm(false);
       fetchCompras(1);
@@ -669,7 +684,7 @@ export default function PurchasesTab() {
     } catch (err) {
       console.error('Erro ao salvar compra:', err);
       const errMsg = err.response?.data?.error || err.message || 'Erro ao salvar lançamento de compra.';
-      alert(`Atenção: Não foi possível salvar a compra.\nMotivo: ${errMsg}`);
+      toast.error(`Atenção: Não foi possível salvar a compra.\nMotivo: ${errMsg}`);
       setError(`Erro ao salvar lançamento de compra: ${errMsg}`);
     } finally {
       setLoading(false);
@@ -683,8 +698,7 @@ export default function PurchasesTab() {
     return el ? (el.textContent || '').trim() : '';
   };
 
-  const handleFileUpload = (event) => {
-    const file = event.target.files[0];
+  const processXmlFile = (file) => {
     if (!file) return;
 
     const reader = new FileReader();
@@ -780,15 +794,43 @@ export default function PurchasesTab() {
         });
 
         setShowPurchaseForm(true);
-        setSuccessMsg(`XML NFe #${nNF} de ${emitNome} importado com ${parsedItens.length} itens!`);
+        setSuccessMsg(`XML NF-e #${nNF} de ${emitNome} importado com ${parsedItens.length} itens!`);
         setTimeout(() => setSuccessMsg(''), 5000);
       } catch (err) {
         console.error('Erro ao processar XML:', err);
-        alert('Erro ao interpretar o arquivo XML da NF-e.');
+        toast.error('Erro ao interpretar o arquivo XML da NF-e.');
       }
     };
     reader.readAsText(file);
     if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleFileUpload = (event) => {
+    const file = event.target.files[0];
+    processXmlFile(file);
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    setIsDraggingXml(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    setIsDraggingXml(false);
+  };
+
+  const handleDropXml = (e) => {
+    e.preventDefault();
+    setIsDraggingXml(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      const file = e.dataTransfer.files[0];
+      if (file.name.toLowerCase().endsWith('.xml')) {
+        processXmlFile(file);
+      } else {
+        toast.warning('Por favor, selecione um arquivo no formato XML da NF-e.');
+      }
+    }
   };
 
   const handleOpenDetailModal = async (compra) => {
@@ -810,8 +852,11 @@ export default function PurchasesTab() {
       {/* CABEÇALHO DA ABA COMPRAS */}
       <div className="purchases-header glass">
         <div className="purchases-header-info">
-          <h2>Entrada de Compras & Gestão de Fornecedores</h2>
-          <p>Lançamento de NF-e, Análise de Custos (F5), Rateio de Despesas e Faturamento Contas a Pagar</p>
+          <h2>
+            <ShoppingCart size={24} color="#ea580c" />
+            Entrada de Compras & Gestão de Fornecedores
+          </h2>
+          <p>Lançamento de NF-e, Análise de Custos (F5), Rateio de Despesas e Faturamento Contas a Pagar (F9)</p>
         </div>
 
         <div className="purchases-header-actions">
@@ -827,11 +872,11 @@ export default function PurchasesTab() {
             style={{ display: 'none' }} 
           />
           <button className="btn-secondary" onClick={() => fileInputRef.current?.click()}>
-            <Upload size={16} color="var(--info)" /> Importar XML (NF-e)
+            <Upload size={16} /> Importar XML (NF-e)
           </button>
 
           <button className="btn-primary" onClick={handleOpenCreatePurchase}>
-            <Plus size={16} /> + Lançar Compra Manual
+            <Plus size={16} /> Lançar Compra Manual
           </button>
         </div>
       </div>
@@ -854,7 +899,7 @@ export default function PurchasesTab() {
           </div>
           <div className="purchases-kpi-data">
             <span className="purchases-kpi-label">Volume de Compras</span>
-            <span className="purchases-kpi-value" style={{ color: 'var(--success)' }}>
+            <span className="purchases-kpi-value" style={{ color: 'var(--success, #006c49)' }}>
               {formatCurrency(compras.reduce((acc, c) => acc + (Number(c.valor_total) || 0), 0))}
             </span>
           </div>
@@ -907,14 +952,15 @@ export default function PurchasesTab() {
                 <th>Data Entrada</th>
                 <th style={{ textAlign: 'right' }}>Total Frete</th>
                 <th style={{ textAlign: 'right' }}>Valor Total Compra</th>
+                <th style={{ textAlign: 'center' }}>Status</th>
                 <th style={{ textAlign: 'center' }}>Ações</th>
               </tr>
             </thead>
             <tbody>
               {compras.length === 0 ? (
                 <tr>
-                  <td colSpan="7" style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
-                    Nenhuma compra registrada. Clique em "+ Lançar Compra Manual" ou "Importar XML".
+                  <td colSpan="8" style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
+                    Nenhuma compra registrada. Clique em "Lançar Compra Manual" ou "Importar XML".
                   </td>
                 </tr>
               ) : (
@@ -922,12 +968,23 @@ export default function PurchasesTab() {
                   <tr key={c.id}>
                     <td><span className="item-code">#{c.id}</span></td>
                     <td><strong>{c.fornecedor_nome || `Fornecedor #${c.fornecedor_id}`}</strong></td>
-                    <td>{c.numero_nf || 'MANUAL'}</td>
+                    <td>
+                      {c.numero_nf ? (
+                        <span className="item-code">NF {c.numero_nf}</span>
+                      ) : (
+                        <span className="badge badge-secondary">Manual</span>
+                      )}
+                    </td>
                     <td>{c.data_entrada ? new Date(c.data_entrada).toLocaleDateString('pt-BR') : '-'}</td>
                     <td style={{ textAlign: 'right' }}>{formatCurrency(c.valor_frete || 0)}</td>
-                    <td style={{ textAlign: 'right', fontWeight: 800, color: '#16a34a' }}>{formatCurrency(c.valor_total || 0)}</td>
+                    <td style={{ textAlign: 'right', fontWeight: 800, color: 'var(--success, #006c49)' }}>
+                      {formatCurrency(c.valor_total || 0)}
+                    </td>
                     <td style={{ textAlign: 'center' }}>
-                      <button className="crud-row-btn" onClick={() => handleOpenDetailModal(c)} title="Ver Detalhes / Custos">
+                      <span className="badge badge-success">Faturada</span>
+                    </td>
+                    <td style={{ textAlign: 'center' }}>
+                      <button className="crud-row-btn view" onClick={() => handleOpenDetailModal(c)} title="Ver Detalhes / Custos">
                         <Eye size={14} /> Detalhes
                       </button>
                     </td>
@@ -950,29 +1007,45 @@ export default function PurchasesTab() {
       {/* ========================================================================= */}
       {/* MODAL DE LANÇAMENTO / EDIÇÃO DE COMPRA                                   */}
       {/* ========================================================================= */}
-      {showPurchaseForm && (
+      {showPurchaseForm && createPortal(
         <div className="product-form-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowPurchaseForm(false); }}>
           <div className="product-form-modal-container glass" style={{ maxWidth: '1150px' }}>
             
             <div className="product-modal-header">
               <div className="product-modal-title-group">
-                <div className="product-modal-icon-badge" style={{ background: 'linear-gradient(135deg, #2563eb, #1d4ed8)' }}>
+                <div className="product-modal-icon-badge">
                   <ShoppingCart size={22} color="#ffffff" />
                 </div>
                 <div>
                   <h3>Lançamento de Entrada de Mercadorias (Compra)</h3>
-                  <span className="product-modal-subtitle">Rateio de Custos • Análise F5 • Estoque & Contas a Pagar</span>
+                  <span className="product-modal-subtitle">Rateio de Custos • Análise F5 • Estoque & Contas a Pagar (F9)</span>
                 </div>
               </div>
-              <button className="btn-close" onClick={() => setShowPurchaseForm(false)}><X size={20} /></button>
+              <button className="btn-close" onClick={() => setShowPurchaseForm(false)} title="Fechar (ESC)"><X size={20} /></button>
             </div>
 
             <div className="product-modal-body">
               
+              {/* DROPZONE DE ARRASTAR E SOLTAR XML */}
+              <div 
+                className={`purchases-dropzone ${isDraggingXml ? 'dragging' : ''}`}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDropXml}
+                onClick={() => fileInputRef.current?.click()}
+                title="Clique ou arraste o arquivo XML da NF-e para preencher automaticamente"
+              >
+                <div className="purchases-dropzone-icon">
+                  <Upload size={22} />
+                </div>
+                <div className="purchases-dropzone-title">Importação Rápida via XML (NF-e)</div>
+                <div className="purchases-dropzone-subtitle">Arraste o arquivo XML aqui ou clique para selecionar do computador</div>
+              </div>
+
               {/* DADOS DO CABEÇALHO */}
               <div className="product-section-card">
                 <div className="product-section-title">
-                  <Building2 size={16} color="#2563eb" /> Dados da Nota / Fornecedor
+                  <Building2 size={16} color="#ea580c" /> Dados da Nota / Fornecedor
                 </div>
 
                 <div className="product-grid-4">
@@ -1070,7 +1143,7 @@ export default function PurchasesTab() {
               {/* INCLUSÃO RÁPIDA DE ITENS */}
               <div className="product-section-card">
                 <div className="product-section-title">
-                  <PackagePlus size={16} color="#059669" /> Inclusão de Itens da Compra
+                  <PackagePlus size={16} color="#16a34a" /> Inclusão de Itens da Compra
                 </div>
 
                 <div className="purchases-quick-add-grid">
@@ -1100,7 +1173,7 @@ export default function PurchasesTab() {
                         { key: 'codbarra', label: 'Cód. Barras', render: (p) => <code>{p.codbarra || p.PRO_CODBARRA || '-'}</code> },
                         { key: 'um', label: 'UM', width: '60px', align: 'center', render: (p) => p.um || p.PRO_UM || 'UN' },
                         { key: 'custo', label: 'Custo Atual', align: 'right', render: (p) => formatCurrency(p.custo || p.PRO_VALORC || p.valorc || 0) },
-                        { key: 'valorv', label: 'Preço Venda', align: 'right', render: (p) => <strong style={{ color: 'var(--success)' }}>{formatCurrency(p.valorv || p.PRO_VALORV || 0)}</strong> }
+                        { key: 'valorv', label: 'Preço Venda', align: 'right', render: (p) => <strong style={{ color: 'var(--success, #006c49)' }}>{formatCurrency(p.valorv || p.PRO_VALORV || 0)}</strong> }
                       ]}
                       onSelect={(prod) => {
                         const pId = prod.codigo || prod.PRO_CODIGO;
@@ -1160,8 +1233,8 @@ export default function PurchasesTab() {
                   </div>
 
                   <div>
-                    <button type="button" className="btn-primary" onClick={handleAddItemToPurchase} style={{ height: '38px', padding: '0 1rem' }}>
-                      + Adicionar Item
+                    <button type="button" className="btn-primary" onClick={handleAddItemToPurchase} style={{ height: '40px', padding: '0 1rem' }}>
+                      <Plus size={16} /> Adicionar
                     </button>
                   </div>
                 </div>
@@ -1200,7 +1273,7 @@ export default function PurchasesTab() {
                                     type="button"
                                     className="btn-secondary small"
                                     onClick={() => handleOpenLinkProduct(idx)}
-                                    style={{ padding: '2px 6px', fontSize: '0.7rem' }}
+                                    style={{ padding: '2px 6px', fontSize: '0.72rem' }}
                                     title="Alterar produto vinculado"
                                   >
                                     <Link2 size={11} /> Alterar
@@ -1216,7 +1289,7 @@ export default function PurchasesTab() {
                                       type="button"
                                       className="btn-secondary small"
                                       onClick={() => handleOpenLinkProduct(idx)}
-                                      style={{ padding: '2px 6px', fontSize: '0.7rem', color: '#2563eb', borderColor: '#bfdbfe', background: '#eff6ff' }}
+                                      style={{ padding: '2px 6px', fontSize: '0.72rem' }}
                                       title="Vincular a um produto existente no catálogo"
                                     >
                                       <Link2 size={11} /> Vincular
@@ -1225,10 +1298,10 @@ export default function PurchasesTab() {
                                       type="button"
                                       className="btn-primary small"
                                       onClick={() => handleOpenCreateNewProductFromItem(idx)}
-                                      style={{ padding: '2px 6px', fontSize: '0.7rem', background: '#059669', borderColor: '#059669' }}
+                                      style={{ padding: '2px 6px', fontSize: '0.72rem' }}
                                       title="Cadastrar como novo produto no catálogo"
                                     >
-                                      <Plus size={11} /> + Novo
+                                      <Plus size={11} /> Novo
                                     </button>
                                   </div>
                                 </div>
@@ -1269,7 +1342,7 @@ export default function PurchasesTab() {
                                     className="crud-row-btn edit"
                                     onClick={() => handleOpenLinkFiscal(idx)}
                                     title="Alterar vínculo fiscal"
-                                    style={{ padding: '2px' }}
+                                    style={{ padding: '2px 5px' }}
                                   >
                                     <Edit2 size={11} />
                                   </button>
@@ -1279,10 +1352,10 @@ export default function PurchasesTab() {
                                   type="button"
                                   className="btn-secondary small"
                                   onClick={() => handleOpenLinkFiscal(idx)}
-                                  style={{ padding: '2px 6px', fontSize: '0.7rem', color: '#0284c7', borderColor: '#bae6fd', background: '#f0f9ff', width: '100%' }}
+                                  style={{ padding: '2px 6px', fontSize: '0.72rem', width: '100%' }}
                                   title="Vincular a um produto na base fiscal"
                                 >
-                                  <ShieldCheck size={11} /> + Vincular Fiscal
+                                  <ShieldCheck size={11} /> Vincular Fiscal
                                 </button>
                               )}
                             </td>
@@ -1310,59 +1383,64 @@ export default function PurchasesTab() {
               <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center', flexWrap: 'wrap' }}>
                 <button 
                   type="button" 
-                  className="btn-secondary" 
+                  className="btn-secondary accent-btn" 
                   onClick={handleOpenCostAnalysis}
-                  style={{ background: '#fff7ed', borderColor: '#fed7aa', color: '#ea580c', fontWeight: 700 }}
                   title="Atalho F5: Analisar Custos, Margens e Preços de Venda"
                 >
-                  <Calculator size={16} /> 🔍 F5 - Análise de Custos
+                  <Calculator size={16} /> 
+                  <kbd className="kbd-shortcut">F5</kbd> 
+                  Análise de Custos
                 </button>
 
                 <button 
                   type="button" 
                   className="btn-secondary" 
                   onClick={handleOpenBilling}
-                  style={{ background: '#eff6ff', borderColor: '#bfdbfe', color: '#2563eb', fontWeight: 700 }}
-                  title="Gerar Parcelas do Contas a Pagar"
+                  title="Atalho F9: Gerar Parcelas do Contas a Pagar"
                 >
-                  <CreditCard size={16} /> 💳 Faturamento ({purchaseForm.parcelas.length}x Parcelas)
+                  <CreditCard size={16} /> 
+                  <kbd className="kbd-shortcut">F9</kbd> 
+                  Faturamento ({purchaseForm.parcelas.length}x)
                 </button>
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
                 <div style={{ textAlign: 'right' }}>
-                  <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block' }}>TOTAL DA COMPRA:</span>
-                  <strong style={{ fontSize: '1.3rem', color: '#16a34a' }}>{formatCurrency(calcularTotalForm())}</strong>
+                  <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block', fontWeight: 600 }}>TOTAL DA COMPRA:</span>
+                  <strong style={{ fontSize: '1.3rem', color: 'var(--success, #006c49)' }}>{formatCurrency(calcularTotalForm())}</strong>
                 </div>
 
-                <button type="button" className="btn-primary" onClick={handleSavePurchase} disabled={loading} style={{ minWidth: '160px' }}>
-                  {loading ? <RefreshCw size={18} className="spinner" /> : <Save size={18} />} Finalizar Compra
+                <button type="button" className="btn-primary" onClick={handleSavePurchase} disabled={loading} style={{ minWidth: '170px' }}>
+                  {loading ? <RefreshCw size={18} className="spinner" /> : <Save size={18} />} 
+                  Finalizar Compra
+                  <kbd className="kbd-shortcut kbd-dark" style={{ marginLeft: '4px' }}>Ctrl+S</kbd>
                 </button>
               </div>
             </div>
 
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ========================================================================= */}
       {/* MODAL F5 - ANÁLISE DE CUSTOS & PREÇOS DE VENDA                           */}
       {/* ========================================================================= */}
-      {showCostAnalysisModal && (
+      {showCostAnalysisModal && createPortal(
         <div className="product-form-modal-overlay" style={{ zIndex: 1000000 }}>
           <div className="product-form-modal-container glass" style={{ maxWidth: '1200px', maxHeight: '90vh' }}>
             
             <div className="product-modal-header">
               <div className="product-modal-title-group">
                 <div className="product-modal-icon-badge">
-                  <Calculator size={22} />
+                  <Calculator size={22} color="#ffffff" />
                 </div>
                 <div>
-                  <h3>F5 - Painel de Análise de Custos & Preços de Venda</h3>
+                  <h3>Painel de Análise de Custos & Preços de Venda</h3>
                   <span className="product-modal-subtitle">Rateio Automático • Margens de Lucro • Formação dos 3 Preços de Venda</span>
                 </div>
               </div>
-              <button className="btn-close" onClick={() => setShowCostAnalysisModal(false)}><X size={20} /></button>
+              <button className="btn-close" onClick={() => setShowCostAnalysisModal(false)} title="Fechar (ESC)"><X size={20} /></button>
             </div>
 
             <div className="product-modal-body">
@@ -1381,7 +1459,7 @@ export default function PurchasesTab() {
                 </div>
 
                 <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.85rem', color: '#64748b' }}>Aplicar Margem a Todos:</span>
+                  <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Aplicar Margem a Todos:</span>
                   <button type="button" className="btn-secondary small" onClick={() => handleApplyMarginToAll(80)}>80%</button>
                   <button type="button" className="btn-secondary small" onClick={() => handleApplyMarginToAll(100)}>100%</button>
                   <button type="button" className="btn-secondary small" onClick={() => handleApplyMarginToAll(120)}>120%</button>
@@ -1400,9 +1478,9 @@ export default function PurchasesTab() {
                       <th style={{ textAlign: 'right' }}>Custo Merc.</th>
                       <th style={{ textAlign: 'right' }}>Custo Oper.</th>
                       <th style={{ width: '90px', textAlign: 'center' }}>Margem %</th>
-                      <th style={{ textAlign: 'right', color: '#16a34a' }}>Vlr Dinheiro</th>
+                      <th style={{ textAlign: 'right', color: 'var(--success, #006c49)' }}>Vlr Dinheiro</th>
                       <th style={{ textAlign: 'right', color: '#ea580c' }}>Vlr Vista (Pad)</th>
-                      <th style={{ textAlign: 'right', color: '#2563eb' }}>Vlr Prazo</th>
+                      <th style={{ textAlign: 'right' }}>Vlr Prazo</th>
                       <th style={{ textAlign: 'right' }}>Preço Atual</th>
                       <th style={{ textAlign: 'center' }}>Atualizar?</th>
                     </tr>
@@ -1434,7 +1512,7 @@ export default function PurchasesTab() {
                             step="0.01" 
                             value={Number(it.valor_dinheiro).toFixed(2)} 
                             onChange={(e) => handleUpdateAnaliseItem(idx, 'valor_dinheiro', e.target.value)} 
-                            style={{ width: '80px', textAlign: 'right', padding: '2px', color: '#16a34a', fontWeight: 700 }}
+                            style={{ width: '80px', textAlign: 'right', padding: '2px', color: 'var(--success, #006c49)', fontWeight: 700 }}
                           />
                         </td>
 
@@ -1454,7 +1532,7 @@ export default function PurchasesTab() {
                             step="0.01" 
                             value={Number(it.valor_prazo).toFixed(2)} 
                             onChange={(e) => handleUpdateAnaliseItem(idx, 'valor_prazo', e.target.value)} 
-                            style={{ width: '80px', textAlign: 'right', padding: '2px', color: '#2563eb', fontWeight: 700 }}
+                            style={{ width: '80px', textAlign: 'right', padding: '2px', fontWeight: 700 }}
                           />
                         </td>
 
@@ -1491,27 +1569,28 @@ export default function PurchasesTab() {
             </div>
 
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ========================================================================= */}
       {/* MODAL DE FATURAMENTO & CONTAS A PAGAR                                    */}
       {/* ========================================================================= */}
-      {showBillingModal && (
+      {showBillingModal && createPortal(
         <div className="product-form-modal-overlay" style={{ zIndex: 1000000 }}>
           <div className="product-form-modal-container glass" style={{ maxWidth: '900px' }}>
             
             <div className="product-modal-header">
               <div className="product-modal-title-group">
                 <div className="product-modal-icon-badge">
-                  <CreditCard size={22} />
+                  <CreditCard size={22} color="#ffffff" />
                 </div>
                 <div>
                   <h3>Faturamento da Compra & Contas a Pagar</h3>
                   <span className="product-modal-subtitle">Geração de Grade de Parcelas e Vencimentos Financeiros</span>
                 </div>
               </div>
-              <button className="btn-close" onClick={() => setShowBillingModal(false)}><X size={20} /></button>
+              <button className="btn-close" onClick={() => setShowBillingModal(false)} title="Fechar (ESC)"><X size={20} /></button>
             </div>
 
             <div className="product-modal-body">
@@ -1519,7 +1598,7 @@ export default function PurchasesTab() {
               {/* CONFIGURAÇÃO DE PARCELAMENTO */}
               <div className="product-section-card">
                 <div className="product-section-title">
-                  <Calendar size={16} color="#2563eb" /> Condição de Pagamento
+                  <Calendar size={16} color="#ea580c" /> Condição de Pagamento
                 </div>
 
                 <div className="product-grid-3">
@@ -1560,7 +1639,7 @@ export default function PurchasesTab() {
                       onChange={(e) => {
                         setFormaPagamentoPadrao(e.target.value);
                         setTimeout(() => gerarGradeParcelas(condicaoPagamento), 100);
-                      }}
+                      }} 
                     >
                       <option value="BOLETO">Boleto Bancário</option>
                       <option value="PIX">PIX / Transferência</option>
@@ -1633,7 +1712,7 @@ export default function PurchasesTab() {
                   </div>
                   <div>
                     <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Total da Compra: </span>
-                    <strong style={{ color: '#16a34a' }}>{formatCurrency(calcularTotalForm())}</strong>
+                    <strong style={{ color: 'var(--success, #006c49)' }}>{formatCurrency(calcularTotalForm())}</strong>
                   </div>
                 </div>
 
@@ -1649,19 +1728,20 @@ export default function PurchasesTab() {
             </div>
 
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ========================================================================= */}
       {/* MODAL DE DETALHES DA COMPRA REALIZADA                                     */}
       {/* ========================================================================= */}
-      {showDetailModal && (
+      {showDetailModal && createPortal(
         <div className="product-form-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowDetailModal(null); }}>
           <div className="product-form-modal-container glass" style={{ maxWidth: '900px' }}>
             
             <div className="product-modal-header">
               <div className="product-modal-title-group">
-                <div className="product-modal-icon-badge" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
+                <div className="product-modal-icon-badge" style={{ background: 'linear-gradient(135deg, #006c49, #16a34a)' }}>
                   <FileText size={22} color="#ffffff" />
                 </div>
                 <div>
@@ -1669,7 +1749,7 @@ export default function PurchasesTab() {
                   <span className="product-modal-subtitle">{showDetailModal.fornecedor_nome} • NF {showDetailModal.numero_nf || 'MANUAL'}</span>
                 </div>
               </div>
-              <button className="btn-close" onClick={() => setShowDetailModal(null)}><X size={20} /></button>
+              <button className="btn-close" onClick={() => setShowDetailModal(null)} title="Fechar (ESC)"><X size={20} /></button>
             </div>
 
             <div className="product-modal-body">
@@ -1677,20 +1757,20 @@ export default function PurchasesTab() {
               <div className="product-section-card">
                 <div className="product-grid-4">
                   <div>
-                    <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Data de Entrada</span>
+                    <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Data de Entrada</span>
                     <div style={{ fontWeight: 700 }}>{showDetailModal.data_entrada ? new Date(showDetailModal.data_entrada).toLocaleDateString('pt-BR') : '-'}</div>
                   </div>
                   <div>
-                    <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Valor Frete</span>
+                    <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Valor Frete</span>
                     <div style={{ fontWeight: 700 }}>{formatCurrency(showDetailModal.valor_frete || 0)}</div>
                   </div>
                   <div>
-                    <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Outras Despesas</span>
+                    <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Outras Despesas</span>
                     <div style={{ fontWeight: 700 }}>{formatCurrency(showDetailModal.valor_outros || 0)}</div>
                   </div>
                   <div>
-                    <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Valor Total</span>
-                    <div style={{ fontWeight: 800, color: '#16a34a', fontSize: '1.1rem' }}>{formatCurrency(showDetailModal.valor_total || 0)}</div>
+                    <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Valor Total</span>
+                    <div style={{ fontWeight: 800, color: 'var(--success, #006c49)', fontSize: '1.15rem' }}>{formatCurrency(showDetailModal.valor_total || 0)}</div>
                   </div>
                 </div>
               </div>
@@ -1760,18 +1840,26 @@ export default function PurchasesTab() {
             </div>
 
             <div className="product-modal-footer">
+              <button type="button" className="btn-secondary" onClick={() => window.print()}>
+                <Printer size={16} /> Imprimir Espelho da Compra
+              </button>
               <button type="button" className="btn-secondary" onClick={() => setShowDetailModal(null)}>Fechar</button>
             </div>
 
           </div>
-        </div>
+        </div>,
+        document.body
       )}
-      {showLinkProductModal && targetItemIndex !== null && (
+
+      {/* ========================================================================= */}
+      {/* MODAL DE VINCULAR PRODUTO AO CATÁLOGO                                      */}
+      {/* ========================================================================= */}
+      {showLinkProductModal && targetItemIndex !== null && createPortal(
         <div className="product-form-modal-overlay" style={{ zIndex: 1000000 }}>
           <div className="product-form-modal-container glass" style={{ maxWidth: '650px' }}>
             <div className="product-modal-header">
               <div className="product-modal-title-group">
-                <div className="product-modal-icon-badge" style={{ background: '#2563eb' }}>
+                <div className="product-modal-icon-badge">
                   <Link2 size={20} color="#ffffff" />
                 </div>
                 <div>
@@ -1781,7 +1869,7 @@ export default function PurchasesTab() {
                   </span>
                 </div>
               </div>
-              <button className="btn-close" onClick={() => setShowLinkProductModal(false)}><X size={20} /></button>
+              <button className="btn-close" onClick={() => setShowLinkProductModal(false)} title="Fechar (ESC)"><X size={20} /></button>
             </div>
 
             <div className="product-modal-body">
@@ -1832,18 +1920,19 @@ export default function PurchasesTab() {
               <button type="button" className="btn-secondary" onClick={() => setShowLinkProductModal(false)}>Cancelar</button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ========================================================================= */}
       {/* MODAL DE VINCULAR PRODUTO FISCAL (PRO_COD_FISCAL)                          */}
       {/* ========================================================================= */}
-      {showLinkFiscalModal && targetItemIndex !== null && (
+      {showLinkFiscalModal && targetItemIndex !== null && createPortal(
         <div className="product-form-modal-overlay" style={{ zIndex: 1000000 }}>
           <div className="product-form-modal-container glass" style={{ maxWidth: '650px' }}>
             <div className="product-modal-header">
               <div className="product-modal-title-group">
-                <div className="product-modal-icon-badge" style={{ background: '#0284c7' }}>
+                <div className="product-modal-icon-badge" style={{ background: 'linear-gradient(135deg, #006c49, #16a34a)' }}>
                   <ShieldCheck size={20} color="#ffffff" />
                 </div>
                 <div>
@@ -1853,7 +1942,7 @@ export default function PurchasesTab() {
                   </span>
                 </div>
               </div>
-              <button className="btn-close" onClick={() => setShowLinkFiscalModal(false)}><X size={20} /></button>
+              <button className="btn-close" onClick={() => setShowLinkFiscalModal(false)} title="Fechar (ESC)"><X size={20} /></button>
             </div>
 
             <div className="product-modal-body">
@@ -1887,7 +1976,8 @@ export default function PurchasesTab() {
               <button type="button" className="btn-secondary" onClick={() => setShowLinkFiscalModal(false)}>Cancelar</button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ========================================================================= */}
@@ -1905,3 +1995,4 @@ export default function PurchasesTab() {
     </div>
   );
 }
+

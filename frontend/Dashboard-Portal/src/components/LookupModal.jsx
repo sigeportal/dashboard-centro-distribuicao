@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Search, X, Check, RefreshCw, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
+import useFocusTrap from '../hooks/useFocusTrap';
 import './LookupModal.css';
 
 export default function LookupModal({
@@ -16,6 +17,7 @@ export default function LookupModal({
   selectedId = null,
   limit = 10
 }) {
+  const modalRef = useFocusTrap(isOpen);
   const [searchTerm, setSearchTerm] = useState('');
   const [page, setPage] = useState(1);
   const [items, setItems] = useState([]);
@@ -91,27 +93,38 @@ export default function LookupModal({
 
   if (!isOpen) return null;
 
+  const ModalIcon = Icon || Search;
+
   return createPortal(
-    <div className="lookup-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }} onKeyDown={handleKeyDown}>
-      <div className="lookup-modal-container glass">
-        
-        {/* CABEÇALHO */}
+    <div
+      className="lookup-modal-overlay"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onKeyDown={handleKeyDown}
+    >
+      <div
+        ref={modalRef}
+        className="lookup-modal-container glass"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="lookup-modal-title"
+      >
+        {/* Cabeçalho */}
         <div className="lookup-modal-header">
           <div className="lookup-title-wrap">
-            {Icon && (
-              <div className="lookup-icon-badge">
-                <Icon size={20} />
-              </div>
-            )}
+            <div className="lookup-icon-badge">
+              <ModalIcon size={20} />
+            </div>
             <div>
-              <h3>{title}</h3>
-              <span>{subtitle}</span>
+              <h3 id="lookup-modal-title">{title}</h3>
+              <span className="lookup-modal-subtitle">{subtitle}</span>
             </div>
           </div>
-          <button className="btn-close" onClick={onClose}><X size={20} /></button>
+          <button className="lookup-modal-close" onClick={onClose} aria-label="Fechar busca">
+            <X size={20} />
+          </button>
         </div>
 
-        {/* BARRA DE PESQUISA */}
+        {/* Barra de Pesquisa */}
         <div className="lookup-search-bar">
           <div className="lookup-input-wrapper">
             <Search size={18} className="search-icon" />
@@ -124,22 +137,35 @@ export default function LookupModal({
               placeholder={searchPlaceholder}
             />
             {searchTerm && (
-              <button className="lookup-clear-btn" onClick={() => setSearchTerm('')} title="Limpar busca">
+              <button
+                type="button"
+                className="lookup-clear-btn"
+                onClick={() => setSearchTerm('')}
+                title="Limpar busca"
+              >
                 <X size={16} />
               </button>
             )}
           </div>
 
-          <button className="btn-secondary" onClick={() => loadData(searchTerm, page)} disabled={loading} style={{ height: '44px', padding: '0 1rem' }}>
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => loadData(searchTerm, page)}
+            disabled={loading}
+            title="Atualizar resultados"
+            style={{ height: '42px', padding: '0 1rem' }}
+          >
             <RefreshCw size={16} className={loading ? 'spinner' : ''} />
           </button>
         </div>
 
-        {/* CORPO / TABELA PAGINADA */}
+        {/* Corpo / Tabela Paginada */}
         <div className="lookup-modal-body">
           {error && (
-            <div style={{ padding: '1rem', background: '#fee2e2', color: '#b91c1c', display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '1rem', borderRadius: '0.5rem' }}>
-              <AlertCircle size={18} /> {error}
+            <div className="lookup-error-banner">
+              <AlertCircle size={18} />
+              <span>{error}</span>
             </div>
           )}
 
@@ -162,7 +188,7 @@ export default function LookupModal({
                       {col.label}
                     </th>
                   ))}
-                  <th style={{ textAlign: 'center', width: '100px' }}>Ação</th>
+                  <th style={{ textAlign: 'center', width: '110px' }}>Ação</th>
                 </tr>
               </thead>
               <tbody>
@@ -171,9 +197,9 @@ export default function LookupModal({
                   const isSelected = selectedId && String(selectedId) === String(itemId);
 
                   return (
-                    <tr 
-                      key={itemId} 
-                      className={isSelected ? 'selected' : ''} 
+                    <tr
+                      key={itemId}
+                      className={isSelected ? 'selected' : ''}
                       onDoubleClick={() => handleRowClick(item)}
                     >
                       {columns.map((col, cIdx) => (
@@ -182,12 +208,13 @@ export default function LookupModal({
                         </td>
                       ))}
                       <td style={{ textAlign: 'center' }}>
-                        <button 
-                          type="button" 
+                        <button
+                          type="button"
                           className="lookup-select-cell-btn"
                           onClick={() => handleRowClick(item)}
                         >
-                          <Check size={13} style={{ display: 'inline', marginRight: '3px' }} /> Selecionar
+                          <Check size={13} style={{ display: 'inline', marginRight: '3px' }} />
+                          <span>Selecionar</span>
                         </button>
                       </td>
                     </tr>
@@ -198,26 +225,34 @@ export default function LookupModal({
           )}
         </div>
 
-        {/* RODAPÉ COM PAGINAÇÃO */}
+        {/* Rodapé com Paginação e Atalhos */}
         <div className="lookup-modal-footer">
-          <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
-            Total: <strong>{meta.total || items.length}</strong> registro(s) encontrado(s) • Página <strong>{meta.page || page}</strong> de <strong>{meta.pages || 1}</strong>
+          <div className="lookup-footer-info">
+            <div className="shortcut-hint">
+              <kbd>ESC</kbd> <span>Fechar</span>
+            </div>
+            <div className="shortcut-hint">
+              <kbd>Duplo Clique</kbd> <span>Selecionar</span>
+            </div>
+            <span className="lookup-total-counter">
+              Total: <strong>{meta.total || items.length}</strong> • Página <strong>{meta.page || page}</strong> de <strong>{meta.pages || 1}</strong>
+            </span>
           </div>
 
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-            <button 
-              type="button" 
-              className="btn-secondary" 
-              onClick={() => handlePageChange(page - 1)} 
+          <div className="lookup-pagination-controls">
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => handlePageChange(page - 1)}
               disabled={page <= 1 || loading}
               style={{ height: '34px', padding: '0 0.75rem', fontSize: '0.8rem' }}
             >
               <ChevronLeft size={16} /> Anterior
             </button>
-            <button 
-              type="button" 
-              className="btn-secondary" 
-              onClick={() => handlePageChange(page + 1)} 
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => handlePageChange(page + 1)}
               disabled={page >= (meta.pages || 1) || loading}
               style={{ height: '34px', padding: '0 0.75rem', fontSize: '0.8rem' }}
             >
@@ -231,3 +266,4 @@ export default function LookupModal({
     document.body
   );
 }
+

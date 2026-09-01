@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { KeyRound, X, Eye, EyeOff } from 'lucide-react';
+import { KeyRound, X, Eye, EyeOff, CheckCircle2, AlertCircle } from 'lucide-react';
 import axios from 'axios';
 import { AUTH_API_BASE } from '../services/api';
 import { getAccessToken } from '../services/auth';
@@ -119,8 +119,17 @@ export default function PasswordModal({ isOpen, onClose }) {
         aria-modal="true"
         aria-labelledby="password-modal-title"
       >
+        {/* Header */}
         <div className="password-modal-header">
-          <h3 id="password-modal-title"><KeyRound size={22} /> Alterar Senha</h3>
+          <div className="password-modal-title-group">
+            <div className="password-modal-icon-badge">
+              <KeyRound size={20} />
+            </div>
+            <div>
+              <h3 id="password-modal-title">Segurança da Conta</h3>
+              <span className="password-modal-subtitle">Alteração de Senha de Acesso</span>
+            </div>
+          </div>
           <button className="password-modal-close" onClick={handleClose} aria-label="Fechar alterar senha">
             <X size={20} />
           </button>
@@ -201,7 +210,8 @@ export default function PasswordModal({ isOpen, onClose }) {
 
           {passwordMsg.text && (
             <div className={`password-msg ${passwordMsg.type}`}>
-              {passwordMsg.text}
+              {passwordMsg.type === 'success' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
+              <span>{passwordMsg.text}</span>
             </div>
           )}
 
@@ -210,11 +220,21 @@ export default function PasswordModal({ isOpen, onClose }) {
             className="password-submit-btn"
             disabled={passwordLoading}
           >
-            {passwordLoading ? 'Alterando...' : 'Alterar Senha'}
+            {passwordLoading ? 'Alterando...' : 'Salvar Nova Senha'}
           </button>
         </form>
+
+        <div className="password-modal-footer">
+          <div className="shortcut-hint">
+            <kbd>ESC</kbd> <span>Cancelar</span>
+          </div>
+          <div className="shortcut-hint">
+            <kbd>ENTER</kbd> <span>Confirmar</span>
+          </div>
+        </div>
       </div>
     </div>,
     document.body
   );
 }
+

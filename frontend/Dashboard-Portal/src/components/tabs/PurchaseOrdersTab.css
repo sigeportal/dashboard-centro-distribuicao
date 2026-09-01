@@ -1,4 +1,6 @@
-/* PurchaseOrdersTab.css - Official Design System for Purchase Orders (Ordem de Compra) */
+/* ==========================================================================
+   PURCHASE ORDERS TAB (ORDEM DE COMPRA) - DESIGN SYSTEM & PADRONIZAÇÃO VISUAL
+   ========================================================================== */
 
 .orders-container {
   display: flex;
@@ -11,7 +13,9 @@
   animation: fadeIn 0.25s ease-out;
 }
 
-/* Header & KPIs */
+/* --------------------------------------------------------------------------
+   Header & Action Bar
+   -------------------------------------------------------------------------- */
 .orders-header {
   display: flex;
   justify-content: space-between;
@@ -25,16 +29,16 @@
 }
 
 .orders-header-info h2 {
-  font-size: 1.4rem;
+  font-size: 1.35rem;
   font-weight: 800;
-  color: var(--text-primary);
+  color: var(--text-primary, #0b1c30);
   margin: 0;
   letter-spacing: -0.02em;
 }
 
 .orders-header-info p {
   font-size: 0.85rem;
-  color: var(--text-secondary);
+  color: var(--text-secondary, #64748b);
   margin-top: 4px;
 }
 
@@ -45,7 +49,9 @@
   flex-wrap: wrap;
 }
 
-/* KPI Summary Cards */
+/* --------------------------------------------------------------------------
+   KPI Metric Cards
+   -------------------------------------------------------------------------- */
 .orders-kpis {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -55,22 +61,22 @@
 }
 
 .orders-kpi-card {
-  background: var(--bg-secondary);
-  border: 1px solid var(--glass-border);
+  background: var(--bg-secondary, #ffffff);
+  border: 1px solid var(--glass-border, rgba(0, 0, 0, 0.08));
   border-radius: 1.25rem;
   padding: 1.25rem 1.5rem;
   display: flex;
   align-items: center;
   gap: 1.25rem;
-  box-shadow: var(--shadow-level-1);
+  box-shadow: var(--shadow-level-1, 0 4px 12px rgba(0, 0, 0, 0.04));
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
   min-width: 0;
 }
 
 .orders-kpi-card:hover {
   transform: translateY(-2px);
-  box-shadow: var(--shadow-level-2);
-  border-color: var(--accent);
+  box-shadow: var(--shadow-level-2, 0 8px 24px rgba(0, 0, 0, 0.08));
+  border-color: var(--accent, #f97316);
 }
 
 .orders-kpi-icon {
@@ -78,7 +84,7 @@
   height: 48px;
   border-radius: 1rem;
   background: rgba(249, 115, 22, 0.1);
-  color: var(--accent);
+  color: var(--accent, #f97316);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -87,12 +93,7 @@
 
 .orders-kpi-icon.success {
   background: rgba(0, 108, 73, 0.1);
-  color: var(--success);
-}
-
-.orders-kpi-icon.info {
-  background: rgba(0, 101, 145, 0.1);
-  color: var(--info);
+  color: var(--success, #006c49);
 }
 
 .orders-kpi-data {
@@ -103,34 +104,77 @@
 }
 
 .orders-kpi-label {
-  font-size: 0.78rem;
-  font-weight: 600;
+  font-size: 0.76rem;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--text-secondary);
+  color: var(--text-secondary, #64748b);
 }
 
 .orders-kpi-value {
   font-size: 1.35rem;
   font-weight: 800;
-  color: var(--text-primary);
+  color: var(--text-primary, #0b1c30);
   letter-spacing: -0.02em;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-/* Quick Add Grid for Order Matrix Rows */
+/* --------------------------------------------------------------------------
+   Keyboard Shortcuts Footer (<kbd>)
+   -------------------------------------------------------------------------- */
+.orders-footer-shortcuts {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1.25rem;
+  background: var(--bg-secondary, #ffffff);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 1rem;
+  box-shadow: var(--shadow-level-1, 0 4px 12px rgba(0, 0, 0, 0.04));
+  flex-wrap: wrap;
+}
+
+.orders-shortcut-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary, #64748b);
+  user-select: none;
+}
+
+.orders-shortcut-item kbd,
+.product-modal-footer kbd {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.72rem;
+  font-weight: 750;
+  background: #ffffff;
+  color: var(--text-primary, #0b1c30);
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-bottom: 2px solid rgba(0, 0, 0, 0.25);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  padding: 2px 6px;
+  border-radius: 4px;
+  line-height: 1.2;
+  display: inline-block;
+}
+
+/* --------------------------------------------------------------------------
+   Quick Add Grid & Preset Chips
+   -------------------------------------------------------------------------- */
 .orders-quick-add-grid {
   display: grid;
-  grid-template-columns: minmax(200px, 2.5fr) minmax(100px, 1fr) minmax(100px, 1fr) minmax(100px, 1fr) minmax(100px, 1fr) auto;
-  gap: 0.75rem;
+  grid-template-columns: minmax(220px, 2.5fr) minmax(110px, 1fr) minmax(110px, 1fr) minmax(120px, 1.2fr) minmax(120px, 1.2fr) auto;
+  gap: 0.85rem;
   align-items: flex-end;
   background: var(--bg-primary, #f8f9ff);
-  padding: 1rem;
+  padding: 1.1rem;
   border-radius: var(--radius-md, 0.75rem);
-  border: 1px solid rgba(0, 0, 0, 0.05);
-  margin-bottom: 1rem;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  margin-bottom: 1.15rem;
   width: 100%;
   box-sizing: border-box;
 }
@@ -141,100 +185,20 @@
   }
 }
 
-/* Planilha Matrix Styles */
-.matrix-card {
-  background: var(--bg-secondary);
-  border: 1px solid var(--glass-border);
-  border-radius: 1.25rem;
-  padding: 1.5rem;
-  box-shadow: var(--shadow-level-1);
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
-  width: 100%;
-  box-sizing: border-box;
-}
-
-.matrix-table-wrap {
-  width: 100%;
-  max-width: 100%;
-  overflow-x: auto;
-  border-radius: 0.75rem;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  box-sizing: border-box;
-  -webkit-overflow-scrolling: touch;
-}
-
-.matrix-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.85rem;
-  text-align: left;
-}
-
-.matrix-table th {
-  background: #f8fafc;
-  color: var(--text-secondary);
-  font-weight: 700;
-  padding: 0.65rem 0.75rem;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
-  font-size: 0.78rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.matrix-table td {
-  padding: 0.5rem 0.75rem;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-  vertical-align: middle;
-}
-
-.matrix-table tr:hover {
-  background: rgba(249, 115, 22, 0.02);
-}
-
-.matrix-input-cell {
-  width: 50px;
-  height: 32px;
-  text-align: center;
-  font-weight: 700;
-  border: 1px solid rgba(0, 0, 0, 0.15);
-  border-radius: 0.4rem;
-  font-size: 0.88rem;
-  transition: all 0.2s ease;
-}
-
-.matrix-input-cell:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.2);
-  outline: none;
-}
-
-.matrix-total-row {
-  background: #f1f5f9;
-  font-weight: 800;
-}
-
-.matrix-total-row td {
-  padding: 0.75rem;
-  border-top: 2px solid rgba(0, 0, 0, 0.1);
-}
-
-/* Preset Chips */
 .grade-preset-group {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.6rem;
   flex-wrap: wrap;
 }
 
 .grade-preset-chip {
-  padding: 0.4rem 0.8rem;
-  border-radius: 0.6rem;
+  padding: 0.45rem 0.9rem;
+  border-radius: 0.65rem;
   border: 1px solid rgba(0, 0, 0, 0.1);
-  background: var(--bg-secondary);
-  color: var(--text-secondary);
-  font-size: 0.8rem;
+  background: var(--bg-secondary, #ffffff);
+  color: var(--text-secondary, #64748b);
+  font-size: 0.82rem;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -242,13 +206,233 @@
 
 .grade-preset-chip:hover {
   background: rgba(0, 0, 0, 0.04);
-  color: var(--text-primary);
+  color: var(--text-primary, #0b1c30);
   border-color: rgba(0, 0, 0, 0.2);
 }
 
 .grade-preset-chip.active {
-  background: rgba(249, 115, 22, 0.1);
-  color: var(--accent);
-  border-color: var(--accent);
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  color: #ffffff;
+  border-color: transparent;
   font-weight: 700;
+  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.25);
+}
+
+/* --------------------------------------------------------------------------
+   Dynamic Matrix Table Styles
+   -------------------------------------------------------------------------- */
+.matrix-input-cell {
+  width: 48px;
+  height: 32px;
+  text-align: center;
+  font-weight: 750;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 0.45rem;
+  font-size: 0.88rem;
+  background: #ffffff;
+  color: var(--text-primary, #0b1c30);
+  transition: all 0.2s ease;
+  padding: 2px;
+  box-sizing: border-box;
+}
+
+.matrix-input-cell:focus {
+  border-color: var(--accent, #f97316);
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.2);
+  outline: none;
+  background: #fffdfa;
+}
+
+.matrix-total-row {
+  background: rgba(0, 0, 0, 0.03);
+  font-weight: 800;
+}
+
+.matrix-total-row td {
+  padding: 0.85rem 1rem;
+  border-top: 2px solid rgba(0, 0, 0, 0.1);
+}
+
+/* --------------------------------------------------------------------------
+   Modal Structure & Sections
+   -------------------------------------------------------------------------- */
+.order-section-card {
+  margin-bottom: 1.15rem;
+  padding: 1.25rem 1.5rem;
+  border-radius: 1.15rem;
+}
+
+.order-section-card:last-child {
+  margin-bottom: 0;
+}
+
+.product-grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.85rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 1024px) {
+  .product-grid-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .product-grid-4 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Buttons & Actions
+   -------------------------------------------------------------------------- */
+.btn-whatsapp {
+  color: #16a34a !important;
+  border-color: #86efac !important;
+  background: #dcfce7 !important;
+}
+
+.btn-whatsapp:hover {
+  background: #bbf7d0 !important;
+  color: #15803d !important;
+}
+
+.btn-print-primary {
+  background: #f1f5f9 !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #1e293b !important;
+}
+
+.btn-print-primary:hover {
+  background: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+/* --------------------------------------------------------------------------
+   Printable Sheet & Print Media Layout
+   -------------------------------------------------------------------------- */
+.orders-print-sheet {
+  border: 2px solid #0f172a;
+  padding: 1.75rem;
+  font-family: Arial, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #ffffff;
+  color: #0f172a;
+  box-sizing: border-box;
+}
+
+.orders-print-header {
+  display: flex;
+  justify-content: space-between;
+  border-bottom: 2px solid #0f172a;
+  padding-bottom: 1rem;
+  margin-bottom: 1.15rem;
+}
+
+.orders-print-title {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.orders-print-subtitle {
+  font-size: 0.88rem;
+  color: #475569;
+  margin-top: 4px;
+}
+
+.orders-print-conditions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.85rem;
+  background: #f8fafc;
+  padding: 0.85rem 1rem;
+  border-radius: 0.5rem;
+  margin-bottom: 1.35rem;
+  font-size: 0.85rem;
+  border: 1px solid #e2e8f0;
+}
+
+.orders-print-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+  margin-bottom: 1.5rem;
+}
+
+.orders-print-table th {
+  background: #0f172a;
+  color: #ffffff;
+  padding: 7px 8px;
+  border: 1px solid #0f172a;
+  font-weight: 700;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.orders-print-table td {
+  padding: 6px 8px;
+  border: 1px solid #cbd5e1;
+}
+
+.orders-print-table tbody tr:nth-child(even) {
+  background: #f8fafc;
+}
+
+.orders-print-signatures {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3.5rem;
+  margin-top: 3.5rem;
+  text-align: center;
+  font-size: 0.85rem;
+}
+
+.orders-print-signatures div {
+  border-top: 1px solid #0f172a;
+  padding-top: 0.5rem;
+}
+
+/* Estilos Específicos para @media print */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  
+  .orders-print-sheet,
+  .orders-print-sheet * {
+    visibility: visible;
+  }
+
+  .orders-print-sheet {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    border: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .product-form-modal-overlay,
+  .product-form-modal-container {
+    position: static !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    border: none !important;
+  }
+
+  .product-modal-header,
+  .product-modal-footer,
+  .btn-close {
+    display: none !important;
+  }
 }

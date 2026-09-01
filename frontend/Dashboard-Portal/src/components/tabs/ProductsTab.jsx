@@ -185,7 +185,7 @@ export default function ProductsTab({ data, pages, searchTerms, setSearchTerms, 
           onClick={() => { setProductToEditModal(null); setShowProductModal(true); }}
           style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '0.55rem 1.1rem', fontWeight: 600 }}
         >
-          <Plus size={16} /> Novo Produto (Pop-up)
+          <Plus size={16} /> Novo Produto
         </button>
       </div>
 
@@ -245,7 +245,7 @@ export default function ProductsTab({ data, pages, searchTerms, setSearchTerms, 
                       <button 
                         className="action-btn" 
                         onClick={() => { setProductToEditModal(item); setShowProductModal(true); }}
-                        title="Editar Produto (Pop-up)"
+                        title="Editar Produto"
                         style={{
                           padding: '4px 8px',
                           fontSize: '0.78rem',
