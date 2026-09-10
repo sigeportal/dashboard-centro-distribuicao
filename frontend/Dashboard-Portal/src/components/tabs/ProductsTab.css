@@ -1,0 +1,264 @@
+/* ProductsTab.css - Design System Portal Gerencial */
+
+.products-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.products-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  position: relative;
+}
+
+.products-header-actions .btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1.15rem;
+  border-radius: 0.75rem;
+  background: var(--bg-secondary, #ffffff);
+  color: var(--text-primary, #0b1c30);
+  border: 1px solid #cbd5e1;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  transition: all 0.2s ease;
+}
+
+.products-header-actions .btn-secondary:hover:not(:disabled),
+.products-header-actions .btn-secondary.active {
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: var(--text-primary, #0b1c30);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.08);
+}
+
+.products-header-actions .btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1.25rem;
+  border-radius: 0.75rem;
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  color: #ffffff;
+  border: none;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 3px 10px rgba(249, 115, 22, 0.22);
+}
+
+.products-header-actions .btn-primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #ea580c 0%, #c2410c 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 5px 14px rgba(249, 115, 22, 0.32);
+}
+
+.auxiliares-menu-container {
+  position: relative;
+}
+
+.cadastros-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 230px;
+  background: #ffffff;
+  border-radius: 0.85rem;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.15);
+  z-index: 120;
+  overflow: hidden;
+  animation: dropdownFade 0.15s ease-out;
+}
+
+.cadastros-dropdown-header {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 0.75rem 1rem 0.35rem 1rem;
+}
+
+.cadastros-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  width: 100%;
+  padding: 0.65rem 1rem;
+  background: transparent;
+  border: none;
+  text-align: left;
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: #334155;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.cadastros-dropdown-item:hover {
+  background: rgba(249, 115, 22, 0.08);
+  color: #ea580c;
+}
+
+.cadastros-dropdown-item svg {
+  color: #64748b;
+  transition: color 0.15s ease;
+}
+
+.cadastros-dropdown-item:hover svg {
+  color: #ea580c;
+}
+
+/* Coluna de Preços */
+.prices-cell {
+  white-space: nowrap;
+}
+
+.price-badge-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.price-primary {
+  font-weight: 700;
+  font-size: 0.92rem;
+  color: var(--text-primary, #0f172a);
+}
+
+.price-primary .price-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-secondary, #64748b);
+  text-transform: uppercase;
+  margin-right: 0.25rem;
+}
+
+.price-secondary-row {
+  display: flex;
+  gap: 0.4rem;
+  font-size: 0.76rem;
+}
+
+.price-tag {
+  background: rgba(0, 0, 0, 0.04);
+  padding: 0.15rem 0.4rem;
+  border-radius: 0.35rem;
+  color: var(--text-secondary, #64748b);
+  font-weight: 500;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.codbarra-cell {
+  white-space: nowrap;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.85rem;
+  letter-spacing: 0.3px;
+  color: var(--text-secondary, #64748b);
+}
+
+/* Ações em 3 pontinhos (...) */
+.actions-cell-relative {
+  position: relative;
+  text-align: center;
+}
+
+.action-dots-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 0.5rem;
+  background: transparent;
+  border: 1px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.action-dots-btn:hover,
+.action-dots-btn.active {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #0f172a;
+}
+
+.action-menu-dropdown {
+  position: absolute;
+  right: 0.5rem;
+  top: 100%;
+  width: 175px;
+  background: #ffffff;
+  border-radius: 0.75rem;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.18);
+  z-index: 150;
+  overflow: hidden;
+  animation: dropdownFade 0.15s ease-out;
+  text-align: left;
+}
+
+.action-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.6rem 0.85rem;
+  background: transparent;
+  border: none;
+  text-align: left;
+  font-size: 0.84rem;
+  font-weight: 500;
+  color: #334155;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.action-menu-item:hover {
+  background: rgba(249, 115, 22, 0.08);
+  color: #ea580c;
+}
+
+.action-menu-item:hover svg {
+  color: #ea580c;
+}
+
+.action-menu-divider {
+  height: 1px;
+  background: #f1f5f9;
+  margin: 0.2rem 0;
+}
+
+.action-menu-item.delete {
+  color: #ef4444;
+}
+
+.action-menu-item.delete:hover {
+  background: rgba(239, 68, 68, 0.08);
+  color: #dc2626;
+}
+
+@keyframes dropdownFade {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

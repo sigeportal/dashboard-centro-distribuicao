@@ -1,0 +1,377 @@
+/* FornecedoresModal.css - Design System Portal Gerencial */
+.fornecedores-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 1.5rem;
+  animation: modalFadeIn 0.2s ease-out;
+}
+
+.fornecedores-modal-container {
+  width: 95vw;
+  max-width: 1080px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  border-radius: 1.25rem;
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+  animation: modalSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.fornecedores-modal-header {
+  padding: 1.25rem 1.75rem;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: linear-gradient(to bottom, #ffffff, #f8fafc);
+}
+
+.fornecedores-modal-header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.fornecedores-icon-badge {
+  width: 42px;
+  height: 42px;
+  border-radius: 0.75rem;
+  background: rgba(249, 115, 22, 0.1);
+  color: #ea580c;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.fornecedores-modal-title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.fornecedores-modal-subtitle {
+  margin: 0.15rem 0 0 0;
+  font-size: 0.82rem;
+  color: #64748b;
+}
+
+.fornecedores-btn-close {
+  background: transparent;
+  border: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.fornecedores-btn-close:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.fornecedores-modal-body {
+  padding: 1.5rem 1.75rem;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.fornecedores-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.fornecedores-search-box {
+  flex: 1;
+  min-width: 280px;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.fornecedores-search-box svg {
+  position: absolute;
+  left: 0.85rem;
+  color: #94a3b8;
+}
+
+.fornecedores-search-input {
+  width: 100%;
+  height: 42px;
+  padding: 0 1rem 0 2.5rem;
+  border-radius: 0.75rem;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 0.92rem;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.fornecedores-search-input:focus {
+  border-color: #f97316;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
+}
+
+.fornecedores-btn-novo {
+  height: 42px;
+  padding: 0 1.25rem;
+  border-radius: 0.75rem;
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  color: #ffffff;
+  border: none;
+  font-weight: 600;
+  font-size: 0.9rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(234, 88, 12, 0.25);
+  transition: all 0.2s ease;
+}
+
+.fornecedores-btn-novo:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(234, 88, 12, 0.35);
+}
+
+/* Formulário de Fornecedor */
+.fornecedores-form-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.fornecedores-form-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.25rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.fornecedores-form-header h4 {
+  margin: 0;
+  font-size: 1.05rem;
+  color: #0f172a;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.fornecedores-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.15rem;
+  margin-bottom: 1.5rem;
+}
+
+.fornecedores-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.fornecedores-form-group input,
+.fornecedores-form-group select {
+  height: 42px;
+  padding: 0 0.85rem;
+  border-radius: 0.65rem;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 0.92rem;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.fornecedores-form-group input:focus,
+.fornecedores-form-group select:focus {
+  border-color: #f97316;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
+}
+
+.fornecedores-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+.fornecedores-btn-cancelar {
+  height: 40px;
+  padding: 0 1.25rem;
+  border-radius: 0.65rem;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #475569;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.fornecedores-btn-cancelar:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.fornecedores-btn-salvar {
+  height: 40px;
+  padding: 0 1.5rem;
+  border-radius: 0.65rem;
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  border: none;
+  color: #ffffff;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.25);
+  transition: all 0.2s ease;
+}
+
+.fornecedores-btn-salvar:hover:not(:disabled) {
+  background: linear-gradient(135deg, #ea580c 0%, #c2410c 100%);
+  box-shadow: 0 6px 16px rgba(249, 115, 22, 0.35);
+  transform: translateY(-1px);
+}
+
+.fornecedores-btn-salvar:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Tabela */
+.fornecedores-table-wrap {
+  background: #ffffff;
+  border-radius: 0.85rem;
+  border: 1px solid #e2e8f0;
+  overflow-x: auto;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.fornecedores-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.88rem;
+}
+
+.fornecedores-table thead th {
+  background: #f8fafc;
+  padding: 0.85rem 1rem;
+  font-weight: 600;
+  color: #475569;
+  border-bottom: 1px solid #e2e8f0;
+  white-space: nowrap;
+}
+
+.fornecedores-table tbody td {
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid #f1f5f9;
+  color: #1e293b;
+  vertical-align: middle;
+}
+
+.fornecedores-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+.fornecedores-code-badge {
+  display: inline-block;
+  padding: 0.2rem 0.5rem;
+  background: #f1f5f9;
+  color: #475569;
+  font-family: ui-monospace, monospace;
+  font-weight: 600;
+  border-radius: 0.4rem;
+  font-size: 0.8rem;
+}
+
+.fornecedores-actions-cell {
+  display: flex;
+  gap: 0.4rem;
+  justify-content: center;
+}
+
+.fornecedores-action-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.fornecedores-action-btn.edit {
+  background: rgba(249, 115, 22, 0.1);
+  color: #ea580c;
+}
+
+.fornecedores-action-btn.edit:hover {
+  background: #ea580c;
+  color: #ffffff;
+}
+
+.fornecedores-action-btn.delete {
+  background: rgba(239, 68, 68, 0.08);
+  color: #ef4444;
+}
+
+.fornecedores-action-btn.delete:hover {
+  background: #ef4444;
+  color: #ffffff;
+}
+
+@keyframes modalFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes modalSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}

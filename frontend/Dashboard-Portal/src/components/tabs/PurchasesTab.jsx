@@ -984,8 +984,8 @@ export default function PurchasesTab() {
                       <span className="badge badge-success">Faturada</span>
                     </td>
                     <td style={{ textAlign: 'center' }}>
-                      <button className="crud-row-btn view" onClick={() => handleOpenDetailModal(c)} title="Ver Detalhes / Custos">
-                        <Eye size={14} /> Detalhes
+                      <button className="crud-row-btn view" onClick={() => handleOpenDetailModal(c)} title="Visualizar detalhes / custos">
+                        <Eye size={16} />
                       </button>
                     </td>
                   </tr>
@@ -1741,7 +1741,7 @@ export default function PurchasesTab() {
             
             <div className="product-modal-header">
               <div className="product-modal-title-group">
-                <div className="product-modal-icon-badge" style={{ background: 'linear-gradient(135deg, #006c49, #16a34a)' }}>
+                <div className="product-modal-icon-badge" style={{ background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)' }}>
                   <FileText size={22} color="#ffffff" />
                 </div>
                 <div>
@@ -1932,11 +1932,11 @@ export default function PurchasesTab() {
           <div className="product-form-modal-container glass" style={{ maxWidth: '650px' }}>
             <div className="product-modal-header">
               <div className="product-modal-title-group">
-                <div className="product-modal-icon-badge" style={{ background: 'linear-gradient(135deg, #006c49, #16a34a)' }}>
+                <div className="product-modal-icon-badge" style={{ background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)' }}>
                   <ShieldCheck size={20} color="#ffffff" />
                 </div>
                 <div>
-                  <h3>Vincular Item a Produto Fiscal (PRO_COD_FISCAL)</h3>
+                  <h3>Vincular Item a Produto Fiscal</h3>
                   <span className="product-modal-subtitle">
                     Item: {purchaseForm.itens[targetItemIndex]?.produto_nome}
                   </span>

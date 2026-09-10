@@ -234,7 +234,7 @@ export default function ProductFormModal({
     }
   };
 
-  // Carregar Cidades e Estados
+  // Carregar Cidades e Estados sob demanda (apenas ao abrir o cadastro de novo fornecedor)
   const fetchCidadesEEstados = async () => {
     try {
       const [cRes, eRes] = await Promise.all([
@@ -248,6 +248,27 @@ export default function ProductFormModal({
     } catch (err) {
       console.warn('Erro ao carregar cidades e estados:', err);
     }
+  };
+
+  const handleOpenQuickVendorModal = () => {
+    if (cidadesList.length === 0) {
+      fetchCidadesEEstados();
+    }
+    setQuickVendorForm({
+      nome: '',
+      fantasia: '',
+      cnpj: '',
+      inscricao: '',
+      telefone: '',
+      email: '',
+      endereco: '',
+      bairro: '',
+      for_cid: '',
+      cidade: '',
+      uf: 'PR',
+      contato: ''
+    });
+    setShowQuickVendorModal(true);
   };
 
   // Buscar tamanhos disponíveis do banco de dados
@@ -342,8 +363,7 @@ export default function ProductFormModal({
 
       const [loadedTams, loadedMods] = await Promise.all([
         fetchTamanhos(),
-        fetchModelos(),
-        fetchCidadesEEstados()
+        fetchModelos()
       ]);
 
       if (productToEdit) {
@@ -583,7 +603,7 @@ export default function ProductFormModal({
       // F7: Novo Fornecedor Rápido
       if (e.key === 'F7') {
         e.preventDefault();
-        setShowQuickVendorModal(true);
+        handleOpenQuickVendorModal();
         return;
       }
 
@@ -766,8 +786,8 @@ export default function ProductFormModal({
         codigo: 0,
         nome: quickVendorForm.nome.toUpperCase(),
         razao_social: quickVendorForm.nome.toUpperCase(),
-        fantasia: quickVendorForm.fantasia.toUpperCase(),
-        cnpj_cpf: quickVendorForm.cnpj,
+        fantasia: (quickVendorForm.fantasia || quickVendorForm.nome).toUpperCase(),
+        cnpj_cpf: quickVendorForm.cnpj.replace(/\D/g, ''),
         insc_estadual: quickVendorForm.inscricao,
         fone: quickVendorForm.telefone,
         email: quickVendorForm.email,
@@ -776,19 +796,28 @@ export default function ProductFormModal({
         cid: Number(quickVendorForm.for_cid) || 0,
         for_cid: Number(quickVendorForm.for_cid) || 0,
         cidade: quickVendorForm.cidade,
-        uf: quickVendorForm.uf,
+        uf: (quickVendorForm.uf || 'PR').toUpperCase(),
         contato: quickVendorForm.contato
       };
 
       const res = await api.post('/v1/fornecedores', payload);
       const created = res.data;
+      const createdId = created.codigo || created.FOR_CODIGO;
+      const createdNome = created.nome || created.razao_social || quickVendorForm.nome.toUpperCase();
+
+      setFornecedoresList(prev => {
+        const exists = prev.some(f => Number(f.codigo) === Number(createdId));
+        if (exists) return prev;
+        return [...prev, { ...payload, codigo: createdId, nome: createdNome }];
+      });
+
       setForm(prev => ({
         ...prev,
-        pro_for: created.codigo || created.FOR_CODIGO,
-        fabricante: prev.fabricante || created.nome || created.razao_social || ''
+        pro_for: createdId,
+        fabricante: prev.fabricante || createdNome
       }));
       setShowQuickVendorModal(false);
-      setSuccessMsg(`Fornecedor #${created.codigo} cadastrado com sucesso!`);
+      setSuccessMsg(`Fornecedor #${createdId} cadastrado com sucesso!`);
       setTimeout(() => setSuccessMsg(''), 3000);
     } catch (err) {
       toast.error('Erro ao salvar fornecedor: ' + (err.response?.data?.error || err.message));
@@ -1132,7 +1161,7 @@ export default function ProductFormModal({
               <div className="product-section-card">
                 <div className="product-section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <Layers size={16} color="#2563eb" /> Classificação & Fornecedor
+                    <Layers size={16} color="#ea580c" /> Classificação & Fornecedor
                   </div>
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
                     <button
@@ -1146,7 +1175,7 @@ export default function ProductFormModal({
                     <button
                       type="button"
                       className="btn-secondary small"
-                      onClick={() => setShowQuickVendorModal(true)}
+                      onClick={handleOpenQuickVendorModal}
                       title="Atalho F7: Cadastrar Novo Fornecedor Rápido"
                       style={{ color: '#ea580c', borderColor: '#fed7aa', background: '#fff7ed' }}
                     >
@@ -1499,7 +1528,7 @@ export default function ProductFormModal({
                       className="btn-secondary small"
                       onClick={handleGerarCodigosBarrasGrades}
                       title="Atalho F10: Gerar EAN13 para todas as grades"
-                      style={{ color: '#2563eb' }}
+                      style={{ color: '#ea580c' }}
                     >
                       <Barcode size={14} /> <kbd style={{ marginRight: '4px', fontSize: '0.68rem', padding: '1px 4px', background: '#f8fafc', border: '1px solid rgba(0,0,0,0.12)', borderBottom: '2px solid rgba(0,0,0,0.18)', borderRadius: '3px' }}>F10</kbd> Gerar EANs
                     </button>
@@ -1587,7 +1616,7 @@ export default function ProductFormModal({
                   </div>
 
                   <div className="form-group">
-                    <label style={{ color: '#2563eb' }}>Vlr Prazo</label>
+                    <label style={{ color: '#475569' }}>Vlr Prazo</label>
                     <input
                       type="number"
                       step="0.01"
@@ -1619,7 +1648,7 @@ export default function ProductFormModal({
                           <th>Cód. Barras</th>
                           <th style={{ textAlign: 'right', color: '#16a34a' }}>Dinheiro</th>
                           <th style={{ textAlign: 'right', color: '#ea580c' }}>À Vista</th>
-                          <th style={{ textAlign: 'right', color: '#2563eb' }}>A Prazo</th>
+                          <th style={{ textAlign: 'right', color: '#475569' }}>A Prazo</th>
                           <th style={{ textAlign: 'center' }}>Ações</th>
                         </tr>
                       </thead>
@@ -1840,7 +1869,7 @@ export default function ProductFormModal({
                         : ''
                     }
                     placeholder="Buscar Produto na Base Fiscal para Vincular..."
-                    title="Selecionar Produto Fiscal (PRO_COD_FISCAL)"
+                    title="Selecionar Produto Fiscal Mestre"
                     subtitle="Busca na base fiscal por código, descrição ou código de barras"
                     icon={ShieldCheck}
                     searchPlaceholder="Digite o nome, código ou código de barras do produto fiscal..."
@@ -2008,7 +2037,7 @@ export default function ProductFormModal({
       {/* ========================================================================= */}
       {showQuickVendorModal && (
         <div className="product-form-modal-overlay" style={{ zIndex: 1000001 }}>
-          <div className="product-form-modal-container glass" style={{ maxWidth: '650px' }}>
+          <div className="product-form-modal-container glass" style={{ maxWidth: '760px' }}>
             <div className="product-modal-header">
               <div className="product-modal-title-group">
                 <div className="product-modal-icon-badge" style={{ width: '38px', height: '38px' }}>
@@ -2016,7 +2045,7 @@ export default function ProductFormModal({
                 </div>
                 <div>
                   <h4 style={{ margin: 0 }}>Novo Fornecedor Rápido</h4>
-                  <span className="product-modal-subtitle">Com máscara CNPJ e vínculo de Cidade/UF (FOR_CID)</span>
+                  <span className="product-modal-subtitle">Cadastre o fornecedor parceiro e vincule ao produto</span>
                 </div>
               </div>
               <button className="product-modal-close" onClick={() => setShowQuickVendorModal(false)}><X size={18} /></button>
@@ -2048,7 +2077,7 @@ export default function ProductFormModal({
                 </div>
 
                 <div className="form-group">
-                  <label>CNPJ / CPF (com máscara) *</label>
+                  <label>CNPJ / CPF</label>
                   <input
                     type="text"
                     value={quickVendorForm.cnpj}
@@ -2058,7 +2087,17 @@ export default function ProductFormModal({
                 </div>
 
                 <div className="form-group">
-                  <label>Telefone / Celular</label>
+                  <label>Inscrição Estadual</label>
+                  <input
+                    type="text"
+                    value={quickVendorForm.inscricao}
+                    onChange={(e) => setQuickVendorForm({ ...quickVendorForm, inscricao: e.target.value })}
+                    placeholder="Ex: 90123456-78"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Telefone / WhatsApp</label>
                   <input
                     type="text"
                     value={quickVendorForm.telefone}
@@ -2073,13 +2112,33 @@ export default function ProductFormModal({
                     type="email"
                     value={quickVendorForm.email}
                     onChange={(e) => setQuickVendorForm({ ...quickVendorForm, email: e.target.value })}
-                    placeholder="contato@empresa.com"
+                    placeholder="contato@empresa.com.br"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Endereço (Rua e Número)</label>
+                  <input
+                    type="text"
+                    value={quickVendorForm.endereco}
+                    onChange={(e) => setQuickVendorForm({ ...quickVendorForm, endereco: e.target.value })}
+                    placeholder="Av. Brasil, 1500"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Bairro</label>
+                  <input
+                    type="text"
+                    value={quickVendorForm.bairro}
+                    onChange={(e) => setQuickVendorForm({ ...quickVendorForm, bairro: e.target.value })}
+                    placeholder="Centro"
                   />
                 </div>
 
                 {/* SELETOR DE CIDADE VINCULANDO FOR_CID E UF */}
                 <div className="form-group">
-                  <label>Cidade (FOR_CID) *</label>
+                  <label>Cidade</label>
                   <select
                     value={quickVendorForm.for_cid}
                     onChange={(e) => {
@@ -2093,7 +2152,7 @@ export default function ProductFormModal({
                       }));
                     }}
                   >
-                    <option value="">Selecione a Cidade...</option>
+                    <option value="">-- Selecione a Cidade --</option>
                     {cidadesList.map(c => (
                       <option key={c.codigo} value={c.codigo}>
                         {c.nome} ({c.uf})
@@ -2109,15 +2168,27 @@ export default function ProductFormModal({
                     maxLength={2}
                     value={quickVendorForm.uf}
                     onChange={(e) => setQuickVendorForm({ ...quickVendorForm, uf: e.target.value.toUpperCase() })}
-                    placeholder="UF"
+                    placeholder="PR"
                     style={{ textTransform: 'uppercase' }}
+                  />
+                </div>
+
+                <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                  <label>Contato / Representante</label>
+                  <input
+                    type="text"
+                    value={quickVendorForm.contato}
+                    onChange={(e) => setQuickVendorForm({ ...quickVendorForm, contato: e.target.value })}
+                    placeholder="Nome do vendedor ou representante comercial"
                   />
                 </div>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.65rem', marginTop: '1.25rem' }}>
                 <button type="button" className="btn-secondary" onClick={() => setShowQuickVendorModal(false)}>Cancelar</button>
-                <button type="submit" className="btn-primary"><Save size={16} /> Salvar Fornecedor</button>
+                <button type="submit" className="btn-primary">
+                  <Save size={16} /> Salvar Fornecedor
+                </button>
               </div>
             </form>
           </div>

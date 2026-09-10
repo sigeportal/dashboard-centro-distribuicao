@@ -436,15 +436,24 @@
 }
 
 .crud-row-btn.view {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 0.5rem;
   background: #f8fafc;
-  color: #334155;
+  color: #475569;
   border-color: #cbd5e1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .crud-row-btn.view:hover {
   background: #fff7ed;
   border-color: #fed7aa;
   color: #ea580c;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(234, 88, 12, 0.15);
 }
 
 .crud-row-btn.edit {

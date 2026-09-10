@@ -1,0 +1,222 @@
+/* ModelosModal.css */
+.modelos-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 1.5rem;
+  animation: modalFadeIn 0.2s ease-out;
+}
+
+.modelos-modal-container {
+  width: 95vw;
+  max-width: 620px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  border-radius: 1.25rem;
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+  animation: modalSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.modelos-modal-header {
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: linear-gradient(to bottom, #ffffff, #f8fafc);
+}
+
+.modelos-modal-header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.modelos-icon-badge {
+  width: 40px;
+  height: 40px;
+  border-radius: 0.75rem;
+  background: rgba(249, 115, 22, 0.1);
+  color: #ea580c;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modelos-modal-title {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.modelos-modal-subtitle {
+  margin: 0.15rem 0 0 0;
+  font-size: 0.82rem;
+  color: #64748b;
+}
+
+.modelos-btn-close {
+  background: transparent;
+  border: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.modelos-btn-close:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.modelos-modal-body {
+  padding: 1.5rem;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.modelos-input-row {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.modelos-input {
+  flex: 1;
+  height: 42px;
+  padding: 0 1rem;
+  border-radius: 0.65rem;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 0.92rem;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.modelos-input:focus {
+  border-color: #f97316;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
+}
+
+.modelos-btn-add {
+  height: 42px;
+  padding: 0 1.25rem;
+  border-radius: 0.65rem;
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  color: #ffffff;
+  border: none;
+  font-weight: 600;
+  font-size: 0.9rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.modelos-btn-add:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(234, 88, 12, 0.25);
+}
+
+.modelos-list {
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  overflow: hidden;
+}
+
+.modelos-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #f1f5f9;
+  transition: background 0.15s ease;
+}
+
+.modelos-item:last-child {
+  border-bottom: none;
+}
+
+.modelos-item:hover {
+  background: #f8fafc;
+}
+
+.modelos-item-left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.modelos-code {
+  font-family: monospace;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #64748b;
+  background: #f1f5f9;
+  padding: 0.15rem 0.45rem;
+  border-radius: 0.35rem;
+}
+
+.modelos-name {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.modelos-actions {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.modelos-action-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 0.45rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.modelos-action-btn.edit {
+  background: rgba(37, 99, 235, 0.08);
+  color: #2563eb;
+}
+
+.modelos-action-btn.edit:hover {
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.modelos-action-btn.delete {
+  background: rgba(239, 68, 68, 0.08);
+  color: #ef4444;
+}
+
+.modelos-action-btn.delete:hover {
+  background: #ef4444;
+  color: #ffffff;
+}

@@ -11,7 +11,7 @@
   background-color: rgba(11, 28, 48, 0.45) !important;
   backdrop-filter: blur(8px) !important;
   -webkit-backdrop-filter: blur(8px) !important;
-  z-index: 1200 !important;
+  z-index: 9999 !important;
   display: flex !important;
   justify-content: center !important;
   align-items: center !important;
@@ -21,7 +21,7 @@
 }
 
 .quick-link-overlay {
-  z-index: 1300 !important;
+  z-index: 10000 !important;
   background-color: rgba(11, 28, 48, 0.6) !important;
 }
 

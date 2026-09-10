@@ -535,7 +535,7 @@ ${nfeItems.map((it, idx) => `      <item nItem="${idx + 1}">
               </div>
               <div className="nfe-grid-4">
                 <div className="form-group">
-                  <label>Município FG IBS (cMunFG)</label>
+                  <label>Município Fato Gerador IBS</label>
                   <input 
                     type="text" 
                     value={header.cmunFgIbs} 
@@ -544,7 +544,7 @@ ${nfeItems.map((it, idx) => `      <item nItem="${idx + 1}">
                 </div>
 
                 <div className="form-group">
-                  <label>Indicador de Operação (cIndOp)</label>
+                  <label>Indicador de Operação</label>
                   <select 
                     value={header.cindOp} 
                     onChange={(e) => setHeader({ ...header, cindOp: e.target.value })}

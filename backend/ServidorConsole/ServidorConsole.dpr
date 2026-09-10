@@ -51,7 +51,6 @@ uses
   UnitTransferenciaItem.Model in '..\Shared\Models\Transferencias\UnitTransferenciaItem.Model.pas',
   UnitTransferencias.Controller in '..\Shared\Controllers\Transferencias\UnitTransferencias.Controller.pas',
   UnitSync.Controller in '..\Shared\Controllers\Sync\UnitSync.Controller.pas',
-  UnitFunctions in '..\..\..\FormsComuns\Classes\ServidoresUtils\Utils\UnitFunctions.pas',
   UnitInicializaClasses in '..\Shared\Utils\UnitInicializaClasses.pas',
   UnitLancamentoCentroCusto.Controller in '..\..\..\FormsComuns\Classes\LancamentoCentroCustos\UnitLancamentoCentroCusto.Controller.pas',
   UnitLancamentoCentroCusto.Model in '..\..\..\FormsComuns\Classes\LancamentoCentroCustos\UnitLancamentoCentroCusto.Model.pas',
@@ -79,7 +78,9 @@ uses
   UnitModelos.Model in '..\Shared\Models\Modelos\UnitModelos.Model.pas',
   UnitModelos.Controller in '..\Shared\Controllers\Modelos\UnitModelos.Controller.pas',
   UnitComEst.Model in '..\Shared\Models\Compras\UnitComEst.Model.pas',
-  UnitConstants in '..\..\..\FormsComuns\Classes\ServidoresUtils\Utils\UnitConstants.pas';
+  UnitConstants in '..\..\..\FormsComuns\Classes\ServidoresUtils\Utils\UnitConstants.pas',
+  UnitFuncoesComuns in '..\..\..\FormsComuns\Classes\ServidoresUtils\Utils\UnitFuncoesComuns.pas',
+  UnitFunctions in '..\..\..\FormsComuns\Classes\ServidoresUtils\Utils\UnitFunctions.pas';
 
 var
 	LLogFileConfig: THorseLoggerConsoleConfig;

@@ -165,13 +165,13 @@ begin
           .Post(Post)
           .Put(Put)
         .&End
-        .Group
         .Prefix('/v1')
         .Route('/grupos/:id')
           .Get(GetForID)
           .Delete(Delete)
         .&End;
-  THorse.Group.Prefix('/v1')
+  THorse.Group
+    .Prefix('/v1')
   	.Route('/grupos/emLote')
     	.Post(PostEmLote)
 	  .&End;

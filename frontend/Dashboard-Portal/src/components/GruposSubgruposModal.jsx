@@ -270,7 +270,7 @@ export default function GruposSubgruposModal({ isOpen, onClose, onSelectGrupoSub
                 />
               </div>
               <div className="gru-input-group flex-1">
-                <label>*Nome do Grupo</label>
+                <label>Nome do Grupo *</label>
                 <input 
                   type="text" 
                   value={grupoForm.nome} 
@@ -406,7 +406,7 @@ export default function GruposSubgruposModal({ isOpen, onClose, onSelectGrupoSub
                 />
               </div>
               <div className="gru-input-group flex-1">
-                <label>*Nome do SubGrupo</label>
+                <label>Nome do Subgrupo *</label>
                 <input 
                   type="text" 
                   value={subgrupoForm.nome} 

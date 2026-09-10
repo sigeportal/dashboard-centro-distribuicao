@@ -6,7 +6,7 @@
         <MainSource>ServidorConsole.dpr</MainSource>
         <Base>True</Base>
         <Config Condition="'$(Config)'==''">Release</Config>
-        <Platform Condition="'$(Platform)'==''">Linux64</Platform>
+        <Platform Condition="'$(Platform)'==''">Win32</Platform>
         <TargetedPlatforms>129</TargetedPlatforms>
         <AppType>Console</AppType>
     </PropertyGroup>
@@ -68,7 +68,7 @@
         <DCC_UsePackage>RESTComponents;emsclientfiredac;DataSnapFireDAC;FireDACIBDriver;emsclient;FireDACCommon;RESTBackendComponents;soapserver;CloudService;FireDACCommonDriver;inet;FireDAC;FireDACSqliteDriver;soaprtl;soapmidas;$(DCC_UsePackage)</DCC_UsePackage>
         <DCC_Namespace>System;Xml;Data;Datasnap;Web;Soap;$(DCC_Namespace)</DCC_Namespace>
         <SanitizedProjectName>ServidorConsole</SanitizedProjectName>
-        <DCC_UnitSearchPath>..\modules\.dcp;..\modules\.dcu;..\modules;..\modules\clientrest\src;..\modules\dataset-serialize\src;..\modules\factory-connections\src\FireDAC;..\modules\factory-connections\src\IBExpress;..\modules\factory-connections\src;..\modules\handle-exception\src;..\modules\horse\src;..\modules\horse-cors\src;..\modules\horse-logger\src;..\modules\horse-logger-provider-console\src;..\modules\horse-octet-stream\src;..\modules\horse-utils-clientip\src;..\modules\jhonson\src;..\modules\portalorm\src\Model;..\modules\portalorm\src\Modulos\FormRTTI\Model;..\modules\portalorm\src\Modulos\FormRTTI;..\modules\portalorm\src\Modulos\Helpers;..\modules\portalorm\src\Modulos\InsereTabela;..\modules\portalorm\src\Modulos\PatternCommand;..\modules\portalorm\src\Utils;..\modules\portalorm\src\views;modules\.dcp;modules\.dcu;modules;modules\clientrest\src;modules\dataset-serialize\src;modules\factory-connections\src\FireDAC;modules\factory-connections\src\IBExpress;modules\factory-connections\src;modules\gbswagger\Source\Core;modules\gbswagger\Source\Datasnap;modules\gbswagger\Source\Horse;modules\gbswagger\Source\Validator;modules\handle-exception\src;modules\horse\src;modules\horse-cors\src;modules\horse-logger\src;modules\horse-logger-provider-console\src;modules\horse-octet-stream\src;modules\horse-utils-clientip\src;modules\jhonson\src;modules\portalorm\src\Model;modules\portalorm\src\Modulos\FormRTTI\Model;modules\portalorm\src\Modulos\FormRTTI;modules\portalorm\src\Modulos\Helpers;modules\portalorm\src\Modulos\InsereTabela;modules\portalorm\src\Modulos\PatternCommand;modules\portalorm\src\Utils;modules\portalorm\src\views;$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
+        <DCC_UnitSearchPath>..\modules\.dcp;..\modules\.dcu;..\modules;..\modules\clientrest\src;..\modules\dataset-serialize\src;..\modules\factory-connections\src\FireDAC;..\modules\factory-connections\src\IBExpress;..\modules\factory-connections\src;..\modules\handle-exception\src;..\modules\horse\src;..\modules\horse-cors\src;..\modules\horse-logger\src;..\modules\horse-logger-provider-console\src;..\modules\horse-octet-stream\src;..\modules\horse-utils-clientip\src;..\modules\jhonson\src;..\modules\portalorm\src\Model;..\modules\portalorm\src\Modulos\FormRTTI\Model;..\modules\portalorm\src\Modulos\FormRTTI;..\modules\portalorm\src\Modulos\Helpers;..\modules\portalorm\src\Modulos\InsereTabela;..\modules\portalorm\src\Modulos\PatternCommand;..\modules\portalorm\src\Utils;..\modules\portalorm\src\views;..\modules\gbswagger\Source\Core;..\modules\gbswagger\Source\Datasnap;..\modules\gbswagger\Source\Horse;..\modules\gbswagger\Source\Validator;modules\.dcp;modules\.dcu;modules;modules\clientrest\src;modules\dataset-serialize\src;modules\factory-connections\src\FireDAC;modules\factory-connections\src\IBExpress;modules\factory-connections\src;modules\gbswagger\Source\Core;modules\gbswagger\Source\Datasnap;modules\gbswagger\Source\Horse;modules\gbswagger\Source\Validator;modules\handle-exception\src;modules\horse\src;modules\horse-cors\src;modules\horse-logger\src;modules\horse-logger-provider-console\src;modules\horse-octet-stream\src;modules\horse-utils-clientip\src;modules\jhonson\src;modules\portalorm\src\Model;modules\portalorm\src\Modulos\FormRTTI\Model;modules\portalorm\src\Modulos\FormRTTI;modules\portalorm\src\Modulos\Helpers;modules\portalorm\src\Modulos\InsereTabela;modules\portalorm\src\Modulos\PatternCommand;modules\portalorm\src\Utils;modules\portalorm\src\views;$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
         <DCC_Define>PORTALORM;$(DCC_Define)</DCC_Define>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base_Linux64)'!=''">
@@ -118,7 +118,7 @@
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_2_Win32)'!=''">
         <Debugger_IncludeSystemVars>true</Debugger_IncludeSystemVars>
-        <Debugger_EnvVars>PORT=8080;CAMINHO_BD=D:\PROJETOS\Confeccoes\GRUPO GIGANTE\CENTRO_DISTRIBUICAO\PRINCIPAL.FDB;$(Debugger_EnvVars)</Debugger_EnvVars>
+        <Debugger_EnvVars>PORT=8080;CAMINHO_BD=F:\Projetos\dashboard-centro-distribuicao\backend\ServidorConsole\DADOS\PRINCIPAL.FDB;$(Debugger_EnvVars)</Debugger_EnvVars>
         <VerInfo_Locale>1033</VerInfo_Locale>
         <Manifest_File>(None)</Manifest_File>
         <DCC_ExeOutput>./dist</DCC_ExeOutput>
@@ -165,7 +165,6 @@
         <DCCReference Include="..\Shared\Models\Transferencias\UnitTransferenciaItem.Model.pas"/>
         <DCCReference Include="..\Shared\Controllers\Transferencias\UnitTransferencias.Controller.pas"/>
         <DCCReference Include="..\Shared\Controllers\Sync\UnitSync.Controller.pas"/>
-        <DCCReference Include="..\..\..\FormsComuns\Classes\ServidoresUtils\Utils\UnitFunctions.pas"/>
         <DCCReference Include="..\Shared\Utils\UnitInicializaClasses.pas"/>
         <DCCReference Include="..\..\..\FormsComuns\Classes\LancamentoCentroCustos\UnitLancamentoCentroCusto.Controller.pas"/>
         <DCCReference Include="..\..\..\FormsComuns\Classes\LancamentoCentroCustos\UnitLancamentoCentroCusto.Model.pas"/>
@@ -194,6 +193,8 @@
         <DCCReference Include="..\Shared\Controllers\Modelos\UnitModelos.Controller.pas"/>
         <DCCReference Include="..\Shared\Models\Compras\UnitComEst.Model.pas"/>
         <DCCReference Include="..\..\..\FormsComuns\Classes\ServidoresUtils\Utils\UnitConstants.pas"/>
+        <DCCReference Include="..\..\..\FormsComuns\Classes\ServidoresUtils\Utils\UnitFuncoesComuns.pas"/>
+        <DCCReference Include="..\..\..\FormsComuns\Classes\ServidoresUtils\Utils\UnitFunctions.pas"/>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>
             <CfgParent>Base</CfgParent>
@@ -215,14 +216,6 @@
                     <Source Name="MainSource">ServidorConsole.dpr</Source>
                 </Source>
                 <Excluded_Packages>
-                    <Excluded_Packages Name="D:\PROJETOS\ACBR\Lib\Delphi\LibD25\Win32\DCLACBr_OpenSSL.bpl">ACBr - (design-time) Bind para OpenSSL 1.1.1 - (http://www.projetoacbr.com.br/)</Excluded_Packages>
-                    <Excluded_Packages Name="D:\PROJETOS\ACBR\Lib\Delphi\LibD25\Win32\DCLACBr_Serial.bpl">ACBr - (design-time) ECF, Balanças, Cheques, Displays, Etiquetas, Gavetas, Terminais, SMS, RFD, Leitores - (http://www.projetoacbr.com.br/)</Excluded_Packages>
-                    <Excluded_Packages Name="D:\PROJETOS\ACBR\Lib\Delphi\LibD25\Win32\DCLACBr_Convenio115.bpl">ACBr - (design-time) Convênio ICMS 115 - (http://www.projetoacbr.com.br/)</Excluded_Packages>
-                    <Excluded_Packages Name="D:\PROJETOS\ACBR\Lib\Delphi\LibD25\Win32\DCLACBr_LFD.bpl">ACBr - (design-time) Livro Fiscal Digital - (http://www.projetoacbr.com.br/)</Excluded_Packages>
-                    <Excluded_Packages Name="D:\PROJETOS\ACBR\Lib\Delphi\LibD25\Win32\DCLACBr_EDI.bpl">ACBr - (design-time) Intercâmbio de Arquivos para Transportadora - (http://www.projetoacbr.com.br/)</Excluded_Packages>
-                    <Excluded_Packages Name="D:\PROJETOS\ACBR\Lib\Delphi\LibD25\Win32\DCLACBr_PAF.bpl">ACBr - (design-time) Programa Aplicativo Fiscal ECF - (http://www.projetoacbr.com.br/)</Excluded_Packages>
-                    <Excluded_Packages Name="D:\PROJETOS\ACBR\Lib\Delphi\LibD25\Win32\DCLACBr_SEF2.bpl">ACBr - (design-time) SEF2 (eDoc e SEF) - (http://www.projetoacbr.com.br/)</Excluded_Packages>
-                    <Excluded_Packages Name="D:\PROJETOS\ACBR\Lib\Delphi\LibD25\Win32\DCLACBr_Sintegra.bpl">ACBr - (design-time) Sintegra - (http://www.projectoacbr.com.br/)</Excluded_Packages>
                     <Excluded_Packages Name="$(BDSBIN)\dclDataSnapNativeServer250.bpl">Embarcadero DBExpress DataSnap Native Server Components</Excluded_Packages>
                     <Excluded_Packages Name="$(BDSBIN)\dcloffice2k250.bpl">Microsoft Office 2000 Sample Automation Server Wrapper Components</Excluded_Packages>
                     <Excluded_Packages Name="$(BDSBIN)\dclofficexp250.bpl">Microsoft Office XP Sample Automation Server Wrapper Components</Excluded_Packages>
