@@ -286,7 +286,7 @@ export default function GradesModal({ isOpen, onClose, product, onGradesUpdated 
             <div>
               <div className="grades-header-title-line">
                 <h3>Cadastro de Grades & Variações</h3>
-                <span className="grades-total-badge" title="Somatória física de todas as variações (GRA_QUANTIDADE)">
+                <span className="grades-total-badge" title="Somatória física de todas as variações">
                   Total: {totalGradeQty} UN
                 </span>
               </div>

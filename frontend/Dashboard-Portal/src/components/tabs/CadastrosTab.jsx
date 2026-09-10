@@ -1031,7 +1031,7 @@ export default function CadastrosTab() {
                   <input type="text" value={fornForm.bairro} onChange={(e) => setFornForm({ ...fornForm, bairro: e.target.value })} placeholder="Centro" />
                 </label>
                 <label className="crud-input">
-                  Cidade (FOR_CID) *
+                  Cidade *
                   <select 
                     value={fornForm.for_cid} 
                     onChange={(e) => {
@@ -1360,7 +1360,7 @@ export default function CadastrosTab() {
                         <td className="codbarra-cell">{item.codbarra || '-'}</td>
                         <td className="actions-cell">
                           <button className="crud-row-btn grades" onClick={() => handleOpenProductGradesModal(item)} title="Gerenciar Grades / Variações"><Grid size={14} /></button>
-                          <button className="crud-row-btn history" onClick={() => handleOpenHistoryModal(item)} title="Histórico de Movimentações (HIS_PRO)"><History size={14} /></button>
+                          <button className="crud-row-btn history" onClick={() => handleOpenHistoryModal(item)} title="Histórico de Movimentações"><History size={14} /></button>
                           <button className="crud-row-btn edit" onClick={() => handleOpenEdit(item)} title="Editar Produto"><Edit size={14} /></button>
                           <button className="crud-row-btn delete" onClick={() => handleDelete(item.codigo)} title="Excluir Produto"><Trash2 size={14} /></button>
                         </td>

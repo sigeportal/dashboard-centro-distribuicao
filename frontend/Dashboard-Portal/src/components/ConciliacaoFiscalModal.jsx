@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   FileCheck2, Search, Link2, Unlink, Printer, X, ChevronDown, ChevronRight, 
   AlertTriangle, CheckCircle, Package, ArrowRight, RefreshCw, Layers
@@ -138,7 +139,7 @@ export default function ConciliacaoFiscalModal({ onClose }) {
     return true;
   });
 
-  return (
+  return createPortal(
     <div className="conciliacao-overlay" onClick={(e) => { if (e.target === e.currentTarget && onClose) onClose(); }}>
       <div className="conciliacao-container glass conciliacao-print-area">
         
@@ -468,6 +469,7 @@ export default function ConciliacaoFiscalModal({ onClose }) {
         </div>
       )}
 
-    </div>
+    </div>,
+    document.body
   );
 }

@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useOutletContext, useSearchParams, useNavigate } from 'react-router-dom';
 import useDashboardData from '../hooks/useDashboardData';
 import OverviewTab from '../components/tabs/OverviewTab';
@@ -10,7 +11,6 @@ import ReceivablesTab from '../components/tabs/ReceivablesTab';
 import SalesTab from '../components/tabs/SalesTab';
 import ServiceOrdersTab from '../components/tabs/ServiceOrdersTab';
 import TransferTab from '../components/tabs/TransferTab';
-import CadastrosTab from '../components/tabs/CadastrosTab';
 import PurchasesTab from '../components/tabs/PurchasesTab';
 import PurchaseOrdersTab from '../components/tabs/PurchaseOrdersTab';
 import NfeTab from '../components/tabs/NfeTab';
@@ -23,6 +23,12 @@ export default function Dashboard() {
   const activeTab = searchParams.get('tab') || 'geral';
   const { userRole } = useAuth();
   const isFinancialAllowed = userRole === 'admin' || userRole === 'gerente';
+
+  useEffect(() => {
+    if (activeTab === 'cadastros') {
+      navigate('/dashboard?tab=produtos', { replace: true });
+    }
+  }, [activeTab, navigate]);
 
   const {
     data, pages, chartData, chartLoading, loading, error,
@@ -149,7 +155,6 @@ export default function Dashboard() {
       {activeTab === 'transferencias' && <TransferTab />}
       {activeTab === 'nfe' && <NfeTab />}
       {activeTab === 'conciliacao' && <ConciliacaoFiscalModal onClose={() => navigate('/dashboard?tab=produtos')} />}
-      {activeTab === 'cadastros' && <CadastrosTab />}
     </div>
   );
 }
