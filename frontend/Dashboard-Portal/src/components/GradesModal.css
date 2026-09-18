@@ -316,9 +316,9 @@
 
 .grades-size-badge {
   display: inline-block;
-  background: rgba(37, 99, 235, 0.08);
-  color: #2563eb;
-  border: 1px solid rgba(37, 99, 235, 0.18);
+  background: rgba(249, 115, 22, 0.08);
+  color: #ea580c;
+  border: 1px solid rgba(249, 115, 22, 0.22);
   font-weight: 800;
   padding: 2px 8px;
   border-radius: 6px;
@@ -470,15 +470,22 @@
   line-height: 1.2;
 }
 
+.grades-shortcut-required {
+  color: #ea580c;
+  font-size: 0.76rem;
+  font-weight: 600;
+  margin-left: 0.5rem;
+}
+
 .grades-btn-batch-barcode {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
   padding: 0.55rem 0.9rem;
   border-radius: 0.5rem;
-  background: rgba(37, 99, 235, 0.08);
-  color: #2563eb;
-  border: 1px solid rgba(37, 99, 235, 0.2);
+  background: rgba(249, 115, 22, 0.08);
+  color: #ea580c;
+  border: 1px solid rgba(249, 115, 22, 0.25);
   font-size: 0.82rem;
   font-weight: 700;
   cursor: pointer;
@@ -486,8 +493,10 @@
 }
 
 .grades-btn-batch-barcode:hover:not(:disabled) {
-  background: #2563eb;
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
   color: #ffffff;
+  border-color: #ea580c;
+  box-shadow: 0 2px 8px rgba(234, 88, 12, 0.25);
 }
 
 .grades-btn-batch-barcode:disabled {

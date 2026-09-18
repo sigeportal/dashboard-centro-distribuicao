@@ -27,6 +27,37 @@ function geraCodBarraGrade(gradeCodigo) {
   return '189600' + codPadded + dv;
 }
 
+// Extrai rótulo legível e seguro do tamanho evitando erro de renderizar objeto no React
+function getTamLabel(g, tList) {
+  if (!g) return '-';
+  if (typeof g.tam_nome === 'string' && g.tam_nome.trim()) return g.tam_nome;
+  if (typeof g.sigla === 'string' && g.sigla.trim()) return g.sigla;
+  if (typeof g.tamanho_str === 'string' && g.tamanho_str.trim()) return g.tamanho_str;
+  
+  if (g.tamanho && typeof g.tamanho === 'object') {
+    if (typeof g.tamanho.sigla === 'string' && g.tamanho.sigla.trim()) return g.tamanho.sigla;
+    if (typeof g.tamanho.tamanho === 'string' && g.tamanho.tamanho.trim()) return g.tamanho.tamanho;
+    if (g.tamanho.codigo) return `Tam #${g.tamanho.codigo}`;
+  } else if (typeof g.tamanho === 'string' && g.tamanho.trim()) {
+    return g.tamanho;
+  }
+
+  const tamCod = Number(typeof g.tam === 'object' && g.tam !== null ? g.tam.codigo : g.tam);
+  if (tList && tList.length > 0 && !isNaN(tamCod)) {
+    const found = tList.find(t => Number(t.codigo) === tamCod);
+    if (found) {
+      if (typeof found.sigla === 'string' && found.sigla.trim()) return found.sigla;
+      if (typeof found.tamanho === 'string' && found.tamanho.trim()) return found.tamanho;
+    }
+  }
+
+  if (g.tam !== null && g.tam !== undefined && typeof g.tam !== 'object') {
+    return String(g.tam);
+  }
+
+  return '-';
+}
+
 export default function GradesModal({ isOpen, onClose, product, onGradesUpdated }) {
   if (!isOpen) return null;
 
@@ -120,16 +151,29 @@ export default function GradesModal({ isOpen, onClose, product, onGradesUpdated 
 
   const handleSelectGrade = (g) => {
     setSelectedGrade(g);
+    let tamVal = 'M';
+    if (g.tam && typeof g.tam === 'object') {
+      tamVal = String(g.tam.codigo || '');
+    } else if (g.tamanho && typeof g.tamanho === 'object') {
+      tamVal = String(g.tamanho.codigo || '');
+    } else if (g.tam !== null && g.tam !== undefined) {
+      tamVal = String(g.tam);
+    } else if (typeof g.tamanho === 'string' || typeof g.tamanho === 'number') {
+      tamVal = String(g.tamanho);
+    } else if (tamanhosList.length > 0) {
+      tamVal = String(tamanhosList[0].codigo);
+    }
+
     setForm({
       codigo: g.codigo || g.id,
-      pro: g.pro || product.codigo,
-      tam: g.tam || g.tamanho || (tamanhosList[0]?.codigo || 'M'),
-      cor: g.cor || 'PADRAO',
+      pro: g.pro || product?.codigo || product?.id,
+      tam: tamVal,
+      cor: typeof g.cor === 'string' ? g.cor : 'PADRAO',
       quantidade: String(g.quantidade || 0),
       valor_dinheiro: String(g.valor_dinheiro ?? g.valorDinheiro ?? g.valordinheiro ?? g.valor ?? 0),
       valor: String(g.valor || 0),
       valor_prazo: String(g.valor_prazo ?? g.valorPrazo ?? g.valorprazo ?? g.valor ?? 0),
-      codbarra: g.codbarra || ''
+      codbarra: typeof g.codbarra === 'string' ? g.codbarra : ''
     });
     setMode('browse');
   };
@@ -316,7 +360,7 @@ export default function GradesModal({ isOpen, onClose, product, onGradesUpdated 
               </div>
 
               <div className="grades-input-field">
-                <label>*Tamanho</label>
+                <label>Tamanho *</label>
                 <select 
                   value={form.tam} 
                   onChange={(e) => setForm({ ...form, tam: e.target.value })}
@@ -325,11 +369,16 @@ export default function GradesModal({ isOpen, onClose, product, onGradesUpdated 
                   required
                 >
                   {tamanhosList.length > 0 ? (
-                    tamanhosList.map(t => (
-                      <option key={t.codigo} value={t.codigo}>
-                        {t.sigla ? `${t.sigla} - ${t.tamanho || ''}` : t.tamanho}
-                      </option>
-                    ))
+                    tamanhosList.map(t => {
+                      const siglaStr = typeof t.sigla === 'string' ? t.sigla : '';
+                      const tamStr = typeof t.tamanho === 'string' ? t.tamanho : '';
+                      const label = siglaStr ? `${siglaStr}${tamStr ? ` - ${tamStr}` : ''}` : (tamStr || `Tam #${t.codigo}`);
+                      return (
+                        <option key={t.codigo} value={t.codigo}>
+                          {label}
+                        </option>
+                      );
+                    })
                   ) : (
                     tamanhosDisponiveis.map(t => <option key={t} value={t}>{t}</option>)
                   )}
@@ -442,8 +491,7 @@ export default function GradesModal({ isOpen, onClose, product, onGradesUpdated 
                     const vDin = Number(g.valor_dinheiro ?? g.valorDinheiro ?? g.valordinheiro ?? g.valor ?? 0);
                     const vVis = Number(g.valor || 0);
                     const vPrz = Number(g.valor_prazo ?? g.valorPrazo ?? g.valorprazo ?? g.valor ?? 0);
-                    const tamObj = tamanhosList.find(t => Number(t.codigo) === Number(g.tam));
-                    const tamLabel = tamObj ? (tamObj.sigla || tamObj.tamanho) : (g.tamanho || g.tam || '-');
+                    const tamLabel = getTamLabel(g, tamanhosList);
 
                     return (
                       <tr 
@@ -457,17 +505,17 @@ export default function GradesModal({ isOpen, onClose, product, onGradesUpdated 
                         <td>
                           <span className="grades-size-badge">{tamLabel}</span>
                         </td>
-                        <td style={{ textAlign: 'right', fontWeight: 600 }}>R$ {vDin.toFixed(2)}</td>
-                        <td style={{ textAlign: 'right', fontWeight: 600 }}>R$ {vVis.toFixed(2)}</td>
-                        <td style={{ textAlign: 'right', fontWeight: 600 }}>R$ {vPrz.toFixed(2)}</td>
+                        <td style={{ textAlign: 'right', fontWeight: 600 }}>R$ {(isNaN(vDin) ? 0 : vDin).toFixed(2)}</td>
+                        <td style={{ textAlign: 'right', fontWeight: 600 }}>R$ {(isNaN(vVis) ? 0 : vVis).toFixed(2)}</td>
+                        <td style={{ textAlign: 'right', fontWeight: 600 }}>R$ {(isNaN(vPrz) ? 0 : vPrz).toFixed(2)}</td>
                         <td style={{ textAlign: 'center' }}>
                           <span className="grades-qty-badge">{g.quantidade || 0}</span>
                         </td>
                         <td>
-                          <span className="grades-ean-cell">{g.codbarra || '-'}</span>
+                          <span className="grades-ean-cell">{typeof g.codbarra === 'string' ? g.codbarra : (g.codbarra || '-')}</span>
                         </td>
                         <td style={{ color: '#64748b', fontSize: '0.82rem', fontWeight: 500 }}>
-                          {g.cor || 'PADRAO'}
+                          {typeof g.cor === 'string' ? g.cor : 'PADRAO'}
                         </td>
                       </tr>
                     );
@@ -536,6 +584,7 @@ export default function GradesModal({ isOpen, onClose, product, onGradesUpdated 
             <span className="grades-shortcut-item"><kbd>F2</kbd> Inserir</span>
             <span className="grades-shortcut-item"><kbd>F10</kbd> Gerar Cód. Barras</span>
             <span className="grades-shortcut-item"><kbd>Ctrl+S</kbd> Gravar</span>
+            <span className="grades-shortcut-required">* Campos obrigatórios</span>
           </div>
 
           <div style={{ display: 'flex', gap: '0.6rem' }}>
